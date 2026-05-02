@@ -4,4 +4,5 @@ compatibility_date = "2026-04-01"
 
 [vars]
 GITHUB_CLIENT_ID = "Ov23li6iYF3wfpn2cdgM"
+GITHUB_CLIENT_ID_DEV = "Ov23liXTsm3BlRW2gJVv"
 ALLOWED_ORIGINS = "https://wgsl-play.dev,http://localhost:9111"
