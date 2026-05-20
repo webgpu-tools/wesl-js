@@ -1,4 +1,4 @@
-import { takeStoredState } from "./Authorize.ts";
+import { takeStoredCsrf } from "./Authorize.ts";
 import { type AuthToken, writeToken } from "./Token.ts";
 
 export const workerUrl = "https://play-auth.mighdoll.workers.dev";
@@ -8,21 +8,21 @@ export type CallbackResult =
   | { ok: false; error: string };
 
 /**
- * Post-redirect handler for `/auth/callback`. Verifies state, swaps the
- * `code` for a token via the Cloudflare Worker, fetches the GitHub profile
- * for avatar/login caching, and persists the result.
+ * Post-redirect handler for `/auth/callback`. Verifies the CSRF token,
+ * swaps the `code` for a token via the Cloudflare Worker, fetches the GitHub
+ * profile for avatar/login caching, and persists the result.
  */
 export async function completeSignIn(): Promise<CallbackResult> {
   const params = new URLSearchParams(location.search);
   const code = params.get("code");
-  const returnedState = params.get("state");
+  const returnedCsrf = params.get("state");
   const githubError = params.get("error");
   if (githubError) return { ok: false, error: `GitHub: ${githubError}` };
-  if (!code || !returnedState) {
+  if (!code || !returnedCsrf) {
     return { ok: false, error: "Missing code or state in callback URL." };
   }
-  const expected = takeStoredState();
-  if (!expected || expected !== returnedState) {
+  const expectedCsrf = takeStoredCsrf();
+  if (!expectedCsrf || expectedCsrf !== returnedCsrf) {
     return { ok: false, error: "State mismatch. Please try signing in again." };
   }
 

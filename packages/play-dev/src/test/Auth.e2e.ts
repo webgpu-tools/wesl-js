@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { stateKey } from "../auth/Authorize.ts";
+import { csrfKey } from "../auth/Authorize.ts";
 import { workerUrl } from "../auth/Callback.ts";
 import { tokenKey } from "../auth/Token.ts";
 
@@ -76,7 +76,7 @@ test("signed-in shows avatar and dropdown with Sign out", async ({ page }) => {
 });
 
 test("Sign in button starts OAuth redirect", async ({ page }) => {
-  // Capture the state value via console at the moment it's written, since
+  // Capture the CSRF value via console at the moment it's written, since
   // the navigation to github.com would otherwise race the read.
   const sessionWrites: Record<string, string> = {};
   page.on("console", msg => {
@@ -105,7 +105,7 @@ test("Sign in button starts OAuth redirect", async ({ page }) => {
   expect(url.searchParams.get("client_id")).toBe("Ov23li6iYF3wfpn2cdgM");
   expect(url.searchParams.get("scope")).toBe("gist");
   expect(url.searchParams.get("state")).toBeTruthy();
-  expect(sessionWrites[stateKey]).toBe(url.searchParams.get("state"));
+  expect(sessionWrites[csrfKey]).toBe(url.searchParams.get("state"));
 });
 
 test("callback exchange persists token and reloads to editor", async ({
@@ -113,8 +113,8 @@ test("callback exchange persists token and reloads to editor", async ({
 }) => {
   await stubWorkerAndProfile(page);
   await page.addInitScript(
-    ({ key, state }) => sessionStorage.setItem(key, state),
-    { key: stateKey, state: "the-state" },
+    ({ key, csrf }) => sessionStorage.setItem(key, csrf),
+    { key: csrfKey, csrf: "the-state" },
   );
 
   await page.goto("/auth/callback?code=the-code&state=the-state");
@@ -132,8 +132,8 @@ test("callback exchange persists token and reloads to editor", async ({
 
 test("callback rejects mismatched state", async ({ page }) => {
   await page.addInitScript(
-    ({ key, state }) => sessionStorage.setItem(key, state),
-    { key: stateKey, state: "expected" },
+    ({ key, csrf }) => sessionStorage.setItem(key, csrf),
+    { key: csrfKey, csrf: "expected" },
   );
   await page.goto("/auth/callback?code=x&state=different");
   await expect(page.locator(".callback-error")).toContainText("State mismatch");
@@ -155,7 +155,7 @@ test("editor buffer survives sign-in redirect simulation", async ({ page }) => {
     });
   });
 
-  await page.evaluate(k => sessionStorage.setItem(k, "s"), stateKey);
+  await page.evaluate(k => sessionStorage.setItem(k, "s"), csrfKey);
   await page.goto("/auth/callback?code=c&state=s");
   await page.waitForURL("**/");
   await waitForCompileSuccess(page, "#player");
