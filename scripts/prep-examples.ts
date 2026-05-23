@@ -34,8 +34,7 @@ async function main() {
   const opts = args();
   const versions = await weslVersion();
 
-  const targetDir =
-    opts.targetDir || path.join(toolsPath, "../../wesl-examples");
+  const targetDir = opts.targetDir || path.join(toolsPath, "../wesl-examples");
 
   const examplesSrc = path.join(toolsPath, "examples");
   await cleanDirectory(targetDir);
