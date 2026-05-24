@@ -38,6 +38,7 @@ export const locSection: ReportSection = {
       statKind: "min",
       toDisplay: msToLocSec,
       formatter: integer,
+      comparable: true,
       higherIsBetter: true,
     },
     {
