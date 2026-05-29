@@ -13,6 +13,7 @@ import { baselineDir, hasBaselineModule } from "../src/BaselineVariations.ts";
 import type { WeslSource } from "../src/LoadExamples.ts";
 import { ensureBevyFixture } from "../src/LoadExamples.ts";
 import { locSection } from "../src/LocSection.ts";
+import { meanTimeSection } from "../src/MeanTimeSection.ts";
 
 const fixturesDir = join(
   fileURLToPath(new URL(".", import.meta.url)),
@@ -43,7 +44,12 @@ await runBenchCli({
         ? new URL("../src/baseline/", import.meta.url).href
         : undefined,
     };
-    const sections = [locSection, ...gcSections(args), runsSection];
+    const sections = [
+      locSection,
+      ...gcSections(args),
+      meanTimeSection,
+      runsSection,
+    ];
     return {
       suite: { name: "WESL Benchmarks", matrices: [matrix] },
       sections,

@@ -1,9 +1,4 @@
-import {
-  integer,
-  type MeasuredResults,
-  type ReportSection,
-  timeMs,
-} from "benchforge";
+import { integer, type MeasuredResults, type ReportSection } from "benchforge";
 
 /** @return toDisplay fn that converts timing ms to lines/sec using metadata */
 function msToLocSec(ms: number, metadata?: Record<string, unknown>): number {
@@ -33,20 +28,15 @@ export const locSection: ReportSection = {
       higherIsBetter: true,
     },
     {
-      key: "locSecMax",
-      title: "max",
-      statKind: "min",
+      key: "locSecP95",
+      title: "p95",
+      // 5th percentile of time = 95th percentile of throughput: a clean (fast)
+      // run, more robust to noise than the single fastest sample (former max).
+      statKind: { percentile: 0.05 },
       toDisplay: msToLocSec,
       formatter: integer,
       comparable: true,
       higherIsBetter: true,
-    },
-    {
-      key: "meanTime",
-      title: "mean time",
-      statKind: "mean",
-      formatter: timeMs,
-      comparable: true,
     },
     {
       key: "lines",

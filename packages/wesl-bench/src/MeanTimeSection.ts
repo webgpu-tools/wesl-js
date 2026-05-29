@@ -1,15 +1,16 @@
-import { type ReportSection, timeMs } from "benchforge";
+import { average, type MeasuredResults, type ReportSection, timeMs } from "benchforge";
 
-/** Mean time section */
+/** Mean iteration time, shown as a single number per run (no CI chart),
+ *  grouped with run-count rather than the lines/sec throughput section. */
 export const meanTimeSection: ReportSection = {
   title: "time",
   columns: [
     {
-      key: "mean",
+      key: "meanTime",
       title: "mean",
       formatter: timeMs,
       comparable: true,
-      statKind: "mean",
+      value: (r: MeasuredResults) => (r.samples.length ? average(r.samples) : undefined),
     },
   ],
 };
