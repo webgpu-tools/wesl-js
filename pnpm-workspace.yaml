@@ -1,19 +1,26 @@
 packages:
-- 'packages/*'
-- 'packages/test_pkg/*'
-- 'packages/wesl-packager/src/test/multi_package'
-- 'packages/wesl-plugin/test/*'
-- 'examples/*'
+  - 'packages/*'
+  - 'packages/test_pkg/*'
+  - 'packages/wesl-packager/src/test/multi_package'
+  - 'packages/wesl-plugin/test/*'
+  - 'examples/*'
+
+allowBuilds:
+  esbuild: true
+  es5-ext: false
+  webgpu: true
+  sharp: false
+  workerd: false
 
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
-- 'wesl'
-- 'wesl-*'
-- 'lygia'
-- 'thimbleberry'
-- 'berry-pretty'
-- '@typescript/*'
-- 'webgpu'
-- '@webgpu/*'
-- 'monobump'
-- 'benchforge'
+  - 'wesl'
+  - 'wesl-*'
+  - 'lygia'
+  - 'thimbleberry'
+  - 'berry-pretty'
+  - '@typescript/*'
+  - 'webgpu'
+  - '@webgpu/*'
+  - 'monobump'
+  - 'benchforge'

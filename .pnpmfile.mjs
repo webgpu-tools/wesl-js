@@ -1,11 +1,11 @@
-const path = require("path");
-const { execSync } = require("child_process");
+import path from "node:path";
+import { execSync } from "node:child_process";
 
 /** Get the main repo root (not the worktree root). */
 function repoRoot() {
   const gitCommonDir = execSync("git rev-parse --path-format=absolute --git-common-dir", {
     encoding: "utf-8",
-    cwd: __dirname,
+    cwd: import.meta.dirname,
   }).trim();
   return path.dirname(gitCommonDir);
 }
@@ -24,4 +24,4 @@ function readPackage(pkg) {
   return pkg;
 }
 
-module.exports = { hooks: { readPackage } };
+export const hooks = { readPackage };
