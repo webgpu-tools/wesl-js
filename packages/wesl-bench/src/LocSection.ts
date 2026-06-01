@@ -1,4 +1,4 @@
-import { integer, type MeasuredResults, type ReportSection } from "benchforge";
+import { integer, type MetricSection, metricSection } from "benchforge";
 
 /** @return toDisplay fn that converts timing ms to lines/sec using metadata */
 function msToLocSec(ms: number, metadata?: Record<string, unknown>): number {
@@ -6,44 +6,20 @@ function msToLocSec(ms: number, metadata?: Record<string, unknown>): number {
   return lines / (ms / 1000);
 }
 
-export const locSection: ReportSection = {
+/** Lines/sec throughput: the primary verdict metric (higher is better). The
+ *  mean drives the console headline + Δ% and the HTML shift-function fan; the
+ *  line count rides along as an extra scalar cell. */
+export const locSection: MetricSection = metricSection({
   title: "lines / sec",
-  columns: [
-    {
-      key: "locSecMean",
-      title: "mean",
-      statKind: "mean",
-      toDisplay: msToLocSec,
-      formatter: integer,
-      comparable: true,
-      higherIsBetter: true,
-    },
-    {
-      key: "locSecP50",
-      title: "p50",
-      statKind: { percentile: 0.5 },
-      toDisplay: msToLocSec,
-      formatter: integer,
-      comparable: true,
-      higherIsBetter: true,
-    },
-    {
-      key: "locSecP95",
-      title: "p95",
-      // 5th percentile of time = 95th percentile of throughput: a clean (fast)
-      // run, more robust to noise than the single fastest sample (former max).
-      statKind: { percentile: 0.05 },
-      toDisplay: msToLocSec,
-      formatter: integer,
-      comparable: true,
-      higherIsBetter: true,
-    },
+  higherIsBetter: true,
+  toDisplay: msToLocSec,
+  formatter: integer,
+  extras: [
     {
       key: "lines",
       title: "lines",
       formatter: integer,
-      value: (_r: MeasuredResults, meta?: Record<string, unknown>) =>
-        meta?.linesOfCode ?? meta?.loc,
+      value: (_r, meta) => meta?.linesOfCode ?? meta?.loc,
     },
   ],
-};
+});

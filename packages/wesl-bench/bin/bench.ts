@@ -53,7 +53,6 @@ await runBenchCli({
     return {
       suite: { name: "WESL Benchmarks", matrices: [matrix] },
       sections,
-      reportOptions: { variantTitle: "name" },
       currentVersion: getCurrentGitVersion(),
       baselineVersion: args.baseline
         ? (getBaselineVersion(baselineDir) ?? { hash: "unknown", date: "" })

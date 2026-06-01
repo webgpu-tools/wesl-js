@@ -14,7 +14,6 @@ test("runs without errors", () => {
     { encoding: "utf8" },
   );
 
-  if (!result.includes("time")) throw new Error("Missing table header");
   if (!result.includes("bevy_env_map"))
     throw new Error("Missing benchmark name");
   if (!result.includes("link")) throw new Error("Missing link variant");
