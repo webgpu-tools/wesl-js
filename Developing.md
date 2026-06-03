@@ -43,10 +43,17 @@ WESL npm packages.
 Supporting sources for tests are available as subprojects in the
 `/wesl-testsuite` directory.
 
-## bb script
-the script `bin/bb` is convenient way to run package
-scripts from any directory within the project.
-- soft link bb to your `PATH`, e.g. as `~/bin/bb` (if `~/bin` is in your PATH).
-- Then you can run bb instead of any pnpm script.
-And you can run package.json scripts from any directory.
-- `bb fix:all` (instead of `cd ../..; pnpm fix:all`)
+## rpr script
+
+`rpr` is a convenient way to run package scripts from any directory within the
+project. It's a standalone tool (the [repo-runner](https://github.com/mighdoll/repo-runner) package),
+not part of this repo.
+
+- Install it globally: `pnpm add -g repo-runner` (or `npm i -g repo-runner`).
+- Then run `rpr` instead of any pnpm script, from any directory:
+  - `rpr fix:all` (instead of `cd ../..; pnpm fix:all`)
+  - `rpr test`, `rpr typecheck`, etc.
+
+`rpr` finds the repo root, runs root-level scripts from the root and
+current-package scripts from the current directory, and detects pnpm
+automatically. Unknown commands pass through to pnpm.

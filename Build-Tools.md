@@ -6,9 +6,9 @@
   Best to put interim commits on a branch that's merged to main.
 
 ### prepush script
-- `bb prepush` verifies tests, linting, formatting before pushing
+- `rpr prepush` verifies tests, linting, formatting before pushing
 - uses Turborepo for parallel task execution with quiet output (errors only)
-- `bb prepush:sequential` runs tasks one at a time (useful for debugging)
+- `rpr prepush:sequential` runs tasks one at a time (useful for debugging)
 
 ### turbo
 - Turborepo orchestrates builds, typechecks, tests across packages
@@ -17,10 +17,10 @@
 - Logs written to `.turbo/` directories for debugging
 
 ```bash
-bb turbo:validate              # quiet mode (default)
-bb turbo:validate:verbose      # full output
-bb turbo:validate --force      # bypass cache, re-run everything
-bb turbo:validate --dry-run    # show what would run
+rpr turbo:validate              # quiet mode (default)
+rpr turbo:validate:verbose      # full output
+rpr turbo:validate --force      # bypass cache, re-run everything
+rpr turbo:validate --dry-run    # show what would run
 ```
 
 - Only tasks run via `turbo run <task>` need turbo.json entries
@@ -30,7 +30,7 @@ bb turbo:validate --dry-run    # show what would run
 - version bumps should be done on the `tomain` branch
 - after bumping, push with tags: `git push && git push --tags`
 - the auto-merge workflow will promote `tomain` to `main` after CI passes
-- then run `bb publish:all` and `bb prep:examples` to complete the release
+- then run `rpr publish:all` and `rpr prep:examples` to complete the release
 
 ### continuous integration
 - we run CI on macos and windows.
