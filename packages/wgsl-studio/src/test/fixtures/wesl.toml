@@ -1,2 +1,2 @@
 include = ["*.wesl"]
-dependencies = ["wgsl_test"]
+dependencies = "auto"

@@ -1,2 +1,2 @@
 edition = "unstable_2025"
-dependencies = ["random_wgsl"]
+dependencies = "auto"

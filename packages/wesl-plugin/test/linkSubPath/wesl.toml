@@ -1,2 +1,2 @@
 edition = "unstable_2025"
-dependencies = ["multi_pkg/second"]
+dependencies = "auto"

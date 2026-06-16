@@ -18,9 +18,6 @@ export interface WeslToml {
 
   /** package manager ("npm" or "cargo") */
   "package-manager"?: string;
-
-  /** names of directly referenced wesl shader packages (e.g. npm package names), or "auto" for auto-detection */
-  dependencies?: string[] | string;
 }
 
 /** Information about the loaded wesl.toml file and its location */
@@ -45,7 +42,6 @@ export const defaultWeslToml: WeslToml = {
   edition: "unstable_2025",
   include: ["shaders/**/*.w[eg]sl"],
   root: "shaders",
-  dependencies: "auto",
 };
 
 /**

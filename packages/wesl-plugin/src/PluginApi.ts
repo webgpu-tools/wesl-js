@@ -44,29 +44,14 @@ async function getScopedProject(
   unpluginCtx: UnpluginBuildContext & UnpluginContext,
 ): Promise<ProjectSources> {
   const fullSrc = await loadWesl(context, unpluginCtx);
-  const { toml, tomlDir: projectDir } = await getWeslToml(context, unpluginCtx);
+  const { tomlDir: projectDir } = await getWeslToml(context, unpluginCtx);
 
   const registry = await getRegistry(context, unpluginCtx);
   const resolver = freshResolver(registry);
   const modulePath = fileToModulePath(rootModuleName, "package", false);
   const { weslSrc, unbound } = discoverModules(fullSrc, resolver, modulePath);
-  const dependencies = resolveDepsFromUnbound(
-    toml.dependencies,
-    unbound,
-    projectDir,
-  );
+  const dependencies = resolvePkgDeps(unbound, projectDir);
   return { weslSrc, dependencies };
-}
-
-/** Resolve dependencies using pre-computed unbound refs (avoids re-parsing). */
-function resolveDepsFromUnbound(
-  dependencies: string | string[] | undefined,
-  unbound: string[][],
-  projectDir: string,
-): string[] {
-  return resolveDepsWithDiscovery(dependencies, () =>
-    resolvePkgDeps(unbound, projectDir),
-  );
 }
 
 /** Load and cache the wesl.toml configuration. */
@@ -136,39 +121,14 @@ async function fetchProject(
   return api.scopedProject(rootModuleName);
 }
 
-/** Find dependencies, resolving "auto" entries by parsing source files. */
+/** Find dependencies by auto-detecting them from the source files. */
 async function findDependencies(
   context: PluginContext,
   unpluginCtx: UnpluginBuildContext & UnpluginContext,
 ): Promise<string[]> {
-  const { toml, tomlDir: projectDir } = await getWeslToml(context, unpluginCtx);
+  const { tomlDir: projectDir } = await getWeslToml(context, unpluginCtx);
   const weslSrc = await loadWesl(context, unpluginCtx);
-  return resolveDeps(toml.dependencies, weslSrc, projectDir);
-}
-
-/** Resolve the dependency list, replacing "auto" entries with discovered deps. */
-function resolveDeps(
-  dependencies: string | string[] | undefined,
-  weslSrc: Record<string, string>,
-  projectDir: string,
-): string[] {
-  return resolveDepsWithDiscovery(dependencies, () =>
-    parseDependencies(weslSrc, projectDir),
-  );
-}
-
-/** Normalize deps array, replace "auto" with discovered deps, deduplicate. */
-function resolveDepsWithDiscovery(
-  dependencies: string | string[] | undefined,
-  discover: () => string[],
-): string[] {
-  const depsArray = Array.isArray(dependencies)
-    ? dependencies
-    : [dependencies ?? "auto"];
-  if (!depsArray.includes("auto")) return depsArray;
-
-  const base = depsArray.filter(dep => dep !== "auto");
-  return [...new Set([...base, ...discover()])];
+  return parseDependencies(weslSrc, projectDir);
 }
 
 /** @return a function that resolves a shader path to a weslRoot-relative module path. */
