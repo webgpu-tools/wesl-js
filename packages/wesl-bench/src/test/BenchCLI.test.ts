@@ -34,11 +34,16 @@ test.skip("supports --baseline flag", { timeout: 30000 }, () => {
   if (!result.includes("[")) throw new Error("Missing baseline CI intervals");
 });
 
-test("supports variant filter", { timeout: 30000 }, () => {
+// --list resolves the matrix cases/variants without running any benchmark,
+// so it's a fast check that wesl-bench is wired into benchforge correctly.
+test("--list shows matrix cases and variants", () => {
   const result = execSync(
-    `node --expose-gc --experimental-strip-types ${benchPath} --profile --filter "/link"`,
+    `node --expose-gc --experimental-strip-types ${benchPath} --list`,
     { encoding: "utf8" },
   );
 
-  if (!result.includes("link")) throw new Error("Missing link variant");
+  if (!result.includes("WESL")) throw new Error("Missing matrix name");
+  for (const variant of ["link", "parse", "tokenize", "wgsl-reflect"]) {
+    if (!result.includes(variant)) throw new Error(`Missing variant: ${variant}`);
+  }
 });
