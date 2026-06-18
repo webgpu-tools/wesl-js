@@ -44,10 +44,10 @@ interface Local {
   mutable: boolean;
 }
 
-/** A scope maps names to `Local` objects. A child scope is `new Map(parent)`,
- *  which copies the entries but shares the `Local` objects by reference: so a
- *  `var` mutated in a nested block updates the outer binding, while a new
- *  declaration of the same name only rebinds the child's entry (shadowing). */
+/** A child scope is `new Map(parent)`: it copies the entries but shares the
+ *  `Local` objects by reference, so a `var` mutated in a nested block updates
+ *  the outer binding, while re-declaring a name only rebinds the child's own
+ *  entry (shadowing). */
 type Scope = Map<string, Local>;
 
 interface Env {
@@ -593,11 +593,11 @@ function applyBinary(op: string, l: number, r: number): number {
 }
 
 /**
- * Wrap an integer arithmetic result at the 32-bit boundary. Pragmatic Tier 1
- * discipline (not a full tagged-scalar type system, which is Tier 3): do-block
- * counters are u32 (`var i = 0u`), so wrap to u32 via `>>> 0`. If any operand is
- * negative we wrap as i32 via `| 0` instead, keeping `i - 1` style math sane.
- * Non-integer results pass through unwrapped so a stray float surfaces as-is.
+ * Wrap an integer arithmetic result at the 32-bit boundary. Do-block counters
+ * are u32 (`var i = 0u`), so wrap to u32 via `>>> 0`. If any operand or the
+ * result is negative we wrap as i32 via `| 0` instead, keeping `i - 1` style
+ * math sane. Non-integer results pass through unwrapped so a stray float
+ * surfaces as-is.
  */
 function wrapInt(result: number, ...operands: number[]): number {
   if (!Number.isInteger(result)) return result;
@@ -605,7 +605,7 @@ function wrapInt(result: number, ...operands: number[]): number {
   return result >>> 0;
 }
 
-/** Comparisons and logical ops yield 1/0 (no bool type yet; that's Tier 3). */
+/** Comparisons and logical ops yield 1/0; there is no distinct bool type yet. */
 function boolBit(b: boolean): number {
   return b ? 1 : 0;
 }
