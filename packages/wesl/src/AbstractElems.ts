@@ -594,10 +594,12 @@ export interface BreakElem extends ElemWithContentsBase, HasAttributes {
   condition?: ExpressionElem;
 }
 
+/** A continue statement. */
 export interface ContinueElem extends ElemWithContentsBase, HasAttributes {
   kind: "continue";
 }
 
+/** A discard statement. */
 export interface DiscardElem extends ElemWithContentsBase, HasAttributes {
   kind: "discard";
 }

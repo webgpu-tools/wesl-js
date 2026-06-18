@@ -114,6 +114,7 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
   } else if (kind === "directive") {
     addDirective(elem, str);
   } else if (
+    // statement kinds: the debug printer shows only their attributes
     kind === "block" ||
     kind === "if" ||
     kind === "for" ||
