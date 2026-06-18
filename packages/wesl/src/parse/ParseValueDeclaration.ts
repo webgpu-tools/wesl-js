@@ -2,6 +2,7 @@ import type {
   AttributeElem,
   ConstElem,
   ElemKindMap,
+  ExpressionElem,
   OverrideElem,
   TypedDeclElem,
   TypeRefElem,
@@ -80,11 +81,12 @@ function parseValueDecl<K extends ValueDeclKind>(
     throwParseError(stream, `Expected identifier after '${keyword}'`);
   ctx.addElem(typedDecl);
 
+  let init: ExpressionElem | undefined;
   if (requiresInit) {
     expect(stream, "=", `${keyword} identifier`);
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   } else if (stream.matchText("=")) {
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   }
 
   expect(stream, ";", `${keyword} declaration`);
@@ -97,6 +99,7 @@ function parseValueDecl<K extends ValueDeclKind>(
   const elem: ConstElem | OverrideElem = {
     kind: keyword,
     name: typedDecl,
+    ...(keyword === "const" ? { init } : {}),
     start: startPos,
     end: endPos,
     contents,

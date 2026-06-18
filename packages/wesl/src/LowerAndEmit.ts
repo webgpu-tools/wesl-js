@@ -166,8 +166,22 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
 
     case "var":
     case "let":
-    case "statement":
+    case "block":
+    case "if":
+    case "for":
+    case "while":
+    case "loop":
     case "continuing":
+    case "switch":
+    case "return":
+    case "break":
+    case "continue":
+    case "discard":
+    case "assign":
+    case "increment":
+    case "decrement":
+    case "call":
+    case "empty":
       emitStatement(e, ctx);
       return;
 
@@ -330,7 +344,27 @@ function emitModule(e: ContainerElem, ctx: EmitContext): void {
 function emitStatement(
   e: Extract<
     ContainerElem,
-    { kind: "var" | "let" | "statement" | "continuing" }
+    {
+      kind:
+        | "var"
+        | "let"
+        | "block"
+        | "if"
+        | "for"
+        | "while"
+        | "loop"
+        | "continuing"
+        | "switch"
+        | "return"
+        | "break"
+        | "continue"
+        | "discard"
+        | "assign"
+        | "increment"
+        | "decrement"
+        | "call"
+        | "empty";
+    }
   >,
   ctx: EmitContext,
 ): void {

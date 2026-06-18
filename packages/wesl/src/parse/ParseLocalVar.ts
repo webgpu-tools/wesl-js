@@ -1,4 +1,9 @@
-import type { AttributeElem, LetElem, VarElem } from "../AbstractElems.ts";
+import type {
+  AttributeElem,
+  ExpressionElem,
+  LetElem,
+  VarElem,
+} from "../AbstractElems.ts";
 import { beginElem, finishElem } from "./ContentsHelpers.ts";
 import { skipTemplateList } from "./ParseGlobalVar.ts";
 import { getStartWithAttributes } from "./ParseStatement.ts";
@@ -52,17 +57,18 @@ function parseVarOrLet(
     throwParseError(stream, `Expected identifier after '${keyword}'`);
   ctx.addElem(typedDecl);
 
+  let init: ExpressionElem | undefined;
   if (requiresInit) {
     const msg = `${keyword} identifier (${keyword} requires initialization)`;
     expect(stream, "=", msg);
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   } else if (stream.matchText("=")) {
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   }
 
   expect(stream, ";", `${keyword} declaration`);
 
-  const elem = finishElem(keyword, startPos, ctx, { name: typedDecl });
+  const elem = finishElem(keyword, startPos, ctx, { name: typedDecl, init });
   attachAttributes(elem, attributes);
   linkDeclIdent(typedDecl, elem);
   return elem;

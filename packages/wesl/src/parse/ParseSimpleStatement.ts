@@ -1,11 +1,25 @@
-import type { AttributeElem, StatementElem } from "../AbstractElems.ts";
-import { beginElem, finishContents } from "./ContentsHelpers.ts";
+import type {
+  AssignElem,
+  AssignOp,
+  AttributeElem,
+  BreakElem,
+  CallElem,
+  ContinueElem,
+  DecrementElem,
+  DiscardElem,
+  EmptyElem,
+  ExpressionElem,
+  IncrementElem,
+  PhonyTarget,
+  ReturnElem,
+  Statement,
+} from "../AbstractElems.ts";
+import type { Span } from "../Span.ts";
+import { beginElem, finishContents, finishElem } from "./ContentsHelpers.ts";
 import { parseExpression } from "./ParseExpression.ts";
+import { getStartWithAttributes } from "./ParseStatement.ts";
 import {
-  finishBlockStatement,
-  getStartWithAttributes,
-} from "./ParseStatement.ts";
-import {
+  attachAttributes,
   expect,
   expectExpression,
   parseContentExpression,
@@ -38,36 +52,48 @@ const assignmentOps = new Set([
 export function parseSimpleStatement(
   ctx: ParsingContext,
   attributes?: AttributeElem[],
-): StatementElem | null {
+): Statement | null {
   const { stream } = ctx;
   const startPos = getStartWithAttributes(attributes, stream.checkpoint());
 
   return (
     parseReturnStmt(ctx, startPos, attributes) ||
     parseBreakStmt(ctx, startPos, attributes) ||
-    parseKeywordStmt(ctx, startPos, attributes, "continue") ||
-    parseKeywordStmt(ctx, startPos, attributes, "discard") ||
+    parseContinueStmt(ctx, startPos, attributes) ||
+    parseDiscardStmt(ctx, startPos, attributes) ||
     parseEmptyStmt(stream, startPos) ||
     parsePhonyAssignment(ctx, startPos, attributes) ||
     parseExpressionStmt(ctx, startPos, attributes)
   );
 }
 
-/** Grammar: assignment_statement : lhs_expression ( '=' | compound_assignment_operator ) expression */
-export function parseAssignmentOperator(stream: WeslStream): boolean {
-  return !!stream.nextIf(({ text }) => assignmentOps.has(text));
+/** Match an assignment operator, capturing its value and span. */
+export function parseAssignmentOp(stream: WeslStream): AssignOp | null {
+  const token = stream.nextIf(({ text }) => assignmentOps.has(text));
+  if (!token) return null;
+  return { value: token.text as AssignOp["value"], span: token.span };
 }
 
-/** Grammar: ( '=' | compound_assignment_operator ) expression (rhs of assignment_statement) */
-export function parseAssignmentRhs(ctx: ParsingContext): boolean {
-  if (!parseAssignmentOperator(ctx.stream)) return false;
-  expectExpression(ctx, "Expected expression after assignment operator");
-  return true;
+/** Match '++' or '--', returning its text and span (or null if absent). */
+export function parseIncDecOp(
+  stream: WeslStream,
+): { op: "++" | "--"; span: Span } | null {
+  const token = stream.nextIf(({ text }) => text === "++" || text === "--");
+  if (!token) return null;
+  return { op: token.text as "++" | "--", span: token.span };
 }
 
-/** Grammar: increment_statement : lhs_expression '++' ; decrement_statement : lhs_expression '--' */
-export function parseIncDecOperator(stream: WeslStream): boolean {
-  return !!stream.nextIf(({ text }) => text === "++" || text === "--");
+/** Grammar: ( '=' | compound_assignment_operator ) expression. Returns op + rhs. */
+export function parseAssignmentRhs(
+  ctx: ParsingContext,
+): { op: AssignOp; rhs: ExpressionElem } | null {
+  const op = parseAssignmentOp(ctx.stream);
+  if (!op) return null;
+  const rhs = expectExpression(
+    ctx,
+    "Expected expression after assignment operator",
+  );
+  return { op, rhs };
 }
 
 /** Grammar: return_statement : 'return' expression? ';' */
@@ -75,13 +101,15 @@ function parseReturnStmt(
   ctx: ParsingContext,
   startPos: number,
   attributes?: AttributeElem[],
-): StatementElem | null {
+): ReturnElem | null {
   const { stream } = ctx;
   if (!stream.matchText("return")) return null;
-  beginElem(ctx, "statement", attributes);
-  parseContentExpression(ctx); // null for bare 'return;'
+  beginElem(ctx, "return", attributes);
+  const value = parseContentExpression(ctx) ?? undefined;
   expect(stream, ";", "return statement");
-  return finishBlockStatement(startPos, ctx, attributes);
+  const elem = finishElem("return", startPos, ctx, { value });
+  attachAttributes(elem, attributes);
+  return elem;
 }
 
 /**
@@ -92,39 +120,55 @@ function parseBreakStmt(
   ctx: ParsingContext,
   startPos: number,
   attributes?: AttributeElem[],
-): StatementElem | null {
+): BreakElem | null {
   const { stream } = ctx;
   if (!stream.matchText("break")) return null;
-  beginElem(ctx, "statement", attributes);
+  beginElem(ctx, "break", attributes);
+  let condition: ExpressionElem | undefined;
   if (stream.matchText("if")) {
-    expectExpression(ctx, "Expected condition after 'break if'");
+    condition = expectExpression(ctx, "Expected condition after 'break if'");
   }
   expect(stream, ";", "break statement");
-  return finishBlockStatement(startPos, ctx, attributes);
+  const elem = finishElem("break", startPos, ctx, { condition });
+  attachAttributes(elem, attributes);
+  return elem;
 }
 
-/** Grammar: continue_statement : 'continue' ';' also handles 'discard' */
-function parseKeywordStmt(
+/** Grammar: continue_statement : 'continue' ';' */
+function parseContinueStmt(
   ctx: ParsingContext,
   startPos: number,
-  attributes: AttributeElem[] | undefined,
-  keyword: string,
-): StatementElem | null {
+  attributes?: AttributeElem[],
+): ContinueElem | null {
   const { stream } = ctx;
-  if (!stream.matchText(keyword)) return null;
-  beginElem(ctx, "statement", attributes);
-  expect(stream, ";", `${keyword} statement`);
-  return finishBlockStatement(startPos, ctx, attributes);
+  if (!stream.matchText("continue")) return null;
+  beginElem(ctx, "continue", attributes);
+  expect(stream, ";", "continue statement");
+  const elem = finishElem("continue", startPos, ctx, {});
+  attachAttributes(elem, attributes);
+  return elem;
 }
 
-/** Parse empty statement (just ';'). */
-function parseEmptyStmt(
-  stream: WeslStream,
-  start: number,
-): StatementElem | null {
+/** Grammar: 'discard' ';' */
+function parseDiscardStmt(
+  ctx: ParsingContext,
+  startPos: number,
+  attributes?: AttributeElem[],
+): DiscardElem | null {
+  const { stream } = ctx;
+  if (!stream.matchText("discard")) return null;
+  beginElem(ctx, "discard", attributes);
+  expect(stream, ";", "discard statement");
+  const elem = finishElem("discard", startPos, ctx, {});
+  attachAttributes(elem, attributes);
+  return elem;
+}
+
+/** Parse empty statement (just ';'). Spans the ';' so it emits no extra text. */
+function parseEmptyStmt(stream: WeslStream, start: number): EmptyElem | null {
   if (!stream.matchText(";")) return null;
   const end = stream.checkpoint();
-  return { kind: "statement", start, end, contents: [] };
+  return { kind: "empty", start, end, contents: [] };
 }
 
 /** Grammar: assignment_statement : '_' '=' expression ';' (phony assignment) */
@@ -132,15 +176,22 @@ function parsePhonyAssignment(
   ctx: ParsingContext,
   startPos: number,
   attributes?: AttributeElem[],
-): StatementElem | null {
+): AssignElem | null {
   const { stream } = ctx;
-  if (!stream.matchText("_")) return null;
-  if (!parseAssignmentOperator(stream))
-    throwParseError(stream, "Expected assignment operator after '_'");
-  beginElem(ctx, "statement", attributes);
-  expectExpression(ctx, "Expected expression after assignment operator");
+  const underscore = stream.matchText("_");
+  if (!underscore) return null;
+  const lhs: PhonyTarget = { kind: "phony", span: underscore.span };
+  const op = parseAssignmentOp(stream);
+  if (!op) throwParseError(stream, "Expected assignment operator after '_'");
+  beginElem(ctx, "assign", attributes);
+  const rhs = expectExpression(
+    ctx,
+    "Expected expression after assignment operator",
+  );
   expect(stream, ";", "assignment");
-  return finishBlockStatement(startPos, ctx, attributes);
+  const elem = finishElem("assign", startPos, ctx, { lhs, op, rhs });
+  attachAttributes(elem, attributes);
+  return elem;
 }
 
 /**
@@ -151,9 +202,9 @@ function parseExpressionStmt(
   ctx: ParsingContext,
   startPos: number,
   attributes?: AttributeElem[],
-): StatementElem | null {
+): AssignElem | IncrementElem | DecrementElem | CallElem | null {
   const { stream } = ctx;
-  beginElem(ctx, "statement", attributes);
+  beginElem(ctx, "assign", attributes);
   const expr = parseExpression(ctx);
   if (!expr) {
     finishContents(ctx, startPos, startPos);
@@ -162,7 +213,31 @@ function parseExpressionStmt(
   }
   ctx.addElem(expr);
 
-  if (!parseIncDecOperator(stream)) parseAssignmentRhs(ctx);
+  const incDec = parseIncDecOp(stream);
+  if (incDec) {
+    expect(stream, ";", "expression");
+    const kind = incDec.op === "++" ? "increment" : "decrement";
+    const elem = finishElem(kind, startPos, ctx, { target: expr });
+    attachAttributes(elem, attributes);
+    return elem;
+  }
+
+  const assign = parseAssignmentRhs(ctx);
   expect(stream, ";", "expression");
-  return finishBlockStatement(startPos, ctx, attributes);
+  if (assign) {
+    const elem = finishElem("assign", startPos, ctx, {
+      lhs: expr,
+      op: assign.op,
+      rhs: assign.rhs,
+    });
+    attachAttributes(elem, attributes);
+    return elem;
+  }
+
+  if (expr.kind !== "call-expression") {
+    throwParseError(stream, "Expected call, assignment, or increment");
+  }
+  const elem = finishElem("call", startPos, ctx, { call: expr });
+  attachAttributes(elem, attributes);
+  return elem;
 }

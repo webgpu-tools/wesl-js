@@ -1,11 +1,11 @@
 import type {
   BinaryExpression,
+  BlockElem,
   DoBlockElem,
   ExpressionElem,
   FunctionCallExpression,
   LetElem,
   Literal,
-  StatementElem,
   UnaryExpression,
   VarElem,
   WeslAST,
@@ -87,7 +87,7 @@ function interpretBlock(
 
 /** Interpret one body statement: skip text, bind let/var locals, dispatch calls. */
 function interpretStatement(
-  elem: StatementElem["contents"][number],
+  elem: BlockElem["contents"][number],
   block: DoBlockElem,
   env: Env,
   scope: Map<string, number>,
@@ -97,20 +97,13 @@ function interpretStatement(
     bindLocal(elem, block, scope);
     return;
   }
-  if (elem.kind === "statement") {
-    const call = findCallExpression(elem);
-    if (!call) {
-      throw new Error(
-        `do block '${block.name.name}' contains a statement unsupported by ` +
-          `the interpreter (straight-line only: let/var bindings + entry-point or do calls)`,
-      );
-    }
-    dispatchCall(call, block, env, scope);
+  if (elem.kind === "call") {
+    dispatchCall(elem.call, block, env, scope);
     return;
   }
   throw new Error(
-    `do block '${block.name.name}': unsupported body element '${elem.kind}' ` +
-      `(interpreter is straight-line only)`,
+    `do block '${block.name.name}' contains a statement unsupported by ` +
+      `the interpreter (straight-line only: let/var bindings + entry-point or do calls)`,
   );
 }
 
@@ -120,21 +113,12 @@ function bindLocal(
   scope: Map<string, number>,
 ): void {
   const name = decl.name.decl.ident.originalName;
-  const initExpr = decl.contents.find(isExpression);
-  if (!initExpr) {
+  if (!decl.init) {
     throw new Error(
       `do block '${block.name.name}': '${decl.kind} ${name}' has no initializer`,
     );
   }
-  scope.set(name, evalExpr(initExpr, block, scope));
-}
-
-function findCallExpression(
-  stmt: StatementElem,
-): FunctionCallExpression | undefined {
-  return stmt.contents.find(
-    (c): c is FunctionCallExpression => c.kind === "call-expression",
-  );
+  scope.set(name, evalExpr(decl.init, block, scope));
 }
 
 /** Dispatch a call: entry-point => GPU dispatch, do block => recurse. */
@@ -166,20 +150,6 @@ function dispatchCall(
 
   throw new Error(
     `do block '${block.name.name}': call to undefined target '${targetName}'`,
-  );
-}
-
-function isExpression(c: { kind: string }): c is ExpressionElem {
-  return (
-    c.kind === "literal" ||
-    c.kind === "ref" ||
-    c.kind === "type" ||
-    c.kind === "parenthesized-expression" ||
-    c.kind === "component-expression" ||
-    c.kind === "component-member-expression" ||
-    c.kind === "unary-expression" ||
-    c.kind === "binary-expression" ||
-    c.kind === "call-expression"
   );
 }
 

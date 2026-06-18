@@ -1,9 +1,5 @@
 import { expect, test } from "vitest";
-import type {
-  DoBlockElem,
-  FunctionCallExpression,
-  StatementElem,
-} from "../AbstractElems.ts";
+import type { CallElem, DoBlockElem } from "../AbstractElems.ts";
 import { freshResolver, RecordResolver } from "../ModuleResolver.ts";
 import { linkTestOpts, parseTest } from "./TestUtil.ts";
 
@@ -72,15 +68,12 @@ test("do body call-expressions expose structured .arguments", () => {
   `;
   const [block] = doBlocks(src);
   const stmt = block.body.contents.find(
-    (c): c is StatementElem => c.kind === "statement",
+    (c): c is CallElem => c.kind === "call",
   );
   expect(stmt).toBeDefined();
-  const call = stmt!.contents.find(
-    (c): c is FunctionCallExpression => c.kind === "call-expression",
-  );
-  expect(call).toBeDefined();
-  expect(call!.arguments).toHaveLength(3);
-  expect(call!.arguments.every(a => a.kind === "literal")).toBe(true);
+  const call = stmt!.call;
+  expect(call.arguments).toHaveLength(3);
+  expect(call.arguments.every(a => a.kind === "literal")).toBe(true);
 });
 
 test("parse do blocks: recursion, if/else, uniforms + slider params", () => {

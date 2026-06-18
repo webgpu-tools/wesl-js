@@ -46,14 +46,14 @@ test("parse @elif with complex condition", () => {
       fn f() @if
         attribute @if(foo)
         decl %f
-        statement
+        block
           text '{}'
       text '
     '
       fn f() @elif
         attribute @elif(bar && !baz)
         decl %f
-        statement
+        block
           text '{}'"
   `);
 });

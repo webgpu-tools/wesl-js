@@ -14,7 +14,7 @@ test("parse fn with line comment", () => {
         '
       fn binaryOp()
         decl %binaryOp
-        statement
+        block
           text '{ // binOpImpl
         }'"
   `);

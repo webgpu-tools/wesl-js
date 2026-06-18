@@ -1,11 +1,11 @@
 import type {
   AttributeElem,
-  BlockStatement,
-  ContinuingElem,
+  BlockElem,
+  ContainerElem,
   ElifAttribute,
   ElseAttribute,
   IfAttribute,
-  StatementElem,
+  Statement,
 } from "../AbstractElems.ts";
 import { findMap } from "../Util.ts";
 import { beginElem, finishElem } from "./ContentsHelpers.ts";
@@ -43,7 +43,7 @@ interface CompoundOptions {
 const conditionalBlockFeature = true;
 
 /** Function bodies share scope with parameters (per WGSL spec). */
-export function parseFunctionBody(ctx: ParsingContext): StatementElem | null {
+export function parseFunctionBody(ctx: ParsingContext): BlockElem | null {
   return parseCompoundStatement(ctx, undefined, { noScope: true });
 }
 
@@ -55,22 +55,23 @@ export function parseCompoundStatement(
   ctx: ParsingContext,
   attributes?: AttributeElem[],
   options?: CompoundOptions,
-): StatementElem | null {
+): BlockElem | null {
   const brace = ctx.stream.matchText("{");
   if (!brace) return null;
 
   const startPos = getStartWithAttributes(attributes, brace.span[0]);
-
-  beginElem(ctx, "statement", attributes);
+  beginElem(ctx, "block", attributes);
 
   const skipScope =
     options?.noScope ||
     (conditionalBlockFeature && hasConditionalAttr(attributes));
   if (!skipScope) ctx.pushScope();
-  parseBlockStatements(ctx, options?.loopBody);
+  const body = parseBlockStatements(ctx, options?.loopBody);
   if (!skipScope) ctx.popScope();
 
-  return finishBlockStatement(startPos, ctx, attributes);
+  const elem = finishElem("block", startPos, ctx, { body });
+  attachAttributes(elem, attributes);
+  return elem;
 }
 
 /** Grammar: attribute* compound_statement (for control flow bodies) */
@@ -78,7 +79,7 @@ export function expectCompound(
   ctx: ParsingContext,
   errorMsg: string,
   loopBody?: boolean,
-): StatementElem {
+): BlockElem {
   const attrs = parseAttributeList(ctx);
   const attrsOrUndef = attrs.length > 0 ? attrs : undefined;
   const options = loopBody ? { loopBody } : undefined;
@@ -95,12 +96,12 @@ export function getStartWithAttributes(
   return attributes?.[0]?.start ?? keywordPos;
 }
 
-/** Match keyword and begin statement element. Returns start position or null. */
+/** Match keyword and begin a statement element of `kind`. Returns start position or null. */
 export function beginStatement(
   ctx: ParsingContext,
   keyword: string,
+  kind: ContainerElem["kind"],
   attributes?: AttributeElem[],
-  kind: "statement" | "continuing" = "statement",
 ): number | null {
   const keywordPos = ctx.stream.checkpoint();
   if (!ctx.stream.matchText(keyword)) return null;
@@ -109,46 +110,29 @@ export function beginStatement(
   return startPos;
 }
 
-/** Finish block statement element: close contents, attach attributes. */
-export function finishBlockStatement(
-  start: number,
-  ctx: ParsingContext,
-  attributes?: AttributeElem[],
-): StatementElem;
-export function finishBlockStatement(
-  start: number,
-  ctx: ParsingContext,
-  attributes: AttributeElem[] | undefined,
-  kind: "continuing",
-): ContinuingElem;
-export function finishBlockStatement(
-  start: number,
-  ctx: ParsingContext,
-  attributes?: AttributeElem[],
-  kind: "statement" | "continuing" = "statement",
-): BlockStatement {
-  const elem = finishElem(kind, start, ctx, {});
-  attachAttributes(elem, attributes);
-  return elem;
-}
-
 function hasConditionalAttr(attributes?: AttributeElem[]): boolean {
   return !!attributes && hasConditionalAttribute(attributes);
 }
 
 /** Grammar: statement* '}' (after '{' consumed). Loop bodies may end with continuing. */
-function parseBlockStatements(ctx: ParsingContext, loopBody?: boolean): void {
+function parseBlockStatements(
+  ctx: ParsingContext,
+  loopBody?: boolean,
+): Statement[] {
   const { stream } = ctx;
+  const body: Statement[] = [];
   while (true) {
     if (stream.matchText("}")) break;
     const stmt = parseStatement(ctx);
     if (!stmt) throwParseError(stream, "Expected statement or '}'");
     ctx.addElem(stmt);
+    body.push(stmt);
     if (loopBody && stmt.kind === "continuing") {
       expect(stream, "}", "continuing block");
       break;
     }
   }
+  return body;
 }
 
 /**
@@ -159,7 +143,7 @@ function parseBlockStatements(ctx: ParsingContext, loopBody?: boolean): void {
  *   | 'discard' ';' | variable_updating_statement ';' | compound_statement
  *   | const_assert_statement ';'
  */
-function parseStatement(ctx: ParsingContext): BlockStatement | null {
+function parseStatement(ctx: ParsingContext): Statement | null {
   const { stream } = ctx;
   const startPos = stream.checkpoint();
   const attributes = parseAttributeList(ctx);
@@ -193,7 +177,7 @@ function parseStatement(ctx: ParsingContext): BlockStatement | null {
   if (!stmt) return null;
 
   finalizeConditional(ctx, hasConditional, attributes);
-  return stmt as BlockStatement;
+  return stmt as Statement;
 }
 
 function finalizeConditional(

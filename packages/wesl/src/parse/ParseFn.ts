@@ -1,10 +1,10 @@
 import type {
   AttributeElem,
+  BlockElem,
   DeclIdentElem,
   FnElem,
   FnParamElem,
   GrammarElem,
-  StatementElem,
   TypeRefElem,
 } from "../AbstractElems.ts";
 import { beginElem, finishElem } from "./ContentsHelpers.ts";
@@ -124,7 +124,7 @@ function buildFnContents(
   decl: DeclIdentElem,
   params: FnParamElem[],
   returnType: TypeRefElem | undefined,
-  body: StatementElem,
+  body: BlockElem,
 ): GrammarElem[] {
   const base = returnType
     ? [decl, ...params, returnType, body]

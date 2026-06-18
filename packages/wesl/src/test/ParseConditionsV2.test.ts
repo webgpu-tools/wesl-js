@@ -9,7 +9,7 @@ test("parse complex condition", () => {
       fn a() @if
         attribute @if(true || (!foo && !!false))
         decl %a
-        statement
+        block
           text '{}'"
   `);
 });
@@ -88,7 +88,7 @@ test("conditional statement", () => {
         '
       fn main()
         decl %main
-        statement
+        block
           text '{
           '
           var %x
@@ -100,7 +100,7 @@ test("conditional statement", () => {
             text ';'
           text '
           '
-          statement @if
+          assign @if
             attribute @if(true)
             text ' '
             ref x
@@ -130,10 +130,10 @@ test("compound statement", () => {
         '
       fn main()
         decl %main
-        statement
+        block
           text '{
           '
-          statement @if
+          block @if
             attribute @if(false)
             text ' {
             '
@@ -167,7 +167,7 @@ test("conditional local var", () => {
         '
       fn main()
         decl %main
-        statement
+        block
           text '{
           '
           var %x @if
@@ -256,9 +256,9 @@ test("@else with function", () => {
       fn foo() @if
         attribute @if(DEBUG)
         decl %foo
-        statement
+        block
           text '{'
-          statement
+          return
             text ' return '
             literal literal(1)
             text ';'
@@ -268,9 +268,9 @@ test("@else with function", () => {
       fn foo() @else
         attribute @else
         decl %foo
-        statement
+        block
           text '{'
-          statement
+          return
             text ' return '
             literal literal(2)
             text ';'
@@ -295,7 +295,7 @@ test("@else with statement", () => {
         '
       fn main()
         decl %main
-        statement
+        block
           text '{
           '
           let %x @if
@@ -338,10 +338,10 @@ test("@else compound statement", () => {
         '
       fn test()
         decl %test
-        statement
+        block
           text '{
           '
-          statement @if
+          block @if
             attribute @if(MOBILE)
             text ' { '
             let %a
@@ -354,7 +354,7 @@ test("@else compound statement", () => {
             text ' }'
           text '
           '
-          statement @else
+          block @else
             attribute @else
             text ' { '
             let %a
@@ -471,7 +471,7 @@ test("parse @else fn", () => {
       fn testFn() @if
         attribute @if(FOO)
         decl %testFn
-        statement
+        block
           text '{ '
           let %a
             text 'let '
@@ -486,7 +486,7 @@ test("parse @else fn", () => {
       fn testFn() @else
         attribute @else
         decl %testFn
-        statement
+        block
           text '{ '
           let %a
             text 'let '

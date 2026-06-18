@@ -113,7 +113,24 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
     str.add(" %" + elem.ident.originalName);
   } else if (kind === "directive") {
     addDirective(elem, str);
-  } else if (kind === "statement" || kind === "continuing") {
+  } else if (
+    kind === "block" ||
+    kind === "if" ||
+    kind === "for" ||
+    kind === "while" ||
+    kind === "loop" ||
+    kind === "continuing" ||
+    kind === "switch" ||
+    kind === "return" ||
+    kind === "break" ||
+    kind === "continue" ||
+    kind === "discard" ||
+    kind === "assign" ||
+    kind === "increment" ||
+    kind === "decrement" ||
+    kind === "call" ||
+    kind === "empty"
+  ) {
     listAttributeElems(elem.attributes, str);
   } else if (kind === "literal") {
     str.add(` literal(${elem.value})`);
