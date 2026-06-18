@@ -44,6 +44,7 @@ test("--list shows matrix cases and variants", () => {
 
   if (!result.includes("WESL")) throw new Error("Missing matrix name");
   for (const variant of ["link", "parse", "tokenize", "wgsl-reflect"]) {
-    if (!result.includes(variant)) throw new Error(`Missing variant: ${variant}`);
+    if (!result.includes(variant))
+      throw new Error(`Missing variant: ${variant}`);
   }
 });
