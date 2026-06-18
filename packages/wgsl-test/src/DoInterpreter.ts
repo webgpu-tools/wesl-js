@@ -44,6 +44,10 @@ interface Local {
   mutable: boolean;
 }
 
+/** A scope maps names to `Local` objects. A child scope is `new Map(parent)`,
+ *  which copies the entries but shares the `Local` objects by reference: so a
+ *  `var` mutated in a nested block updates the outer binding, while a new
+ *  declaration of the same name only rebinds the child's entry (shadowing). */
 type Scope = Map<string, Local>;
 
 interface Env {
@@ -211,8 +215,7 @@ function interpretFor(
     try {
       runBlock(stmt.body, block, env, loopScope);
     } catch (e) {
-      if (e instanceof BreakSignal) break;
-      if (!(e instanceof ContinueSignal)) throw e;
+      if (loopJump(e) === "break") break;
     }
     if (stmt.update) interpretStatement(stmt.update, block, env, loopScope);
   }
@@ -229,8 +232,7 @@ function interpretWhile(
     try {
       runBlock(stmt.body, block, env, scope);
     } catch (e) {
-      if (e instanceof BreakSignal) break;
-      if (!(e instanceof ContinueSignal)) throw e;
+      if (loopJump(e) === "break") break;
     }
   }
 }
@@ -251,8 +253,7 @@ function interpretLoop(
         interpretStatement(s, block, env, loopScope);
       }
     } catch (e) {
-      if (e instanceof BreakSignal) break;
-      if (!(e instanceof ContinueSignal)) throw e;
+      if (loopJump(e) === "break") break;
     }
     if (stmt.continuing) {
       for (const s of stmt.continuing.body.body) {
@@ -266,6 +267,14 @@ function interpretLoop(
       }
     }
   }
+}
+
+/** Translate a caught loop signal into the host loop's action: a BreakSignal
+ *  ends the loop, a ContinueSignal resumes it; any other error propagates. */
+function loopJump(e: unknown): "break" | "continue" {
+  if (e instanceof BreakSignal) return "break";
+  if (e instanceof ContinueSignal) return "continue";
+  throw e;
 }
 
 /** Assignment / compound assignment to a scalar local named by a `ref` lhs. */
