@@ -2,8 +2,8 @@ import type {
   AbstractElem,
   AttributeElem,
   BindingStructElem,
-  DeclarationElem,
   FnElem,
+  FnParamElem,
   ModuleElem,
   SimpleMemberRef,
   StructElem,
@@ -245,7 +245,7 @@ interface MemberRefToStruct extends StructTrace {
 
 interface StructTrace {
   struct: StructElem; // e.g. the struct Bindings
-  intermediates: DeclarationElem[]; // e.g. the fn param b:Bindings from 'fn(b:Bindings)'
+  intermediates: FnParamElem[]; // e.g. the fn param b:Bindings from 'fn(b:Bindings)'
 }
 
 /** find all simple member references in the module that refer to binding structs */

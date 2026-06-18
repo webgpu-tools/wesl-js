@@ -42,7 +42,9 @@ test("@if(false) const_assert true;", () => {
         '
       assert
         attribute @if(false)
-        text ' const_assert true;'
+        text ' const_assert '
+        literal literal(true)
+        text ';'
       text '
       '"
   `);
@@ -63,7 +65,9 @@ test("@if(true) var x = 7", () => {
         text ' var '
         typeDecl %x
           decl %x
-        text ' = 7;'
+        text ' = '
+        literal literal(7)
+        text ';'
       text '
       '"
   `);
@@ -91,14 +95,18 @@ test("conditional statement", () => {
             text 'var '
             typeDecl %x
               decl %x
-            text ' = 1;'
+            text ' = '
+            literal literal(1)
+            text ';'
           text '
           '
           statement @if
             attribute @if(true)
             text ' '
             ref x
-            text ' = 2 ;'
+            text ' = '
+            literal literal(2)
+            text ' ;'
           text '
         }'
       text '
@@ -133,7 +141,9 @@ test("compound statement", () => {
               text 'let '
               typeDecl %x
                 decl %x
-              text ' = 1;'
+              text ' = '
+              literal literal(1)
+              text ';'
             text '
           }'
           text '
@@ -165,7 +175,9 @@ test("conditional local var", () => {
             text ' var '
             typeDecl %x
               decl %x
-            text ' = 1;'
+            text ' = '
+            literal literal(1)
+            text ';'
           text '
         }'
       text '
@@ -188,7 +200,9 @@ test("@if(MOBILE) const x = 1", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 1;'
+        text ' = '
+        literal literal(1)
+        text ';'
       text '
       '"
   `);
@@ -210,7 +224,9 @@ test("@else after @if", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 1;'
+        text ' = '
+        literal literal(1)
+        text ';'
       text '
         '
       const %x @else
@@ -218,7 +234,9 @@ test("@else after @if", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 2;'
+        text ' = '
+        literal literal(2)
+        text ';'
       text '
       '"
   `);
@@ -241,7 +259,9 @@ test("@else with function", () => {
         statement
           text '{'
           statement
-            text ' return 1;'
+            text ' return '
+            literal literal(1)
+            text ';'
           text ' }'
       text '
         '
@@ -251,7 +271,9 @@ test("@else with function", () => {
         statement
           text '{'
           statement
-            text ' return 2;'
+            text ' return '
+            literal literal(2)
+            text ';'
           text ' }'
       text '
       '"
@@ -281,7 +303,9 @@ test("@else with statement", () => {
             text ' let '
             typeDecl %x
               decl %x
-            text ' = 1.0;'
+            text ' = '
+            literal literal(1.0)
+            text ';'
           text '
           '
           let %x @else
@@ -289,7 +313,9 @@ test("@else with statement", () => {
             text ' let '
             typeDecl %x
               decl %x
-            text ' = 2.0;'
+            text ' = '
+            literal literal(2.0)
+            text ';'
           text '
         }'
       text '
@@ -322,7 +348,9 @@ test("@else compound statement", () => {
               text 'let '
               typeDecl %a
                 decl %a
-              text ' = 1;'
+              text ' = '
+              literal literal(1)
+              text ';'
             text ' }'
           text '
           '
@@ -333,7 +361,9 @@ test("@else compound statement", () => {
               text 'let '
               typeDecl %a
                 decl %a
-              text ' = 2;'
+              text ' = '
+              literal literal(2)
+              text ';'
             text ' }'
           text '
         }'
@@ -447,7 +477,9 @@ test("parse @else fn", () => {
             text 'let '
             typeDecl %a
               decl %a
-            text ' = 0;'
+            text ' = '
+            literal literal(0)
+            text ';'
           text ' }'
       text '
         '
@@ -460,7 +492,9 @@ test("parse @else fn", () => {
             text 'let '
             typeDecl %a
               decl %a
-            text ' = 1;'
+            text ' = '
+            literal literal(1)
+            text ';'
           text ' }'
       text '
       '"

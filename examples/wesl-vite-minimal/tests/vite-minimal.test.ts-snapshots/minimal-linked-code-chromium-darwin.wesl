@@ -1,6 +1,6 @@
 
 @compute @workgroup_size(1) fn main() {
-  let a = b + pcg_2u_3f(vec2u(1,3)).x;
+  let a = b + pcg_2u_3f(vec2u(1, 3)).x;
 }
 
 const b = 7.1;
@@ -13,11 +13,7 @@ fn pcg_2u_3f(pos: vec2u) -> vec3f {
 }
 
 fn mix2to3(p: vec2u) -> vec3u {
-    let seed = vec3u(
-        p.x,
-        p.x ^ p.y,
-        p.x + p.y,
-    );
+    let seed = vec3u(p.x, p.x ^ p.y, p.x + p.y);
     return seed;
 }
 

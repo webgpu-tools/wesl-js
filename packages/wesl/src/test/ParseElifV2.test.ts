@@ -13,7 +13,9 @@ test("parse @elif basic", () => {
         text ' const '
         typeDecl %a
           decl %a
-        text ' = 1;'
+        text ' = '
+        literal literal(1)
+        text ';'
       text '
     '
       const %a @elif
@@ -21,7 +23,9 @@ test("parse @elif basic", () => {
         text ' const '
         typeDecl %a
           decl %a
-        text ' = 2;'
+        text ' = '
+        literal literal(2)
+        text ';'
       text '
     '
       const %a @else
@@ -29,7 +33,9 @@ test("parse @elif basic", () => {
         text ' const '
         typeDecl %a
           decl %a
-        text ' = 3;'"
+        text ' = '
+        literal literal(3)
+        text ';'"
   `);
 });
 
@@ -63,7 +69,9 @@ test("parse multiple @elif", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 1;'
+        text ' = '
+        literal literal(1)
+        text ';'
       text '
     '
       const %x @elif
@@ -71,7 +79,9 @@ test("parse multiple @elif", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 2;'
+        text ' = '
+        literal literal(2)
+        text ';'
       text '
     '
       const %x @elif
@@ -79,7 +89,9 @@ test("parse multiple @elif", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 3;'
+        text ' = '
+        literal literal(3)
+        text ';'
       text '
     '
       const %x @else
@@ -87,7 +99,9 @@ test("parse multiple @elif", () => {
         text ' const '
         typeDecl %x
           decl %x
-        text ' = 4;'"
+        text ' = '
+        literal literal(4)
+        text ';'"
   `);
 });
 

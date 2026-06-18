@@ -11,11 +11,9 @@ import type {
 import { ParseError } from "../ParseError.ts";
 import type { RefIdent } from "../Scope.ts";
 import type { Stream, Token } from "../Stream.ts";
-import { parseExpression } from "./ParseExpression.ts";
+import { type ExpressionOpts, parseExpression } from "./ParseExpression.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 import type { WeslStream, WeslToken } from "./WeslStream.ts";
-
-// --- Stream/token expectations ---
 
 /** Match text and throw ParseError if not found. */
 export function expect(
@@ -47,14 +45,24 @@ export function expectWord(
   return token as WeslToken<"word">;
 }
 
-/** Parse expression and throw ParseError if not found. */
+/** Parse a required expression, adding it to the open container's contents. */
 export function expectExpression(
   ctx: ParsingContext,
   errorMsg = "Expected expression",
 ): ExpressionElem {
   const expr = parseExpression(ctx);
   if (!expr) throwParseError(ctx.stream, errorMsg);
-  if (ctx.options.preserveExpressions) ctx.addElem(expr);
+  ctx.addElem(expr);
+  return expr;
+}
+
+/** Parse an optional expression, adding it to the open container's contents. */
+export function parseContentExpression(
+  ctx: ParsingContext,
+  opts?: ExpressionOpts,
+): ExpressionElem | null {
+  const expr = parseExpression(ctx, opts);
+  if (expr) ctx.addElem(expr);
   return expr;
 }
 
@@ -67,8 +75,6 @@ export function throwParseError(stream: Stream<Token>, message: string): never {
     : ([weslStream.checkpoint(), weslStream.checkpoint()] as const);
   throw new ParseError(message, span);
 }
-
-// --- List parsing ---
 
 /** Parse comma-separated items. Caller handles delimiters. */
 export function parseCommaList<T>(
@@ -92,8 +98,6 @@ export function* parseMany<T>(
 ): Generator<T> {
   for (let elem = parse(ctx); elem; elem = parse(ctx)) yield elem;
 }
-
-// --- Element creation ---
 
 /** Create a NameElem from a word token. */
 export function makeNameElem(token: WeslToken<"word">): NameElem {
@@ -136,8 +140,7 @@ export function makeRefIdentElem(
   return elem;
 }
 
-// --- Attribute utilities ---
-
+/** @return true if the attribute is a conditional (@if, @elif, @else) */
 export function isConditionalAttribute(attr: Attribute): boolean {
   const { kind } = attr;
   return kind === "@if" || kind === "@elif" || kind === "@else";
@@ -155,8 +158,6 @@ export function attachAttributes<T extends { attributes?: AttributeElem[] }>(
 ): void {
   if (attributes?.length) elem.attributes = attributes;
 }
-
-// --- Declaration linking ---
 
 /** Link a DeclIdentElem's ident to its parent declaration. */
 export function linkDeclIdentElem(

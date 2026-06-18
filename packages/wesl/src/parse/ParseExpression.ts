@@ -26,7 +26,6 @@ import { parseIdent } from "./ParseIdent.ts";
 import { parseTemplateParams } from "./ParseType.ts";
 import {
   expect,
-  expectExpression,
   expectWord,
   makeNameElem,
   throwParseError,
@@ -145,10 +144,14 @@ function parseBinaryExpr(
     if (isBinaryOpInContext(nextToken, inTemplate)) {
       const nextPrec = getPrecedence(nextToken);
       if (nextPrec > precedence) {
-        const group = "unary" as const;
-        const left = right;
-        const args = { prec: nextPrec, left, group, condRef, inTemplate };
-        right = parseBinaryExpr(ctx, args).expr;
+        const rightArgs: BinaryExprArgs = {
+          prec: nextPrec,
+          left: right,
+          group: "unary",
+          condRef,
+          inTemplate,
+        };
+        right = parseBinaryExpr(ctx, rightArgs).expr;
       }
     }
 
@@ -282,7 +285,10 @@ function parseIndexAccess(
 ): ComponentExpression | null {
   const { stream } = ctx;
   if (!stream.matchText("[")) return null;
-  const indexExpr = expectExpression(ctx, "Expected expression in array index");
+  // bare parseExpression: the index belongs in ComponentExpression.access,
+  // not in the enclosing container's contents
+  const indexExpr = parseExpression(ctx);
+  if (!indexExpr) throwParseError(stream, "Expected expression in array index");
   const closeBracket = expect(stream, "]", "array index");
   return makeComponentExpression(base, indexExpr, closeBracket.span[1]);
 }

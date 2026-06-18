@@ -11,6 +11,7 @@ import type {
   StructElem,
   SyntheticElem,
   TextElem,
+  TypeRefElem,
 } from "./AbstractElems.ts";
 import { assertThatDebug, assertUnreachable } from "./Assertions.ts";
 import { failIdentElem } from "./ClickableError.ts";
@@ -49,11 +50,67 @@ export function lowerAndEmit(params: EmitParams): void {
   for (const e of validElements) lowerAndEmitElem(e, emitContext);
 }
 
+/** Format a diagnostic control as "(severity, rule)" for @diagnostic text. */
+export function diagnosticControlToString(
+  severity: NameElem,
+  rule: [NameElem, NameElem | null],
+): string {
+  const ruleStr = rule[0].name + (rule[1] !== null ? "." + rule[1].name : "");
+  return `(${severity.name}, ${ruleStr})`;
+}
+
+/** Render an expression back to WGSL source text (template args elided as <...>). */
+export function expressionToString(elem: ExpressionElem): string {
+  const { kind } = elem;
+  switch (kind) {
+    case "binary-expression": {
+      const left = expressionToString(elem.left);
+      const right = expressionToString(elem.right);
+      return `${left} ${elem.operator.value} ${right}`;
+    }
+    case "unary-expression":
+      return `${elem.operator.value}${expressionToString(elem.expression)}`;
+    case "ref":
+      return elem.ident.originalName;
+    case "literal":
+      return elem.value;
+    case "parenthesized-expression":
+      return `(${expressionToString(elem.expression)})`;
+    case "component-expression":
+      return `${expressionToString(elem.base)}[${elem.access}]`;
+    case "component-member-expression":
+      return `${expressionToString(elem.base)}.${elem.access}`;
+    case "call-expression": {
+      const fn = elem.function;
+      const name =
+        fn.kind === "ref" ? fn.ident.originalName : fn.name.originalName;
+      const targs = elem.templateArgs ? `<...>` : "";
+      const args = elem.arguments.map(expressionToString).join(", ");
+      return `${name}${targs}(${args})`;
+    }
+    case "type":
+      return elem.name.originalName;
+    default:
+      assertUnreachable(kind);
+  }
+}
+
+/** Trace through refersTo links until we find the declaration. */
+export function findDecl(ident: Ident): DeclIdent {
+  let i: Ident | undefined = ident;
+  do {
+    if (i.kind === "decl") return i;
+    i = i.refersTo;
+  } while (i);
+
+  // TODO show source position if this can happen in a non buggy linker.
+  throw new Error(`unresolved identifer: ${ident.originalName}`);
+}
+
 function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
   switch (e.kind) {
     case "import":
       return; // import statements are dropped from emitted text
-
     case "text":
       emitText(e, ctx);
       return;
@@ -86,9 +143,12 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
     case "member":
     case "memberRef":
     case "expression":
-    case "type":
     case "switch-clause":
       emitContents(e, ctx);
+      return;
+
+    case "type":
+      emitTypeRefElem(e, ctx);
       return;
 
     // "stuff" elements (compound statements) need trimming for proper formatting
@@ -137,6 +197,115 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
     default:
       assertUnreachable(e);
   }
+}
+
+function emitText(e: TextElem, ctx: EmitContext): void {
+  ctx.srcBuilder.addCopy(e.start, e.end);
+}
+
+function emitName(e: NameElem, ctx: EmitContext): void {
+  ctx.srcBuilder.add(e.name, e.start, e.end);
+}
+
+function emitSynthetic(e: SyntheticElem, ctx: EmitContext): void {
+  const { text } = e;
+  ctx.srcBuilder.addSynthetic(text, text, 0, text.length);
+}
+
+function emitRefIdent(e: RefIdentElem, ctx: EmitContext): void {
+  if (e.ident.std) {
+    ctx.srcBuilder.add(e.ident.originalName, e.start, e.end);
+  } else {
+    ctx.srcBuilder.add(displayName(findDecl(e.ident)), e.start, e.end);
+  }
+}
+
+function emitDeclIdent(e: DeclIdentElem, ctx: EmitContext): void {
+  ctx.srcBuilder.add(displayName(e.ident), e.start, e.end);
+}
+
+function emitExpression(e: ExpressionElem, ctx: EmitContext): void {
+  const { kind } = e;
+
+  if (kind === "literal") {
+    ctx.srcBuilder.add(e.value, e.start, e.end);
+    return;
+  }
+
+  if (kind === "ref") {
+    emitRefIdent(e, ctx);
+    return;
+  }
+
+  if (kind === "type") {
+    emitTypeRefElem(e, ctx);
+    return;
+  }
+
+  if (kind === "binary-expression") {
+    const [start, end] = e.operator.span;
+    emitExpression(e.left, ctx);
+    ctx.srcBuilder.add(` ${e.operator.value} `, start, end);
+    emitExpression(e.right, ctx);
+    return;
+  }
+
+  if (kind === "unary-expression") {
+    const { value, start, end } = e.operator;
+    ctx.srcBuilder.add(value, start, end);
+    emitExpression(e.expression, ctx);
+    return;
+  }
+
+  if (kind === "parenthesized-expression") {
+    ctx.srcBuilder.appendNext("(");
+    emitExpression(e.expression, ctx);
+    ctx.srcBuilder.appendNext(")");
+    return;
+  }
+
+  if (kind === "call-expression") {
+    emitExpression(e.function, ctx);
+    if (e.templateArgs) emitTemplateArgs(e.templateArgs, ctx);
+    ctx.srcBuilder.appendNext("(");
+    e.arguments.forEach((arg, i) => {
+      if (i > 0) ctx.srcBuilder.appendNext(", ");
+      emitExpression(arg, ctx);
+    });
+    ctx.srcBuilder.appendNext(")");
+    return;
+  }
+
+  if (kind === "component-expression") {
+    emitExpression(e.base, ctx);
+    ctx.srcBuilder.appendNext("[");
+    emitExpression(e.access, ctx);
+    ctx.srcBuilder.appendNext("]");
+    return;
+  }
+
+  if (kind === "component-member-expression") {
+    emitExpression(e.base, ctx);
+    ctx.srcBuilder.add("." + e.access.name, e.access.start, e.access.end);
+    return;
+  }
+
+  assertUnreachable(kind);
+}
+
+function emitContents(elem: ContainerElem, ctx: EmitContext): void {
+  const validElements = filterValidElements(elem.contents, ctx.conditions);
+  for (const e of validElements) lowerAndEmitElem(e, ctx);
+}
+
+/**
+ * Emit a type reference. Declared types carry their template params in
+ * `contents` (with source punctuation as text), so emit from there to preserve
+ * spacing. Expression-position types have empty contents, so emit structurally.
+ */
+function emitTypeRefElem(e: TypeRefElem, ctx: EmitContext): void {
+  if (e.contents.length) emitContents(e, ctx);
+  else emitTypeRef(e, ctx);
 }
 
 function emitStuff(e: ContainerElem, ctx: EmitContext): void {
@@ -193,14 +362,6 @@ function emitRootElemNl(ctx: EmitContext): void {
   ctx.srcBuilder.addNl();
 }
 
-function emitText(e: TextElem, ctx: EmitContext): void {
-  ctx.srcBuilder.addCopy(e.start, e.end);
-}
-
-function emitName(e: NameElem, ctx: EmitContext): void {
-  ctx.srcBuilder.add(e.name, e.start, e.end);
-}
-
 /** Emit function explicitly to control commas between conditional parameters. */
 function emitFn(e: FnElem, ctx: EmitContext): void {
   const { attributes, name, params, returnAttributes, returnType, body } = e;
@@ -236,18 +397,6 @@ function emitFn(e: FnElem, ctx: EmitContext): void {
   }
 
   emitContents(body, ctx);
-}
-
-function emitAttributes(
-  attributes: AttributeElem[] | undefined,
-  ctx: EmitContext,
-): void {
-  attributes?.forEach(a => {
-    const emitted = emitAttribute(a, ctx);
-    if (emitted) {
-      ctx.srcBuilder.add(" ", a.start, a.end);
-    }
-  });
 }
 
 /** Emit structs explicitly to control commas between conditional members. */
@@ -288,148 +437,6 @@ function emitStruct(e: StructElem, ctx: EmitContext): void {
   }
 }
 
-function warnEmptyStruct(e: StructElem): void {
-  const { name, members } = e;
-  const condStr = members.length ? "(with current conditions)" : "";
-  const message = `struct '${name.ident.originalName}' has no members ${condStr}`;
-  failIdentElem(name, message);
-}
-
-function emitSynthetic(e: SyntheticElem, ctx: EmitContext): void {
-  const { text } = e;
-  ctx.srcBuilder.addSynthetic(text, text, 0, text.length);
-}
-
-function emitContents(elem: ContainerElem, ctx: EmitContext): void {
-  const validElements = filterValidElements(elem.contents, ctx.conditions);
-  for (const e of validElements) lowerAndEmitElem(e, ctx);
-}
-
-/** Emit contents with leading/trailing whitespace trimming (V2 parser). */
-function emitContentsWithTrimming(elem: ContainerElem, ctx: EmitContext): void {
-  const validElements = filterValidElements(elem.contents, ctx.conditions);
-
-  // Find first/last non-conditional-attribute indices for trimming
-  const firstEmit = validElements.findIndex(e => !isConditionalAttr(e));
-  const lastEmit = validElements.findLastIndex(e => !isConditionalAttr(e));
-
-  validElements.forEach((elem, i) => {
-    if (elem.kind === "text") {
-      let text = elem.srcModule.src.slice(elem.start, elem.end);
-      if (i === firstEmit) text = text.trimStart();
-      if (i === lastEmit) text = text.trimEnd();
-      if (text) ctx.srcBuilder.add(text, elem.start, elem.end);
-    } else {
-      lowerAndEmitElem(elem, ctx);
-    }
-  });
-}
-
-function isConditionalAttr(e: AbstractElem): boolean {
-  if (e.kind !== "attribute") return false;
-  const { kind } = e.attribute;
-  return kind === "@if" || kind === "@elif" || kind === "@else";
-}
-
-/** Emit contents without whitespace. */
-function emitContentsNoWs(elem: ContainerElem, ctx: EmitContext): void {
-  const validElements = filterValidElements(elem.contents, ctx.conditions);
-  validElements.forEach(e => {
-    if (e.kind === "text") {
-      const { srcModule, start, end } = e;
-      const text = srcModule.src.slice(start, end);
-      if (text.trim() === "") {
-        return;
-      }
-    }
-    lowerAndEmitElem(e, ctx);
-  });
-}
-
-function emitRefIdent(e: RefIdentElem, ctx: EmitContext): void {
-  if (e.ident.std) {
-    ctx.srcBuilder.add(e.ident.originalName, e.start, e.end);
-  } else {
-    const declIdent = findDecl(e.ident);
-    const mangledName = displayName(declIdent);
-    ctx.srcBuilder.add(mangledName!, e.start, e.end);
-  }
-}
-
-function emitDeclIdent(e: DeclIdentElem, ctx: EmitContext): void {
-  const mangledName = displayName(e.ident);
-  ctx.srcBuilder.add(mangledName!, e.start, e.end);
-}
-
-function emitExpression(e: ExpressionElem, ctx: EmitContext): void {
-  const { kind } = e;
-
-  if (kind === "literal") {
-    ctx.srcBuilder.add(e.value, e.start, e.end);
-    return;
-  }
-
-  if (kind === "ref") {
-    emitRefIdent(e, ctx);
-    return;
-  }
-
-  if (kind === "type") {
-    emitContents(e, ctx);
-    return;
-  }
-
-  if (kind === "binary-expression") {
-    emitExpression(e.left, ctx);
-    ctx.srcBuilder.add(
-      ` ${e.operator.value} `,
-      e.operator.span[0],
-      e.operator.span[1],
-    );
-    emitExpression(e.right, ctx);
-    return;
-  }
-
-  if (kind === "unary-expression") {
-    const { value, start, end } = e.operator;
-    ctx.srcBuilder.add(value, start, end);
-    emitExpression(e.expression, ctx);
-    return;
-  }
-
-  if (kind === "parenthesized-expression") {
-    emitExpression(e.expression, ctx);
-    return;
-  }
-
-  if (kind === "call-expression") {
-    emitExpression(e.function, ctx);
-    if (e.templateArgs) {
-      for (const targ of e.templateArgs) lowerAndEmitElem(targ, ctx);
-    }
-    for (const arg of e.arguments) {
-      emitExpression(arg, ctx);
-    }
-    return;
-  }
-
-  if (kind === "component-expression") {
-    emitExpression(e.base, ctx);
-    emitExpression(e.access, ctx);
-    return;
-  }
-
-  if (kind === "component-member-expression") {
-    emitExpression(e.base, ctx);
-    if (e.access.kind === "name") {
-      ctx.srcBuilder.add(e.access.name, e.access.start, e.access.end);
-    }
-    return;
-  }
-
-  assertUnreachable(kind);
-}
-
 function emitAttribute(e: AttributeElem, ctx: EmitContext): boolean {
   const { kind } = e.attribute;
 
@@ -446,18 +453,14 @@ function emitAttribute(e: AttributeElem, ctx: EmitContext): boolean {
   }
 
   if (kind === "@builtin") {
-    ctx.srcBuilder.add(
-      "@builtin(" + e.attribute.param.name + ")",
-      e.start,
-      e.end,
-    );
+    const builtinStr = `@builtin(${e.attribute.param.name})`;
+    ctx.srcBuilder.add(builtinStr, e.start, e.end);
     return true;
   }
 
   if (kind === "@diagnostic") {
-    const diagStr =
-      "@diagnostic" +
-      diagnosticControlToString(e.attribute.severity, e.attribute.rule);
+    const { severity, rule } = e.attribute;
+    const diagStr = `@diagnostic${diagnosticControlToString(severity, rule)}`;
     ctx.srcBuilder.add(diagStr, e.start, e.end);
     return true;
   }
@@ -469,68 +472,6 @@ function emitAttribute(e: AttributeElem, ctx: EmitContext): boolean {
   }
 
   assertUnreachable(kind);
-}
-
-function emitStandardAttribute(e: AttributeElem, ctx: EmitContext): void {
-  if (e.attribute.kind !== "@attribute") return;
-
-  const { params } = e.attribute;
-  if (!params || params.length === 0) {
-    ctx.srcBuilder.add("@" + e.attribute.name, e.start, e.end);
-    return;
-  }
-
-  ctx.srcBuilder.add("@" + e.attribute.name + "(", e.start, params[0].start);
-  for (let i = 0; i < params.length; i++) {
-    emitContents(params[i], ctx);
-    if (i < params.length - 1) {
-      ctx.srcBuilder.add(",", params[i].end, params[i + 1].start);
-    }
-  }
-  ctx.srcBuilder.add(")", params[params.length - 1].end, e.end);
-}
-
-export function diagnosticControlToString(
-  severity: NameElem,
-  rule: [NameElem, NameElem | null],
-): string {
-  const ruleStr = rule[0].name + (rule[1] !== null ? "." + rule[1].name : "");
-  return `(${severity.name}, ${ruleStr})`;
-}
-
-export function expressionToString(elem: ExpressionElem): string {
-  const { kind } = elem;
-  switch (kind) {
-    case "binary-expression": {
-      const left = expressionToString(elem.left);
-      const right = expressionToString(elem.right);
-      return `${left} ${elem.operator.value} ${right}`;
-    }
-    case "unary-expression":
-      return `${elem.operator.value}${expressionToString(elem.expression)}`;
-    case "ref":
-      return elem.ident.originalName;
-    case "literal":
-      return elem.value;
-    case "parenthesized-expression":
-      return `(${expressionToString(elem.expression)})`;
-    case "component-expression":
-      return `${expressionToString(elem.base)}[${elem.access}]`;
-    case "component-member-expression":
-      return `${expressionToString(elem.base)}.${elem.access}`;
-    case "call-expression": {
-      const fn = elem.function;
-      const name =
-        fn.kind === "ref" ? fn.ident.originalName : fn.name.originalName;
-      const targs = elem.templateArgs ? `<...>` : "";
-      const args = elem.arguments.map(expressionToString).join(", ");
-      return `${name}${targs}(${args})`;
-    }
-    case "type":
-      return elem.name.originalName;
-    default:
-      assertUnreachable(kind);
-  }
 }
 
 function emitDirective(e: DirectiveElem, ctx: EmitContext): void {
@@ -563,16 +504,94 @@ function displayName(declIdent: DeclIdent): string {
   return declIdent.mangledName || declIdent.originalName;
 }
 
-/** Trace through refersTo links until we find the declaration. */
-export function findDecl(ident: Ident): DeclIdent {
-  let i: Ident | undefined = ident;
-  do {
-    if (i.kind === "decl") {
-      return i;
-    }
-    i = i.refersTo;
-  } while (i);
+/** Emit a comma-separated template argument list: <a, b, c>. */
+function emitTemplateArgs(args: ExpressionElem[], ctx: EmitContext): void {
+  ctx.srcBuilder.appendNext("<");
+  args.forEach((a, i) => {
+    if (i > 0) ctx.srcBuilder.appendNext(", ");
+    emitExpression(a, ctx);
+  });
+  ctx.srcBuilder.appendNext(">");
+}
 
-  // TODO show source position if this can happen in a non buggy linker.
-  throw new Error(`unresolved identifer: ${ident.originalName}`);
+/** Emit a type reference structurally: name plus an optional <...> arg list. */
+function emitTypeRef(e: TypeRefElem, ctx: EmitContext): void {
+  emitRefIdent(e.name.refIdentElem, ctx);
+  if (e.templateParams) emitTemplateArgs(e.templateParams, ctx);
+}
+
+/** Emit contents with leading/trailing whitespace trimmed. */
+function emitContentsWithTrimming(elem: ContainerElem, ctx: EmitContext): void {
+  const validElements = filterValidElements(elem.contents, ctx.conditions);
+
+  // Find first/last non-conditional-attribute indices for trimming
+  const firstEmit = validElements.findIndex(e => !isConditionalAttr(e));
+  const lastEmit = validElements.findLastIndex(e => !isConditionalAttr(e));
+
+  validElements.forEach((elem, i) => {
+    if (elem.kind === "text") {
+      let text = elem.srcModule.src.slice(elem.start, elem.end);
+      if (i === firstEmit) text = text.trimStart();
+      if (i === lastEmit) text = text.trimEnd();
+      if (text) ctx.srcBuilder.add(text, elem.start, elem.end);
+    } else {
+      lowerAndEmitElem(elem, ctx);
+    }
+  });
+}
+
+function emitAttributes(
+  attributes: AttributeElem[] | undefined,
+  ctx: EmitContext,
+): void {
+  attributes?.forEach(a => {
+    const emitted = emitAttribute(a, ctx);
+    if (emitted) {
+      ctx.srcBuilder.add(" ", a.start, a.end);
+    }
+  });
+}
+
+/** Emit contents without whitespace. */
+function emitContentsNoWs(elem: ContainerElem, ctx: EmitContext): void {
+  const validElements = filterValidElements(elem.contents, ctx.conditions);
+  validElements.forEach(e => {
+    if (e.kind === "text") {
+      const text = e.srcModule.src.slice(e.start, e.end);
+      if (text.trim() === "") return;
+    }
+    lowerAndEmitElem(e, ctx);
+  });
+}
+
+function warnEmptyStruct(e: StructElem): void {
+  const { name, members } = e;
+  const condStr = members.length ? "(with current conditions)" : "";
+  const message = `struct '${name.ident.originalName}' has no members ${condStr}`;
+  failIdentElem(name, message);
+}
+
+function emitStandardAttribute(e: AttributeElem, ctx: EmitContext): void {
+  if (e.attribute.kind !== "@attribute") return;
+
+  const { params } = e.attribute;
+  if (!params || params.length === 0) {
+    ctx.srcBuilder.add("@" + e.attribute.name, e.start, e.end);
+    return;
+  }
+
+  ctx.srcBuilder.add("@" + e.attribute.name + "(", e.start, params[0].start);
+  for (let i = 0; i < params.length; i++) {
+    emitContents(params[i], ctx);
+    if (i < params.length - 1) {
+      ctx.srcBuilder.add(",", params[i].end, params[i + 1].start);
+    }
+  }
+  ctx.srcBuilder.add(")", params[params.length - 1].end, e.end);
+}
+
+function isConditionalAttr(e: AbstractElem): boolean {
+  if (e.kind !== "attribute") return false;
+  const { kind } = e.attribute;
+  return kind === "@if" || kind === "@elif" || kind === "@else";
 }

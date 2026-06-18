@@ -31,12 +31,12 @@ test("parse fn with calls", () => {
           text '{'
           statement
             text ' '
-            ref foo
-            text '();'
+            call-expression call
+            text ';'
           statement
             text ' '
-            ref bar
-            text '();'
+            call-expression call
+            text ';'
           text ' }'"
   `);
 });
@@ -73,7 +73,9 @@ test("parse global var", () => {
           text ': '
           type i32
             ref i32
-        text ' = 1;'"
+        text ' = '
+        literal literal(1)
+        text ';'"
   `);
 });
 
@@ -103,7 +105,9 @@ test("parse const", () => {
         text 'const '
         typeDecl %y
           decl %y
-        text ' = 11u;'"
+        text ' = '
+        literal literal(11u)
+        text ';'"
   `);
 });
 
@@ -132,9 +136,7 @@ test("parse const_assert", () => {
     "module
       assert
         text 'const_assert '
-        ref x
-        text ' < '
-        ref y
+        binary-expression binop(<)
         text ';'"
   `);
 });
@@ -219,7 +221,7 @@ test("parse @compute @workgroup_size(a, b, 1) before fn", () => {
         '
       fn main() @compute @workgroup_size
         attribute @compute
-        attribute @workgroup_size(ref a, ' ' ref b, ' 1')
+        attribute @workgroup_size(ref a, ' ' ref b, ' ' literal literal(1))
         decl %main
         statement
           text '{}'
@@ -241,9 +243,9 @@ test("parse top level var", () => {
       text '
         '
       gvar %u : Uniforms @group @binding
-        attribute @group('0')
+        attribute @group(literal literal(0))
         text ' '
-        attribute @binding('0')
+        attribute @binding(literal literal(0))
         text ' var<uniform> '
         typeDecl %u : Uniforms
           decl %u
@@ -280,14 +282,18 @@ test("parse top level override and const", () => {
         text 'override '
         typeDecl %x
           decl %x
-        text ' = 21;'
+        text ' = '
+        literal literal(21)
+        text ';'
       text '
         '
       const %y
         text 'const '
         typeDecl %y
           decl %y
-        text ' = 1;'
+        text ' = '
+        literal literal(1)
+        text ';'
       text '
 
         '
@@ -344,7 +350,9 @@ test("parse array alias", () => {
           ref array
           text '<'
           ref Point
-          text ', 3>'
+          text ', '
+          literal literal(3)
+          text '>'
         text ';'
       text '
       '"
@@ -466,7 +474,9 @@ test("parse simple templated type", () => {
               ref array
               text '<'
               ref MyStruct
-              text ',4>'
+              text ','
+              literal literal(4)
+              text '>'
         statement
           text '{ }'"
   `);
@@ -488,7 +498,9 @@ test("parse with space before template", () => {
               ref array
               text ' <'
               ref MyStruct
-              text ',4>'
+              text ','
+              literal literal(4)
+              text '>'
         statement
           text '{ }'"
   `);
@@ -509,10 +521,8 @@ test("parse nested template that ends with >> ", () => {
             type vec2<array<ref MyStruct, literal literal(4)>>
               ref vec2
               text '<'
-              ref array
-              text ' <'
-              ref MyStruct
-              text ',4>>'
+              type array<ref MyStruct, literal literal(4)>
+              text '>'
         statement
           text '{ }'"
   `);
@@ -534,7 +544,9 @@ test("parse type in <template> in global var", () => {
             ref array
             text '<'
             ref MyStruct
-            text ', 8>'
+            text ', '
+            literal literal(8)
+            text '>'
         text ';'"
   `);
 });
@@ -562,10 +574,12 @@ test("parse for(;;) {} not as a fn call", () => {
               text 'var '
               typeDecl %a
                 decl %a
-              text ' = 1;'
+              text ' = '
+              literal literal(1)
+              text ';'
             text ' '
-            ref a
-            text ' < 10; '
+            binary-expression binop(<)
+            text '; '
             ref a
             text '++) '
             statement
@@ -613,7 +627,7 @@ test("parse fn with attributes and suffix comma", () => {
       '
       fn main(grid: vec3<ref u32>, localIndex: u32) @compute @workgroup_size
         attribute @compute
-        attribute @workgroup_size(ref workgroupThreads, ' 1', ' 1')
+        attribute @workgroup_size(ref workgroupThreads, ' ' literal literal(1), ' ' literal literal(1))
         decl %main
         param
           attribute @builtin(global_invocation_id)
@@ -666,7 +680,9 @@ test("parse fn", () => {
         statement
           text '{'
           statement
-            text ' return 1.0;'
+            text ' return '
+            literal literal(1.0)
+            text ';'
           text ' }'"
   `);
 });
@@ -708,8 +724,8 @@ test("parse foo::bar(); ", () => {
           text '{'
           statement
             text ' '
-            ref foo::bar
-            text '();'
+            call-expression call
+            text ';'
           text ' }'"
   `);
 });
@@ -731,7 +747,9 @@ test("parse let x: foo::bar; ", () => {
               text ': '
               type foo::bar
                 ref foo::bar
-            text ' = 1;'
+            text ' = '
+            literal literal(1)
+            text ';'
           text ' }'"
   `);
 });
@@ -794,12 +812,14 @@ test("parse switch statement", () => {
           text '{'
           statement
             text '
-          switch ('
-            ref x
-            text ') {'
+          switch '
+            parenthesized-expression parens
+            text ' {'
             switch-clause
               text '
-            case 1: '
+            case '
+              literal literal(1)
+              text ': '
               statement
                 text '{'
                 statement
@@ -851,16 +871,20 @@ test("parse switch statement-2", () => {
           text '{'
           statement
             text '
-          switch ( '
-            ref code
-            text ' ) {'
+          switch '
+            parenthesized-expression parens
+            text ' {'
             switch-clause
               text '
-            case 5u: '
+            case '
+              literal literal(5u)
+              text ': '
               statement
                 text '{'
                 statement
-                  text ' if 1 > 0 '
+                  text ' if '
+                  binary-expression binop(>)
+                  text ' '
                   statement
                     text '{ }'
                 text ' }'
@@ -903,8 +927,8 @@ test("parse struct constructor in assignment", () => {
             typeDecl %x
               decl %x
             text ' = '
-            ref AStruct
-            text '(1u);'
+            call-expression call
+            text ';'
           text '
         }'
       text '
@@ -934,8 +958,8 @@ test("parse struct.member (component_or_swizzle)", () => {
             typeDecl %x
               decl %x
             text ' = '
-            ref u
-            text '.frame;'
+            component-member-expression .
+            text ';'
           text '
         }'
       text '
@@ -957,7 +981,9 @@ test("var<workgroup> work: array<u32, 128>;", ctx => {
             ref array
             text '<'
             ref u32
-            text ', 128>'
+            text ', '
+            literal literal(128)
+            text '>'
         text ';'"
   `);
 });
@@ -972,7 +998,9 @@ test("fn f() { _ = 1; }", ctx => {
         statement
           text '{'
           statement
-            text ' _ = 1;'
+            text ' _ = '
+            literal literal(1)
+            text ';'
           text ' }'"
   `);
 });
@@ -993,8 +1021,8 @@ test("var foo: vec2<f32 >= vec2( 0.5, -0.5);", ctx => {
             ref f32
             text ' >'
         text '= '
-        ref vec2
-        text '( 0.5, -0.5);'"
+        call-expression call
+        text ';'"
   `);
 });
 
@@ -1016,10 +1044,12 @@ test("fn main() { var tmp: array<i32, 1 << 1>=array(1, 2); }", ctx => {
                 ref array
                 text '<'
                 ref i32
-                text ', 1 << 1>'
+                text ', '
+                binary-expression binop(<<)
+                text '>'
             text '='
-            ref array
-            text '(1, 2);'
+            call-expression call
+            text ';'
           text ' }'"
   `);
 });
@@ -1130,10 +1160,8 @@ test(`parse ptr with internal array`, () => {
             text '<'
             ref storage
             text ', '
-            ref array
-            text '<'
-            ref f32
-            text '>, '
+            type array<ref f32>
+            text ', '
             ref read_write
             text '>'
         text ';'
@@ -1160,9 +1188,9 @@ test(`parse binding struct`, () => {
         text ' {
           '
         member @group @binding particles: ptr<ref storage, array<ref f32>, ref read_write>
-          attribute @group('0')
+          attribute @group(literal literal(0))
           text ' '
-          attribute @binding('0')
+          attribute @binding(literal literal(0))
           text ' '
           name particles
           text ': '
@@ -1171,10 +1199,8 @@ test(`parse binding struct`, () => {
             text '<'
             ref storage
             text ', '
-            ref array
-            text '<'
-            ref f32
-            text '>, '
+            type array<ref f32>
+            text ', '
             ref read_write
             text '>'
         text ', 
@@ -1203,8 +1229,8 @@ test(`parse struct reference`, () => {
             typeDecl %x
               decl %x
             text ' = '
-            ref a
-            text '.b[0];'
+            component-expression []
+            text ';'
           text ' }'
       text ';
       '"
@@ -1230,12 +1256,10 @@ test("member reference with extra components", () => {
           statement
             text '
         '
-            ref output
-            text '[ '
-            ref out
-            text ' + 0u ] = '
-            ref c
-            text '.p0.t0.x;'
+            component-expression []
+            text ' = '
+            component-member-expression .
+            text ';'
           text '
       }'
       text '
@@ -1265,10 +1289,8 @@ test("parse let declaration", () => {
             typeDecl %char
               decl %char
             text ' = '
-            ref array
-            text '<'
-            ref u32
-            text ', 2>(0, 0);'
+            call-expression call
+            text ';'
           text '
         }'
       text '
@@ -1300,7 +1322,9 @@ test("parse let declaration with type", () => {
               text ' : '
               type u32
                 ref u32
-            text ' = 0;'
+            text ' = '
+            literal literal(0)
+            text ';'
           text '
         }'
       text '
@@ -1358,8 +1382,8 @@ test("separator in fn call ", () => {
           statement
             text '
           '
-            ref b::c
-            text '();'
+            call-expression call
+            text ';'
           text '
         }'
       text '
@@ -1388,9 +1412,9 @@ test("binding struct", () => {
         text ' {
           '
         member @group @binding particles: ptr<ref storage, array<ref f32>, ref read_write>
-          attribute @group('0')
+          attribute @group(literal literal(0))
           text ' '
-          attribute @binding('0')
+          attribute @binding(literal literal(0))
           text ' '
           name particles
           text ': '
@@ -1399,18 +1423,16 @@ test("binding struct", () => {
             text '<'
             ref storage
             text ', '
-            ref array
-            text '<'
-            ref f32
-            text '>, '
+            type array<ref f32>
+            text ', '
             ref read_write
             text '>'
         text ', 
           '
         member @group @binding uniforms: ptr<ref uniform, ref Uniforms>
-          attribute @group('0')
+          attribute @group(literal literal(0))
           text ' '
-          attribute @binding('1')
+          attribute @binding(literal literal(1))
           text ' '
           name uniforms
           text ': '
@@ -1424,9 +1446,9 @@ test("binding struct", () => {
         text ', 
           '
         member @group @binding tex: texture_2d<ref rgba8unorm>
-          attribute @group('0')
+          attribute @group(literal literal(0))
           text ' '
-          attribute @binding('2')
+          attribute @binding(literal literal(2))
           text ' '
           name tex
           text ': '
@@ -1438,9 +1460,9 @@ test("binding struct", () => {
         text ',
           '
         member @group @binding samp: sampler
-          attribute @group('0')
+          attribute @group(literal literal(0))
           text ' '
-          attribute @binding('3')
+          attribute @binding(literal literal(3))
           text ' '
           name samp
           text ': '
@@ -1472,10 +1494,10 @@ test("memberRefs with extra components", () => {
           statement
             text '
           '
-            ref b
-            text '.particles[0] = '
-            ref b
-            text '.uniforms.foo;'
+            component-expression []
+            text ' = '
+            component-member-expression .
+            text ';'
           text '
         }'
       text '
@@ -1502,10 +1524,10 @@ test("memberRef with ref in array", () => {
           statement
             text '
           '
-            ref vsOut
-            text '.barycenticCoord['
-            ref vertNdx
-            text '] = 1.0;'
+            component-expression []
+            text ' = '
+            literal literal(1.0)
+            text ';'
           text '
         }'
       text '
@@ -1532,8 +1554,8 @@ test("parse inline package reference", () => {
           statement
             text '
           '
-            ref package::foo::bar
-            text '();'
+            call-expression call
+            text ';'
           text '
         }'
       text '

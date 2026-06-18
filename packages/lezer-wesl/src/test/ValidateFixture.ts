@@ -20,7 +20,7 @@ export function validateFile(name: string, src: string) {
   const lezerNodes = extractLezerNodes(lezerTree);
 
   const srcModule = { src, debugFilePath: name, modulePath: name };
-  const weslAst = parseSrcModule(srcModule, { preserveExpressions: true });
+  const weslAst = parseSrcModule(srcModule);
   const weslNodes = extractWeslNodes(weslAst);
 
   const result = compareNodes(weslNodes, lezerNodes);
@@ -51,10 +51,8 @@ export function expectValidation(name: string) {
     return;
   }
   expect(result.matching).toBeGreaterThan(0);
-  expect(result.missingInLezer, `${name}: wesl nodes missing in lezer`).toEqual(
-    [],
-  );
-  expect(result.missingInWesl, `${name}: lezer nodes missing in wesl`).toEqual(
-    [],
-  );
+  const lezerMsg = `${name}: wesl nodes missing in lezer`;
+  const weslMsg = `${name}: lezer nodes missing in wesl`;
+  expect(result.missingInLezer, lezerMsg).toEqual([]);
+  expect(result.missingInWesl, weslMsg).toEqual([]);
 }

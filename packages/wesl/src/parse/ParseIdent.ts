@@ -56,11 +56,10 @@ export function parseIdent(
 
   const refIdentElem = makeRefIdentElem(ctx, ident, start, end);
 
-  // Don't add conditionRef idents to scope - they're only in the expression tree
-  if (!conditionRef) {
-    ctx.saveIdent(ident);
-    ctx.addElem(refIdentElem);
-  }
+  // conditionRef idents (@if/@elif) stay out of the scope tree entirely.
+  // The RefIdentElem is never added to container contents - it lives only
+  // inside the expression tree built by parseExpression.
+  if (!conditionRef) ctx.saveIdent(ident);
 
   return refIdentElem;
 }

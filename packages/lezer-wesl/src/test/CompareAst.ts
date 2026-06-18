@@ -34,11 +34,6 @@ const localDeclKinds = new Set(["var", "let", "const"]);
 
 const lezerTypes = new Set(Object.values(weslToLezer));
 
-/** @return lezer node type name for a wesl AST kind, or null if not mapped. */
-function mapWeslKind(kind: string): string | null {
-  return weslToLezer[kind] ?? null;
-}
-
 /** Extract comparable nodes from a lezer parse tree. */
 export function extractLezerNodes(tree: Tree): NodeInfo[] {
   const nodes: NodeInfo[] = [];
@@ -57,22 +52,6 @@ export function extractWeslNodes(ast: WeslAST): NodeInfo[] {
   const nodes: NodeInfo[] = [];
   collectNodes(ast.moduleElem, false, nodes);
   return nodes;
-}
-
-/** Walk container elements only (not expressions), collecting mapped nodes. */
-function collectNodes(
-  elem: AbstractElem,
-  inFn: boolean,
-  nodes: NodeInfo[],
-): void {
-  const isLocalDecl = inFn && localDeclKinds.has(elem.kind);
-  const mapped = isLocalDecl ? null : mapWeslKind(elem.kind);
-  if (mapped && "start" in elem)
-    nodes.push({ type: mapped, start: elem.start });
-
-  if (!("contents" in elem)) return;
-  const childInFn = inFn || elem.kind === "fn";
-  for (const child of elem.contents) collectNodes(child, childInFn, nodes);
 }
 
 /** Compare nodes from wesl and lezer ASTs, matching by type and start position. */
@@ -103,4 +82,28 @@ export function compareNodes(
   }
 
   return { matching, missingInLezer, missingInWesl };
+}
+
+/** Walk container elements only (not expressions), collecting mapped nodes. */
+function collectNodes(
+  elem: AbstractElem,
+  inFn: boolean,
+  nodes: NodeInfo[],
+): void {
+  const isLocalDecl = inFn && localDeclKinds.has(elem.kind);
+  const mapped = isLocalDecl ? null : mapWeslKind(elem.kind);
+  if (mapped && "start" in elem)
+    nodes.push({ type: mapped, start: elem.start });
+
+  if (!("contents" in elem)) return;
+  // a type's contents are template-param expressions (incl. nested type refs);
+  // don't descend - lezer does not emit comparable nested nodes there
+  if (elem.kind === "type") return;
+  const childInFn = inFn || elem.kind === "fn";
+  for (const child of elem.contents) collectNodes(child, childInFn, nodes);
+}
+
+/** @return lezer node type name for a wesl AST kind, or null if not mapped. */
+function mapWeslKind(kind: string): string | null {
+  return weslToLezer[kind] ?? null;
 }

@@ -7,6 +7,7 @@ import type {
   RequiresDirective,
 } from "../AbstractElems.ts";
 import { parseAttributeList } from "./ParseAttribute.ts";
+import { getStartWithAttributes } from "./ParseStatement.ts";
 import {
   attachAttributes,
   expect,
@@ -49,11 +50,6 @@ function parseExtensionDirective(
   return makeDirectiveElem(directive, token, stream, attributes);
 }
 
-function parseDirectiveName(ctx: ParsingContext): NameElem {
-  const nameToken = expectWord(ctx.stream, "Expected identifier in name list");
-  return makeNameElem(nameToken);
-}
-
 /**
  * Grammar: diagnostic_directive : 'diagnostic' diagnostic_control ';'
  * Grammar: diagnostic_control : '(' severity_control_name ',' diagnostic_rule_name ',' ? ')'
@@ -91,13 +87,18 @@ function parseDiagnosticDirective(
   return makeDirectiveElem(directive, token, stream, attributes);
 }
 
+function parseDirectiveName(ctx: ParsingContext): NameElem {
+  const nameToken = expectWord(ctx.stream, "Expected identifier in name list");
+  return makeNameElem(nameToken);
+}
+
 function makeDirectiveElem(
   directive: EnableDirective | RequiresDirective | DiagnosticDirective,
   token: WeslToken,
   stream: WeslStream,
   attributes?: AttributeElem[],
 ): DirectiveElem {
-  const start = attributes?.[0]?.start ?? token.span[0];
+  const start = getStartWithAttributes(attributes, token.span[0]);
   const end = stream.checkpoint();
   const elem: DirectiveElem = { kind: "directive", directive, start, end };
   attachAttributes(elem, attributes);

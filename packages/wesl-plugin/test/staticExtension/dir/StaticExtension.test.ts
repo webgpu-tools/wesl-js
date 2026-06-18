@@ -25,11 +25,7 @@ test("verify ?static", async () => {
     }
 
     fn mix2to3(p: vec2u) -> vec3u {
-        let seed = vec3u(
-            p.x,
-            p.x ^ p.y,
-            p.x + p.y,
-        );
+        let seed = vec3u(p.x, p.x ^ p.y, p.x + p.y);
         return seed;
     }
 

@@ -3,7 +3,6 @@ import type {
   ContinuingElem,
   StatementElem,
 } from "../AbstractElems.ts";
-import { parseExpression } from "./ParseExpression.ts";
 import { parseLocalVarDecl } from "./ParseLocalVar.ts";
 import {
   parseAssignmentRhs,
@@ -14,7 +13,11 @@ import {
   expectCompound,
   finishBlockStatement,
 } from "./ParseStatement.ts";
-import { expect, expectExpression } from "./ParseUtil.ts";
+import {
+  expect,
+  expectExpression,
+  parseContentExpression,
+} from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 
 /**
@@ -33,8 +36,7 @@ export function parseForStatement(
   expect(stream, "(", "'for'");
 
   parseForInit(ctx);
-  const cond = parseExpression(ctx); // returns null if empty condition
-  if (cond && ctx.options.preserveExpressions) ctx.addElem(cond);
+  parseContentExpression(ctx); // null if empty condition
   expect(stream, ";", "for loop condition");
   parseForUpdate(ctx);
   expect(stream, ")", "for loop header");
@@ -100,8 +102,7 @@ function parseForInit(ctx: ParsingContext): void {
     ctx.addElem(varDecl);
     // parseLocalVarDecl already consumed the ';'
   } else {
-    const expr = parseExpression(ctx); // returns null for empty case
-    if (expr && ctx.options.preserveExpressions) ctx.addElem(expr);
+    parseContentExpression(ctx); // null for empty case
     expect(stream, ";", "for loop init");
   }
 }
@@ -109,7 +110,6 @@ function parseForInit(ctx: ParsingContext): void {
 /** Grammar: for_update : variable_updating_statement | func_call_statement
  *           variable_updating_statement : assignment_statement | increment_statement | decrement_statement */
 function parseForUpdate(ctx: ParsingContext): void {
-  const expr = parseExpression(ctx);
-  if (expr && ctx.options.preserveExpressions) ctx.addElem(expr);
-  parseIncDecOperator(ctx.stream) || parseAssignmentRhs(ctx);
+  parseContentExpression(ctx);
+  if (!parseIncDecOperator(ctx.stream)) parseAssignmentRhs(ctx);
 }

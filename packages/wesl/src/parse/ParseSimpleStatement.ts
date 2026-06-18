@@ -5,7 +5,12 @@ import {
   finishBlockStatement,
   getStartWithAttributes,
 } from "./ParseStatement.ts";
-import { expect, expectExpression, throwParseError } from "./ParseUtil.ts";
+import {
+  expect,
+  expectExpression,
+  parseContentExpression,
+  throwParseError,
+} from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 import type { WeslStream } from "./WeslStream.ts";
 
@@ -48,6 +53,23 @@ export function parseSimpleStatement(
   );
 }
 
+/** Grammar: assignment_statement : lhs_expression ( '=' | compound_assignment_operator ) expression */
+export function parseAssignmentOperator(stream: WeslStream): boolean {
+  return !!stream.nextIf(({ text }) => assignmentOps.has(text));
+}
+
+/** Grammar: ( '=' | compound_assignment_operator ) expression (rhs of assignment_statement) */
+export function parseAssignmentRhs(ctx: ParsingContext): boolean {
+  if (!parseAssignmentOperator(ctx.stream)) return false;
+  expectExpression(ctx, "Expected expression after assignment operator");
+  return true;
+}
+
+/** Grammar: increment_statement : lhs_expression '++' ; decrement_statement : lhs_expression '--' */
+export function parseIncDecOperator(stream: WeslStream): boolean {
+  return !!stream.nextIf(({ text }) => text === "++" || text === "--");
+}
+
 /** Grammar: return_statement : 'return' expression? ';' */
 function parseReturnStmt(
   ctx: ParsingContext,
@@ -57,8 +79,7 @@ function parseReturnStmt(
   const { stream } = ctx;
   if (!stream.matchText("return")) return null;
   beginElem(ctx, "statement", attributes);
-  const expr = parseExpression(ctx);
-  if (expr && ctx.options.preserveExpressions) ctx.addElem(expr);
+  parseContentExpression(ctx); // null for bare 'return;'
   expect(stream, ";", "return statement");
   return finishBlockStatement(startPos, ctx, attributes);
 }
@@ -139,26 +160,9 @@ function parseExpressionStmt(
     stream.reset(startPos);
     return null;
   }
-  if (ctx.options.preserveExpressions) ctx.addElem(expr);
+  ctx.addElem(expr);
 
   if (!parseIncDecOperator(stream)) parseAssignmentRhs(ctx);
   expect(stream, ";", "expression");
   return finishBlockStatement(startPos, ctx, attributes);
-}
-
-/** Grammar: assignment_statement : lhs_expression ( '=' | compound_assignment_operator ) expression */
-export function parseAssignmentOperator(stream: WeslStream): boolean {
-  return !!stream.nextIf(({ text }) => assignmentOps.has(text));
-}
-
-/** Grammar: ( '=' | compound_assignment_operator ) expression (rhs of assignment_statement) */
-export function parseAssignmentRhs(ctx: ParsingContext): boolean {
-  if (!parseAssignmentOperator(ctx.stream)) return false;
-  expectExpression(ctx, "Expected expression after assignment operator");
-  return true;
-}
-
-/** Grammar: increment_statement : lhs_expression '++' ; decrement_statement : lhs_expression '--' */
-export function parseIncDecOperator(stream: WeslStream): boolean {
-  return !!stream.nextIf(({ text }) => text === "++" || text === "--");
 }

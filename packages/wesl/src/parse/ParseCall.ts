@@ -24,11 +24,10 @@ export function parseCallSuffix(
   if (current.kind !== "ref" && current.kind !== "type") return null;
 
   const { stream } = ctx;
-  // TypeRefElem has templates already; RefIdentElem needs separate parsing
+  // Constructor calls (e.g. vec4<f32>(...)) already have their template args
+  // on the TypeRefElem; only function calls need template args parsed here.
   const templateArgs =
-    current.kind === "type"
-      ? (current.templateParams ?? null)
-      : parseCallTemplateArgs(ctx);
+    current.kind === "ref" ? parseCallTemplateArgs(ctx) : null;
 
   if (!stream.matchText("(")) return null;
 

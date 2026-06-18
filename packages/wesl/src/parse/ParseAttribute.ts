@@ -22,6 +22,7 @@ import {
   expectWord,
   makeNameElem,
   parseCommaList,
+  parseContentExpression,
   parseMany,
 } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
@@ -47,6 +48,27 @@ export function parseElifAttribute(ctx: ParsingContext): ElifAttribute | null {
   return parseConditionalAttribute(ctx, "elif", makeElifAttribute);
 }
 
+/** Parse WESL conditional attributes (@if, @elif, @else) */
+export function parseWeslConditional(
+  ctx: ParsingContext,
+): AttributeElem | null {
+  const { stream } = ctx;
+  const peeked = stream.peek();
+  if (peeked?.text !== "@") return null;
+  const startPos = peeked.span[0]; // Use token position, not stream checkpoint
+
+  const ifAttr = parseIfAttribute(ctx);
+  if (ifAttr) return attributeElem(ifAttr, startPos, stream.checkpoint());
+
+  const elifAttr = parseElifAttribute(ctx);
+  if (elifAttr) return attributeElem(elifAttr, startPos, stream.checkpoint());
+
+  const elseAttr = parseElseAttribute(ctx);
+  if (elseAttr) return attributeElem(elseAttr, startPos, stream.checkpoint());
+
+  return null;
+}
+
 /**
  * Grammar: attribute :
  *   '@' ident_pattern_token argument_expression_list ?
@@ -57,18 +79,9 @@ export function parseElifAttribute(ctx: ParsingContext): ElifAttribute | null {
  * WESL extensions: @if, @elif, @else
  */
 function parseAttribute(ctx: ParsingContext): AttributeElem | null {
-  const { stream } = ctx;
-  const startPos = stream.checkpoint();
-  if (!stream.matchText("@")) return null;
-  stream.reset(startPos);
+  if (ctx.stream.peek()?.text !== "@") return null;
 
-  const weslAttr = parseWeslConditional(ctx);
-  if (weslAttr) return weslAttr;
-
-  const stdAttr = parseStandardAttribute(ctx);
-  if (stdAttr) return stdAttr;
-
-  return null;
+  return parseWeslConditional(ctx) ?? parseStandardAttribute(ctx);
 }
 
 /** Parse `@if(expr)` or `@elif(expr)` conditional attributes. */
@@ -108,25 +121,12 @@ function makeElifAttribute(param: TranslateTimeExpressionElem): ElifAttribute {
   return { kind: "@elif", param } as const;
 }
 
-/** Parse WESL conditional attributes (@if, @elif, @else) */
-export function parseWeslConditional(
-  ctx: ParsingContext,
-): AttributeElem | null {
-  const { stream } = ctx;
-  const peeked = stream.peek();
-  if (peeked?.text !== "@") return null;
-  const startPos = peeked.span[0]; // Use token position, not stream checkpoint
-
-  const ifAttr = parseIfAttribute(ctx);
-  if (ifAttr) return attributeElem(ifAttr, startPos, stream.checkpoint());
-
-  const elifAttr = parseElifAttribute(ctx);
-  if (elifAttr) return attributeElem(elifAttr, startPos, stream.checkpoint());
-
-  const elseAttr = parseElseAttribute(ctx);
-  if (elseAttr) return attributeElem(elseAttr, startPos, stream.checkpoint());
-
-  return null;
+function attributeElem(
+  attribute: Attribute,
+  start: number,
+  end: number,
+): AttributeElem {
+  return { kind: "attribute", attribute, start, end, contents: [] };
 }
 
 /** Parse a standard attribute (not @if/@elif/@else) */
@@ -138,10 +138,7 @@ function parseStandardAttribute(ctx: ParsingContext): AttributeElem | null {
   const startPos = atToken.span[0]; // Use actual @ position, not before whitespace
 
   const nameToken = stream.peek();
-  if (
-    !nameToken ||
-    (nameToken.kind !== "word" && nameToken.kind !== "keyword")
-  ) {
+  if (nameToken?.kind !== "word" && nameToken?.kind !== "keyword") {
     stream.reset(resetPos);
     return null;
   }
@@ -186,14 +183,6 @@ function makeTranslateTimeExpressionElem(args: {
   };
 }
 
-function attributeElem(
-  attribute: Attribute,
-  start: number,
-  end: number,
-): AttributeElem {
-  return { kind: "attribute", attribute, start, end, contents: [] };
-}
-
 function parseBuiltinAttribute(
   ctx: ParsingContext,
   startPos: number,
@@ -225,11 +214,6 @@ function parseInterpolateAttribute(
     params,
   };
   return attributeElem(interpolateAttr, startPos, stream.checkpoint());
-}
-
-function parseNameElem(ctx: ParsingContext): NameElem {
-  const nameToken = expectWord(ctx.stream, "Expected identifier");
-  return makeNameElem(nameToken);
 }
 
 /** @diagnostic(severity, rule) or @diagnostic(severity, namespace.rule) */
@@ -266,11 +250,16 @@ function parseAttributeParams(ctx: ParsingContext): UnknownExpressionElem[] {
   return parseCommaList(ctx, parseAttrParam);
 }
 
+function parseNameElem(ctx: ParsingContext): NameElem {
+  const nameToken = expectWord(ctx.stream, "Expected identifier");
+  return makeNameElem(nameToken);
+}
+
 function parseAttrParam(ctx: ParsingContext): UnknownExpressionElem {
   const { stream } = ctx;
   const start = stream.checkpoint();
   beginElem(ctx, "expression");
-  parseExpression(ctx);
+  parseContentExpression(ctx);
   const end = stream.checkpoint();
   const contents = finishContents(ctx, start, end);
   return { kind: "expression", start, end, contents };
