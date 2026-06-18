@@ -167,9 +167,9 @@ function finishForUpdate(
 }
 
 /**
- * Construct a for-header sub-node (assign/increment/decrement/call) holding only
- * typed fields. The lhs/rhs already live in the for statement's `contents`, so
- * this node carries empty `contents` and is not separately emitted.
+ * Construct a for-header sub-node (assign/increment/decrement/call). Its lhs/rhs
+ * already live in the for statement's `contents`, so this node carries empty
+ * `contents` and is not separately emitted.
  */
 function makeForNode<K extends "assign" | "increment" | "decrement" | "call">(
   ctx: ParsingContext,

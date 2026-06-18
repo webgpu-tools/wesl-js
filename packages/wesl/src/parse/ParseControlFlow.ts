@@ -66,10 +66,9 @@ export function parseSwitchStatement(
  * Grammar: else_if_clause : 'else' 'if' expression compound_statement
  * Grammar: else_clause : 'else' compound_statement
  *
- * The typed result nests (an else-if is an IfElem in the outer if's `else`),
- * but each clause body is still registered in the enclosing if's `contents`
- * (flat, as before) so emit walks them unchanged. Nested IfElems carry their
- * structure in fields only, with empty `contents`.
+ * An else-if nests as an IfElem in the outer if's `else` field, but its body is
+ * still added flat to the enclosing if's `contents` so emit walks them unchanged.
+ * The nested IfElem holds structure in fields only, with empty `contents`.
  */
 function parseElseChain(ctx: ParsingContext): IfElem | BlockElem | undefined {
   const { stream } = ctx;
