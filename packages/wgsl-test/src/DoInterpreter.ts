@@ -1,14 +1,23 @@
 import type {
+  AssignElem,
   BinaryExpression,
   BlockElem,
+  ConstElem,
+  DecrementElem,
   DoBlockElem,
   ExpressionElem,
+  ForElem,
   FunctionCallExpression,
+  IfElem,
+  IncrementElem,
   LetElem,
   Literal,
+  LoopElem,
+  Statement,
   UnaryExpression,
   VarElem,
   WeslAST,
+  WhileElem,
 } from "wesl";
 import { recordComputePass } from "wesl-gpu";
 import { classifyEntryPoints, type EntryPoint } from "wesl-reflect";
@@ -29,6 +38,14 @@ export interface RunDoInterpreterParams {
   maxDepth?: number;
 }
 
+/** A local binding. `let`/`const` are immutable; `var` may be reassigned. */
+interface Local {
+  value: number;
+  mutable: boolean;
+}
+
+type Scope = Map<string, Local>;
+
 interface Env {
   entryPoints: Map<string, EntryPoint>;
   doBlocks: Map<string, DoBlockElem>;
@@ -39,6 +56,13 @@ interface Env {
   depth: number;
   maxDepth: number;
 }
+
+/** Thrown by `break` / `continue`, caught at the enclosing loop so the jump is
+ *  loop-scoped: a `break` inside a nested `if` exits the loop, not the `if`. */
+class BreakSignal {}
+class ContinueSignal {}
+/** Thrown by a valueless `return`, caught at the current block boundary. */
+class ReturnSignal {}
 
 /** Walk a `do` block, recording compute dispatches onto the caller's encoder.
  *  Returns when the body has been fully interpreted. Throws on any unsupported
@@ -60,15 +84,11 @@ export function runDoInterpreter(p: RunDoInterpreterParams): void {
     depth: 0,
     maxDepth: p.maxDepth ?? 256,
   };
-  interpretBlock(block, env, new Map());
+  interpretDoBlock(block, env, new Map());
 }
 
 /** Interpret a do block body in a child scope, guarding recursion depth. */
-function interpretBlock(
-  block: DoBlockElem,
-  env: Env,
-  parentScope: Map<string, number>,
-): void {
+function interpretDoBlock(block: DoBlockElem, env: Env, parent: Scope): void {
   if (env.depth >= env.maxDepth) {
     throw new Error(
       `do block '${block.name.name}' exceeded recursion depth ${env.maxDepth}`,
@@ -76,41 +96,257 @@ function interpretBlock(
   }
   env.depth++;
   try {
-    const scope = new Map(parentScope);
-    for (const elem of block.body.contents) {
-      interpretStatement(elem, block, env, scope);
-    }
+    runBlock(block.body, block, env, parent);
+  } catch (e) {
+    if (!(e instanceof ReturnSignal)) throw e; // valueless return ends the block
   } finally {
     env.depth--;
   }
 }
 
-/** Interpret one body statement: skip text, bind let/var locals, dispatch calls. */
-function interpretStatement(
-  elem: BlockElem["contents"][number],
+/** Run a compound `{ ... }` block's statements in a fresh child scope. */
+function runBlock(
+  body: BlockElem,
   block: DoBlockElem,
   env: Env,
-  scope: Map<string, number>,
+  parent: Scope,
 ): void {
-  if (elem.kind === "text") return;
-  if (elem.kind === "let" || elem.kind === "var") {
-    bindLocal(elem, block, scope);
-    return;
-  }
-  if (elem.kind === "call") {
-    dispatchCall(elem.call, block, env, scope);
-    return;
-  }
-  throw new Error(
-    `do block '${block.name.name}' contains a statement unsupported by ` +
-      `the interpreter (straight-line only: let/var bindings + entry-point or do calls)`,
-  );
+  const scope: Scope = new Map(parent);
+  for (const stmt of body.body) interpretStatement(stmt, block, env, scope);
 }
 
-function bindLocal(
-  decl: LetElem | VarElem,
+/** Interpret one statement, switching on its typed kind. */
+function interpretStatement(
+  stmt: Statement,
   block: DoBlockElem,
-  scope: Map<string, number>,
+  env: Env,
+  scope: Scope,
+): void {
+  switch (stmt.kind) {
+    case "let":
+    case "var":
+    case "const":
+      bindLocal(stmt, block, scope);
+      return;
+    case "call":
+      dispatchCall(stmt.call, block, env, scope);
+      return;
+    case "block":
+      runBlock(stmt, block, env, scope);
+      return;
+    case "if":
+      interpretIf(stmt, block, env, scope);
+      return;
+    case "for":
+      interpretFor(stmt, block, env, scope);
+      return;
+    case "while":
+      interpretWhile(stmt, block, env, scope);
+      return;
+    case "loop":
+      interpretLoop(stmt, block, env, scope);
+      return;
+    case "break":
+      throw new BreakSignal();
+    case "continue":
+      throw new ContinueSignal();
+    case "return":
+      if (stmt.value !== undefined) {
+        throw rejection(
+          block,
+          "a `return` with a value",
+          "Tier 7",
+          "calling user WGSL functions",
+        );
+      }
+      throw new ReturnSignal();
+    case "assign":
+      interpretAssign(stmt, block, scope);
+      return;
+    case "increment":
+    case "decrement":
+      interpretIncDec(stmt, block, scope);
+      return;
+    case "empty":
+      return;
+    default:
+      throw rejection(
+        block,
+        `the '${stmt.kind}' statement`,
+        "Tier 1+",
+        "programmable scheduling",
+      );
+  }
+}
+
+/** if / else-if / else: else is an IfElem (else-if) or a BlockElem (plain else). */
+function interpretIf(
+  stmt: IfElem,
+  block: DoBlockElem,
+  env: Env,
+  scope: Scope,
+): void {
+  if (truthy(evalExpr(stmt.condition, block, scope))) {
+    runBlock(stmt.body, block, env, scope);
+  } else if (stmt.else?.kind === "if") {
+    interpretIf(stmt.else, block, env, scope);
+  } else if (stmt.else) {
+    runBlock(stmt.else, block, env, scope);
+  }
+}
+
+/** for: own scope holds the init binding; while condition holds, run body then update. */
+function interpretFor(
+  stmt: ForElem,
+  block: DoBlockElem,
+  env: Env,
+  scope: Scope,
+): void {
+  const loopScope: Scope = new Map(scope);
+  if (stmt.init) interpretStatement(stmt.init, block, env, loopScope);
+  while (
+    stmt.condition === undefined ||
+    truthy(evalExpr(stmt.condition, block, loopScope))
+  ) {
+    try {
+      runBlock(stmt.body, block, env, loopScope);
+    } catch (e) {
+      if (e instanceof BreakSignal) break;
+      if (!(e instanceof ContinueSignal)) throw e;
+    }
+    if (stmt.update) interpretStatement(stmt.update, block, env, loopScope);
+  }
+}
+
+/** while: run the body while the condition holds. */
+function interpretWhile(
+  stmt: WhileElem,
+  block: DoBlockElem,
+  env: Env,
+  scope: Scope,
+): void {
+  while (truthy(evalExpr(stmt.condition, block, scope))) {
+    try {
+      runBlock(stmt.body, block, env, scope);
+    } catch (e) {
+      if (e instanceof BreakSignal) break;
+      if (!(e instanceof ContinueSignal)) throw e;
+    }
+  }
+}
+
+/** loop: run the body until a `break`; an optional continuing block runs each pass. */
+function interpretLoop(
+  stmt: LoopElem,
+  block: DoBlockElem,
+  env: Env,
+  scope: Scope,
+): void {
+  for (;;) {
+    const loopScope: Scope = new Map(scope);
+    try {
+      // skip the trailing continuing node when iterating the loop body
+      for (const s of stmt.body.body) {
+        if (s.kind === "continuing") continue;
+        interpretStatement(s, block, env, loopScope);
+      }
+    } catch (e) {
+      if (e instanceof BreakSignal) break;
+      if (!(e instanceof ContinueSignal)) throw e;
+    }
+    if (stmt.continuing) {
+      for (const s of stmt.continuing.body.body) {
+        interpretStatement(s, block, env, loopScope);
+      }
+      if (
+        stmt.continuing.breakIf &&
+        truthy(evalExpr(stmt.continuing.breakIf, block, loopScope))
+      ) {
+        break;
+      }
+    }
+  }
+}
+
+/** Assignment / compound assignment to a scalar local named by a `ref` lhs. */
+function interpretAssign(
+  stmt: AssignElem,
+  block: DoBlockElem,
+  scope: Scope,
+): void {
+  const local = resolveAssignTarget(stmt.lhs, block, scope);
+  const rhs = evalExpr(stmt.rhs, block, scope);
+  if (stmt.op.value === "=") {
+    local.value = rhs;
+    return;
+  }
+  const op = stmt.op.value.slice(0, -1); // strip trailing '=' => binary op
+  local.value = applyBinary(op, local.value, rhs);
+}
+
+/** `i++` / `i--` on a scalar local; u32-wraps the result. */
+function interpretIncDec(
+  stmt: IncrementElem | DecrementElem,
+  block: DoBlockElem,
+  scope: Scope,
+): void {
+  const local = resolveAssignTarget(stmt.target, block, scope);
+  const delta = stmt.kind === "increment" ? 1 : -1;
+  local.value = applyBinary("+", local.value, delta);
+}
+
+/** Resolve a mutable scalar local from an lhs/target expression. Rejects
+ *  non-local targets (e.g. buffer writes) with a tiered message. */
+function resolveAssignTarget(
+  lhs: AssignElem["lhs"] | ExpressionElem,
+  block: DoBlockElem,
+  scope: Scope,
+): Local {
+  if (lhs.kind === "phony") {
+    throw rejection(
+      block,
+      "phony assignment `_ = ...`",
+      "Tier 2",
+      "buffer readback",
+    );
+  }
+  if (lhs.kind === "component-expression") {
+    throw rejection(
+      block,
+      "writing to a buffer element `data[i] = ...`",
+      "Tier 2.5",
+      "CPU-to-GPU buffer writes",
+    );
+  }
+  if (lhs.kind !== "ref") {
+    throw rejection(
+      block,
+      `assignment to a '${lhs.kind}'`,
+      "Tier 1+",
+      "programmable scheduling",
+    );
+  }
+  const name = lhs.ident.originalName;
+  const local = scope.get(name);
+  if (!local) {
+    throw new Error(
+      `do block '${block.name.name}': assignment to unbound name '${name}'`,
+    );
+  }
+  if (!local.mutable) {
+    throw new Error(
+      `do block '${block.name.name}': cannot reassign immutable '${name}' ` +
+        "(let/const bindings are immutable; declare with 'var' to mutate)",
+    );
+  }
+  return local;
+}
+
+/** Bind a let/var/const local. `var` is mutable; `let`/`const` are immutable. */
+function bindLocal(
+  decl: LetElem | VarElem | ConstElem,
+  block: DoBlockElem,
+  scope: Scope,
 ): void {
   const name = decl.name.decl.ident.originalName;
   if (!decl.init) {
@@ -118,7 +354,8 @@ function bindLocal(
       `do block '${block.name.name}': '${decl.kind} ${name}' has no initializer`,
     );
   }
-  scope.set(name, evalExpr(decl.init, block, scope));
+  const value = evalExpr(decl.init, block, scope);
+  scope.set(name, { value, mutable: decl.kind === "var" });
 }
 
 /** Dispatch a call: entry-point => GPU dispatch, do block => recurse. */
@@ -126,7 +363,7 @@ function dispatchCall(
   call: FunctionCallExpression,
   block: DoBlockElem,
   env: Env,
-  scope: Map<string, number>,
+  scope: Scope,
 ): void {
   const targetName = callTargetName(call);
   if (!targetName) {
@@ -144,7 +381,7 @@ function dispatchCall(
 
   const childBlock = env.doBlocks.get(targetName);
   if (childBlock) {
-    interpretBlock(childBlock, env, scope);
+    interpretDoBlock(childBlock, env, scope);
     return;
   }
 
@@ -156,21 +393,21 @@ function dispatchCall(
 function evalExpr(
   expr: ExpressionElem,
   block: DoBlockElem,
-  scope: Map<string, number>,
+  scope: Scope,
 ): number {
   switch (expr.kind) {
     case "literal":
       return parseLiteral(expr, block);
     case "ref": {
       const name = expr.ident.originalName;
-      const value = scope.get(name);
-      if (value === undefined) {
+      const local = scope.get(name);
+      if (local === undefined) {
         throw new Error(
           `do block '${block.name.name}': unbound name '${name}' ` +
-            "(evaluator handles only let/var locals)",
+            "(evaluator handles only let/var/const locals)",
         );
       }
-      return value;
+      return local.value;
     }
     case "parenthesized-expression":
       return evalExpr(expr.expression, block, scope);
@@ -178,10 +415,33 @@ function evalExpr(
       return evalUnary(expr, block, scope);
     case "binary-expression":
       return evalBinary(expr, block, scope);
+    case "component-expression":
+      throw rejection(
+        block,
+        "buffer indexing `data[i]`",
+        "Tier 2",
+        "buffer readback",
+      );
+    case "component-member-expression":
+      throw rejection(
+        block,
+        "field/swizzle access `.x`",
+        "Tier 5",
+        "vectors and matrices",
+      );
+    case "call-expression":
+      throw rejection(
+        block,
+        "calling a function in an expression",
+        "Tier 4",
+        "WGSL builtins",
+      );
     default:
-      throw new Error(
-        `do block '${block.name.name}': unsupported expression kind ` +
-          `'${expr.kind}' (interpreter supports integer literals/refs/arithmetic)`,
+      throw rejection(
+        block,
+        `the '${expr.kind}' expression`,
+        "Tier 1+",
+        "programmable scheduling",
       );
   }
 }
@@ -231,12 +491,17 @@ function dispatchEntryPoint(
   );
 }
 
+/** Parse an integer literal, rejecting float literals with a tiered message. */
 function parseLiteral(lit: Literal, block: DoBlockElem): number {
+  if (lit.value === "true") return 1;
+  if (lit.value === "false") return 0;
   const raw = lit.value.replace(/[uif]$/i, "").replace(/_/g, "");
   if (!/^[+-]?\d+$/.test(raw)) {
-    throw new Error(
-      `do block '${block.name.name}': non-integer literal '${lit.value}' ` +
-        "(evaluator is integer-only)",
+    throw rejection(
+      block,
+      `the float literal '${lit.value}'`,
+      "Tier 3",
+      "WGSL numeric types",
     );
   }
   return Number.parseInt(raw, 10);
@@ -245,14 +510,14 @@ function parseLiteral(lit: Literal, block: DoBlockElem): number {
 function evalUnary(
   expr: UnaryExpression,
   block: DoBlockElem,
-  scope: Map<string, number>,
+  scope: Scope,
 ): number {
   const v = evalExpr(expr.expression, block, scope);
   switch (expr.operator.value) {
     case "-":
-      return -v;
+      return wrapInt(-v, v);
     case "~":
-      return ~v;
+      return ~v >>> 0;
     case "!":
       return v === 0 ? 1 : 0;
     default:
@@ -262,30 +527,95 @@ function evalUnary(
   }
 }
 
+/** Binary op dispatch. `&&`/`||` short-circuit; comparisons/logical yield 1/0. */
 function evalBinary(
   expr: BinaryExpression,
   block: DoBlockElem,
-  scope: Map<string, number>,
+  scope: Scope,
 ): number {
+  const op = expr.operator.value;
   const l = evalExpr(expr.left, block, scope);
+  if (op === "&&")
+    return truthy(l) ? boolBit(truthy(evalExpr(expr.right, block, scope))) : 0;
+  if (op === "||")
+    return truthy(l) ? 1 : boolBit(truthy(evalExpr(expr.right, block, scope)));
   const r = evalExpr(expr.right, block, scope);
-  switch (expr.operator.value) {
+  return applyBinary(op, l, r);
+}
+
+/** Apply a binary arithmetic/comparison/bitwise op to two evaluated scalars. */
+function applyBinary(op: string, l: number, r: number): number {
+  switch (op) {
     case "+":
-      return l + r;
+      return wrapInt(l + r, l, r);
     case "-":
-      return l - r;
+      return wrapInt(l - r, l, r);
     case "*":
-      return l * r;
+      return wrapInt(l * r, l, r);
     case "/":
-      return Math.trunc(l / r);
+      return wrapInt(Math.trunc(l / r), l, r);
     case "%":
-      return l % r;
+      return wrapInt(l % r, l, r);
+    case "<":
+      return boolBit(l < r);
+    case "<=":
+      return boolBit(l <= r);
+    case ">":
+      return boolBit(l > r);
+    case ">=":
+      return boolBit(l >= r);
+    case "==":
+      return boolBit(l === r);
+    case "!=":
+      return boolBit(l !== r);
+    case "&":
+      return (l & r) >>> 0;
+    case "|":
+      return (l | r) >>> 0;
+    case "^":
+      return (l ^ r) >>> 0;
+    case "<<":
+      return (l << r) >>> 0;
+    case ">>":
+      return l >>> r;
     default:
-      throw new Error(
-        `do block '${block.name.name}': unsupported binary '${expr.operator.value}' ` +
-          "(interpreter supports + - * / %)",
-      );
+      throw new Error(`unsupported binary operator '${op}'`);
   }
+}
+
+/**
+ * Wrap an integer arithmetic result at the 32-bit boundary. Pragmatic Tier 1
+ * discipline (not a full tagged-scalar type system, which is Tier 3): do-block
+ * counters are u32 (`var i = 0u`), so wrap to u32 via `>>> 0`. If any operand is
+ * negative we wrap as i32 via `| 0` instead, keeping `i - 1` style math sane.
+ * Non-integer results pass through unwrapped so a stray float surfaces as-is.
+ */
+function wrapInt(result: number, ...operands: number[]): number {
+  if (!Number.isInteger(result)) return result;
+  if (operands.some(o => o < 0) || result < 0) return result | 0;
+  return result >>> 0;
+}
+
+/** Comparisons and logical ops yield 1/0 (no bool type yet; that's Tier 3). */
+function boolBit(b: boolean): number {
+  return b ? 1 : 0;
+}
+
+function truthy(v: number): boolean {
+  return v !== 0;
+}
+
+/** Build a tiered rejection error: names the construct and the tier required. */
+function rejection(
+  block: DoBlockElem,
+  construct: string,
+  tier: string,
+  feature: string,
+): Error {
+  return new Error(
+    `do block '${block.name.name}': ${construct} is not yet supported ` +
+      `(${tier}: ${feature})`,
+  );
 }
 
 /** Convert evaluated call args into workgroup dispatch dimensions. */
