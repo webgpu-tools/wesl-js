@@ -560,7 +560,7 @@ function emitTypedDecl(name: TypedDeclElem, ctx: EmitContext): void {
   }
 }
 
-/** Emit a ` = init` clause, or nothing when there is no initializer. */
+/** Emit a ` = init` clause, if present. */
 function emitInit(init: ExpressionElem | undefined, ctx: EmitContext): void {
   if (!init) return;
   ctx.srcBuilder.appendNext(" = ");

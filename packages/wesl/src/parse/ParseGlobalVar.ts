@@ -123,10 +123,9 @@ export function parseConstAssert(
 }
 
 /**
- * Parse an optional var template list `<storage, read_write>`, capturing the
- * comma-separated enumerant names. They are predeclared enumerants (address
- * space / access mode), not user idents, so they are captured as unbound
- * NameElems.
+ * Parse an optional var template list `<storage, read_write>`. The entries are
+ * predeclared enumerants (address space / access mode), not user idents, so they
+ * are captured as unbound NameElems.
  */
 export function parseTemplateList(ctx: ParsingContext): NameElem[] | undefined {
   const { stream } = ctx;
