@@ -32,36 +32,19 @@ export function bindingStructsPlugin(): WeslJsPlugin {
 }
 
 /**
- * Transform binding structures into binding variables by mutating the AST.
+ * Replace binding structs with binding variables, mutating (a clone of) the AST.
  *
- * First we find all the binding structs:
- *   . find all the structs in the module by filtering the moduleElem.contents
- *     . for each struct:
- *       . mark any structs with that contain @group or @binding annotations as 'binding structs' and save them in a list
- *       . (later) create reverse links from structs to struct members
- *       . (later) visit all the binding structs and traverse to referencing structs, marking the referencing structs as binding structs too
- * Generate synethic AST nodes for binding variables
+ * A binding struct is one whose members carry `@group`/`@binding`. Each member
+ * becomes a synthetic global var; references like `b.particles` are rewritten to
+ * the new var, the intermediate `b: Bindings` params are dropped, and the struct
+ * itself is removed.
  *
- * Find all references to binding struct members
- *   . find the componound idents by traversing moduleElem.contents
- *   . filter to find the compound idents that refer to 'binding structs'
- *     . go from each ident to its declaration,
- *     . declaration to typeRef reference
- *     . typeRef to type declaration
- *     . check type declaration to see if it's a binding struct
- *     . record the intermediate declaration (e.g. a fn param b:Bindings from 'fn(b:Bindings)' )
- * rewrite references to binding struct members as synthetic elements
- *
- * Remove the binding structs from the AST
- * Remove the intermediate fn param declarations from the AST
- * Add the new binding variables to the AST
- *
- * @return the binding structs and the mutated AST
+ * @return the mutated AST, with the binding structs recorded in notableElems.
  */
 export function lowerBindingStructs(ast: TransformedAST): TransformedAST {
   const clonedAst = structuredClone(ast);
   const { moduleElem, globalNames, notableElems } = clonedAst;
-  const bindingStructs = markBindingStructs(moduleElem); // CONSIDER should we only mark bining structs referenced from the entry point?
+  const bindingStructs = markBindingStructs(moduleElem); // CONSIDER should we only mark binding structs referenced from the entry point?
   markEntryTypes(moduleElem, bindingStructs);
   const newVars = bindingStructs.flatMap(s =>
     transformBindingStruct(s, globalNames),
@@ -121,10 +104,7 @@ function removeBindingStructs(moduleElem: ModuleElem): AbstractElem[] {
   );
 }
 
-/** mutate the AST, marking StructElems as bindingStructs
- *  (if they contain ptrs with @group @binding annotations)
- * @return the binding structs
- */
+/** Mark and return structs with @group/@binding members as binding structs. */
 export function markBindingStructs(
   moduleElem: ModuleElem,
 ): BindingStructElem[] {
@@ -137,7 +117,7 @@ export function markBindingStructs(
   return bindingStructs as BindingStructElem[];
 }
 
-/** @return true if this struct contains a member with marked with @binding or @group */
+/** @return true if any struct member is marked with @binding or @group */
 function containsBinding(struct: StructElem): boolean {
   return struct.members.some(({ attributes }) => bindingAttribute(attributes));
 }

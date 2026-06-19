@@ -865,7 +865,8 @@ function emitTypeRef(e: TypeRefElem, ctx: EmitContext): void {
 function emitContentsWithTrimming(elem: ContainerElem, ctx: EmitContext): void {
   const validElements = filterValidElements(elem.contents, ctx.conditions);
 
-  // Find first/last non-conditional-attribute indices for trimming
+  // Trim against the first/last elements that actually emit; conditional
+  // attributes produce no output, so skip them when locating the edges.
   const firstEmit = validElements.findIndex(e => !isConditionalAttr(e));
   const lastEmit = validElements.findLastIndex(e => !isConditionalAttr(e));
 
