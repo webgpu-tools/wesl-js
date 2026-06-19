@@ -358,8 +358,8 @@ function emitModule(e: ContainerElem, ctx: EmitContext): void {
   }
 }
 
-/** Statement kinds whose core prints no trailing ';' (compounds; locals and the
- *  empty statement carry their own ';' or none). */
+/** Statement kinds that emitStatement must not follow with a ';': compound
+ *  statements take none, locals already carry their own, empty needs none. */
 const noSemicolon = new Set<Statement["kind"]>([
   "block",
   "if",
