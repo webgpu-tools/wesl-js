@@ -1,4 +1,4 @@
-import type { DoBlockElem, WeslAST } from "wesl";
+import { type DoBlockElem, declsOfKind, type WeslAST } from "wesl";
 import { findAnnotation } from "wesl-reflect";
 
 export interface DoBlockInfo {
@@ -12,14 +12,12 @@ export interface DoBlockInfo {
 
 /** Find all `do` blocks in a parsed WESL module. */
 export function findDoBlocks(ast: WeslAST): DoBlockInfo[] {
-  return ast.moduleElem.decls
-    .filter((e): e is DoBlockElem => e.kind === "do")
-    .map(block => ({
-      name: block.name.name,
-      isTest: !!findAnnotation(block, "test"),
-      isEntry: !!findAnnotation(block, "entry"),
-      block,
-    }));
+  return declsOfKind(ast.moduleElem, "do").map(block => ({
+    name: block.name.name,
+    isTest: !!findAnnotation(block, "test"),
+    isEntry: !!findAnnotation(block, "entry"),
+    block,
+  }));
 }
 
 /** Subset that is runnable as a wgsl-test: `@test @entry`. */

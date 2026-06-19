@@ -1,4 +1,4 @@
-import type { FnElem, WeslAST } from "wesl";
+import { declsOfKind, type FnElem, type WeslAST } from "wesl";
 import { findAnnotation, firstRefName, numericParams } from "wesl-reflect";
 
 export interface TestFunctionInfo {
@@ -21,8 +21,7 @@ export function testDisplayName(name: string, description?: string): string {
 
 /** Find all functions marked with @test attribute (excluding @snapshot fns). */
 export function findTestFunctions(ast: WeslAST): TestFunctionInfo[] {
-  return ast.moduleElem.decls
-    .filter((e): e is FnElem => e.kind === "fn")
+  return declsOfKind(ast.moduleElem, "fn")
     .filter(fn => findAnnotation(fn, "test") && !findAnnotation(fn, "snapshot"))
     .filter(fn => {
       if (fn.params.length > 0) {
@@ -43,8 +42,7 @@ export function findTestFunctions(ast: WeslAST): TestFunctionInfo[] {
 
 /** Find all @fragment @snapshot functions in a parsed WESL module. */
 export function findSnapshotFunctions(ast: WeslAST): SnapshotFunctionInfo[] {
-  return ast.moduleElem.decls
-    .filter((e): e is FnElem => e.kind === "fn")
+  return declsOfKind(ast.moduleElem, "fn")
     .filter(
       fn => findAnnotation(fn, "fragment") && findAnnotation(fn, "snapshot"),
     )

@@ -3,9 +3,20 @@ import type {
   DeclIdentElem,
   ExpressionElem,
   HasAttributes,
+  ModuleElem,
   RefIdentElem,
 } from "./AbstractElems.ts";
 import { srcLog } from "./Logging.ts";
+
+/** A module's top-level declarations of a given kind, narrowed to that elem type. */
+export function declsOfKind<K extends AbstractElem["kind"]>(
+  moduleElem: ModuleElem,
+  kind: K,
+): Extract<AbstractElem, { kind: K }>[] {
+  return moduleElem.decls.filter(
+    (e): e is Extract<AbstractElem, { kind: K }> => e.kind === kind,
+  );
+}
 
 /** Visit an elem and all its descendants, parent before children (pre-order). */
 export function visitAst(

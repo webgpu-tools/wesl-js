@@ -4,10 +4,10 @@ import type {
   AttributeElem,
   ConditionalAttribute,
   ConstAssertElem,
-  DoBlockElem,
   GlobalDeclarationElem,
   ModuleElem,
 } from "../AbstractElems.ts";
+import { declsOfKind } from "../LinkerUtil.ts";
 import { ParseError } from "../ParseError.ts";
 import { findMap } from "../Util.ts";
 import { parseAttributeList } from "./ParseAttribute.ts";
@@ -58,9 +58,7 @@ export function parseModule(ctx: ParsingContext): void {
  * small module-local pass, deliberately not part of bindIdents.
  */
 export function checkDoBlockNames(moduleElem: ModuleElem): void {
-  const doBlocks = moduleElem.decls.filter(
-    (e): e is DoBlockElem => e.kind === "do",
-  );
+  const doBlocks = declsOfKind(moduleElem, "do");
   if (doBlocks.length === 0) return;
 
   const declNames = new Set(moduleElem.decls.map(globalDeclName));

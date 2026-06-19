@@ -1,13 +1,13 @@
 import type {
   AbstractElem,
   ConstAssertElem,
-  ImportElem,
   ImportStatement,
   ModuleElem,
   OpenElemKind,
 } from "./AbstractElems.ts";
 import { filterValidElements } from "./Conditions.ts";
 import { type FlatImport, flattenTreeImport } from "./FlattenTreeImport.ts";
+import { declsOfKind } from "./LinkerUtil.ts";
 import type { ParseError } from "./ParseError.ts";
 import { parseWesl } from "./parse/ParseWesl.ts";
 import type { ParseOptions, WeslExtensions } from "./parse/ParsingContext.ts";
@@ -101,9 +101,7 @@ export function flatImports(
   // TODO cache per condition set?
   if (ast._flatImports && !conditions) return ast._flatImports;
 
-  const importElems = ast.moduleElem.decls.filter(
-    (elem): elem is ImportElem => elem.kind === "import",
-  );
+  const importElems = declsOfKind(ast.moduleElem, "import");
   const validImportElems = conditions
     ? filterValidElements(importElems, conditions)
     : importElems;

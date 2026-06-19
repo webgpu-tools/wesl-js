@@ -9,6 +9,7 @@ import type {
   TypeTemplateParameter,
 } from "./AbstractElems.ts";
 import type { TransformedAST, WeslJsPlugin } from "./Linker.ts";
+import { declsOfKind } from "./LinkerUtil.ts";
 import { minimallyMangledName } from "./Mangler.ts";
 import {
   attributeToString,
@@ -54,7 +55,7 @@ export function markEntryTypes(
   moduleElem: ModuleElem,
   bindingStructs: BindingStructElem[],
 ): void {
-  const fns = moduleElem.decls.filter(e => e.kind === "fn");
+  const fns = declsOfKind(moduleElem, "fn");
   const fnFound = fnReferencesBindingStruct(fns, bindingStructs);
   if (fnFound) {
     const { fn, struct } = fnFound;
@@ -66,7 +67,7 @@ export function markEntryTypes(
 export function markBindingStructs(
   moduleElem: ModuleElem,
 ): BindingStructElem[] {
-  const structs = moduleElem.decls.filter(elem => elem.kind === "struct");
+  const structs = declsOfKind(moduleElem, "struct");
   const bindingStructs = structs.filter(containsBinding);
   bindingStructs.forEach(struct => {
     struct.bindingStruct = true;

@@ -1,9 +1,10 @@
-import type {
-  AttributeElem,
-  GlobalVarElem,
-  StandardAttribute,
-  WeslAST,
-  WeslJsPlugin,
+import {
+  type AttributeElem,
+  declsOfKind,
+  type GlobalVarElem,
+  type StandardAttribute,
+  type WeslAST,
+  type WeslJsPlugin,
 } from "wesl";
 import { findAnnotation, firstRefName, numericParams } from "./Annotations.ts";
 import { buildStructRegistry, type StructRegistry } from "./StructLayout.ts";
@@ -54,9 +55,9 @@ export type DiscoveredResource =
 export function findAnnotatedResources(ast: WeslAST): DiscoveredResource[] {
   const src = ast.srcModule.src;
   const structs = buildStructRegistry(ast);
-  return ast.moduleElem.decls
-    .filter((e): e is GlobalVarElem => e.kind === "gvar")
-    .flatMap(gvar => discoverResource(gvar, src, structs));
+  return declsOfKind(ast.moduleElem, "gvar").flatMap(gvar =>
+    discoverResource(gvar, src, structs),
+  );
 }
 
 /** Linker plugin that decorates @buffer/@test_texture/@sampler globals with
@@ -72,8 +73,7 @@ export function annotatedResourcesPlugin(
   );
   return {
     transform: ast => {
-      for (const elem of ast.moduleElem.decls) {
-        if (elem.kind !== "gvar") continue;
+      for (const elem of declsOfKind(ast.moduleElem, "gvar")) {
         const varName = elem.name.decl.ident.originalName;
         const binding = bindingByName.get(varName);
         if (binding === undefined) continue;

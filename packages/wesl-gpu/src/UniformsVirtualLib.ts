@@ -1,5 +1,5 @@
 import type { StructElem, VirtualLibraryFn } from "wesl";
-import { parseSrcModule } from "wesl";
+import { declsOfKind, parseSrcModule } from "wesl";
 import {
   type AnnotatedLayout,
   annotatedLayout,
@@ -55,7 +55,5 @@ function findUniformsStruct(
   modulePath: string,
 ): StructElem | undefined {
   const ast = parseSrcModule({ modulePath, debugFilePath: "entry", src });
-  return ast.moduleElem.decls
-    .filter((e): e is StructElem => e.kind === "struct")
-    .find(isUniformsStruct);
+  return declsOfKind(ast.moduleElem, "struct").find(isUniformsStruct);
 }
