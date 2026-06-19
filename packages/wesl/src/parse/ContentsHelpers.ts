@@ -3,7 +3,6 @@ import type {
   CommentElem,
   GrammarElem,
   OpenElemKind,
-  TextElem,
 } from "../AbstractElems.ts";
 import type { OpenElem } from "../ParseWESL.ts";
 import type { SrcModule } from "../Scope.ts";
@@ -32,30 +31,11 @@ export function discardOpenElem(ctx: ParsingContext): void {
   popOpenElem(ctx);
 }
 
-/** Pop the open element and return its collected children, in source order and
- *  without gap-covering TextElems. Used by the module, which keeps its ordered
- *  children in a typed `decls` array and emits them structurally. */
+/** Pop the open element and return its collected children, in source order.
+ *  Used by the module, which keeps its ordered children in a typed `decls`
+ *  array and emits them structurally. */
 export function finishCollected(ctx: ParsingContext): GrammarElem[] {
   return popOpenElem(ctx).contents as GrammarElem[];
-}
-
-/** Pop element from stack, fill gaps with TextElems, return contents. */
-export function finishContents(
-  ctx: ParsingContext,
-  start: number,
-  end: number,
-): GrammarElem[] {
-  const open = popOpenElem(ctx);
-  return coverWithText(ctx, open.contents as GrammarElem[], start, end);
-}
-
-/** Create a TextElem */
-export function makeText(
-  srcModule: SrcModule,
-  start: number,
-  end: number,
-): TextElem {
-  return { kind: "text", start, end, srcModule };
 }
 
 /**
@@ -96,27 +76,6 @@ function popOpenElem(ctx: ParsingContext): OpenElem {
   const open = ctx.state.context.openElems.pop();
   if (!open) throw new Error("No open element to close");
   return open;
-}
-
-/** Fill gaps between child elements with TextElems. */
-function coverWithText(
-  ctx: ParsingContext,
-  contents: GrammarElem[],
-  start: number,
-  end: number,
-): GrammarElem[] {
-  const { srcModule } = ctx.state.stable;
-  const sorted = contents.slice().sort((a, b) => a.start - b.start);
-  const elems: GrammarElem[] = [];
-  let pos = start;
-
-  for (const elem of sorted) {
-    if (pos < elem.start) elems.push(makeText(srcModule, pos, elem.start));
-    elems.push(elem);
-    pos = elem.end;
-  }
-  if (pos < end) elems.push(makeText(srcModule, pos, end));
-  return elems;
 }
 
 /**

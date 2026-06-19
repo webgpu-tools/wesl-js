@@ -20,7 +20,6 @@ import type {
   SwitchClauseElem,
   SwitchElem,
   SyntheticElem,
-  TextElem,
   TypedDeclElem,
   TypeRefElem,
   WhileElem,
@@ -157,9 +156,6 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
     case "do":
       return; // do blocks are CPU-only, dropped from emitted text
 
-    case "text":
-      emitText(e, ctx);
-      return;
     case "name":
       emitName(e, ctx);
       return;
@@ -265,10 +261,6 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
     default:
       assertUnreachable(e);
   }
-}
-
-function emitText(e: TextElem, ctx: EmitContext): void {
-  ctx.srcBuilder.addCopy(e.start, e.end);
 }
 
 function emitName(e: NameElem, ctx: EmitContext): void {

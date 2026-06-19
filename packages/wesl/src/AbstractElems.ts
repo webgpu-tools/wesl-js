@@ -96,7 +96,6 @@ export type TerminalElem =
   | DeclIdentElem //
   | NameElem
   | RefIdentElem
-  | TextElem
   | ImportElem;
 
 export type GlobalDeclarationElem =
@@ -141,21 +140,11 @@ export interface CommentElem {
   blankBefore?: boolean;
 }
 
-export interface ElemWithContentsBase extends AbstractElemBase {
-  contents: AbstractElem[];
-}
-
 export interface HasAttributes {
   attributes?: AttributeElem[];
 }
 
 /* ------   Terminal Elements  (don't contain other elements)  ------   */
-
-/** Raw text copied to linked WGSL (e.g., 'var' or '@diagnostic(off,derivative_uniformity)'). */
-export interface TextElem extends AbstractElemBase {
-  kind: "text";
-  srcModule: SrcModule;
-}
 
 /** A name that doesn't need to be an Ident (e.g., struct member, diagnostic rule). */
 export interface NameElem extends AbstractElemBase {

@@ -59,9 +59,7 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
   ) {
     return;
   }
-  if (kind === "text") {
-    str.add(` '${elem.srcModule.src.slice(elem.start, elem.end)}'`);
-  } else if (
+  if (
     kind === "var" ||
     kind === "let" ||
     kind === "gvar" ||
