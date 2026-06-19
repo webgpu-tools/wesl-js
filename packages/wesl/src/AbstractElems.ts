@@ -490,7 +490,9 @@ export interface StructMemberElem extends AbstractElemBase, HasAttributes {
   kind: "member";
   name: NameElem;
   typeRef: TypeRefElem;
-  mangledVarName?: string; // root name if transformed to a var (for binding struct transformation)
+  /** When a binding-struct member is lowered to a global var, the var's mangled
+   * name. Recorded for later use; member-access references are not rewritten. */
+  mangledVarName?: string;
 }
 
 export type TypeTemplateParameter = ExpressionElem;

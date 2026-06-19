@@ -87,7 +87,7 @@ export function transformBindingStruct(
     const typeParameters = typeRef?.templateParams;
 
     const varName = minimallyMangledName(memberName.name, globalNames);
-    member.mangledVarName = varName; // save new name so we can rewrite references to this member later
+    member.mangledVarName = varName; // record the synthesized var's name on the member
     globalNames.add(varName);
 
     const attributes =
