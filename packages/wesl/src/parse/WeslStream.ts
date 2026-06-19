@@ -24,6 +24,8 @@ export interface CommentTrivia {
 // https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
 /** Whitespaces including new lines */
 const blankspaces = /[ \t\n\v\f\r\u{0085}\u{200E}\u{200F}\u{2028}\u{2029}]+/u;
+/** One line break, treating \r\n as a single break. */
+const lineBreak = String.raw`\r\n?|[\n\v\f\u{0085}\u{2028}\u{2029}]`;
 const symbolSet =
   "& && -> @ / ! [ ] { } :: : , == = != >>= >> >= > <<= << <= < % - --" +
   " . + ++ | || ( ) ; * ~ ^ // /* */ += -= *= /= %= &= |= ^=" +
@@ -89,8 +91,8 @@ export function weslExtension<T>(combinator: T): T {
 /** A stream that produces WESL tokens, skipping over comments and white space */
 export class WeslStream implements Stream<WeslToken> {
   private stream: Stream<TypedToken<InternalTokenKind>>;
-  /** New line */
-  private eolPattern = /[\n\v\f\u{0085}\u{2028}\u{2029}]|\r\n?/gu;
+  /** New line (stateful: scanned via lastIndex, so kept per-instance). */
+  private eolPattern = new RegExp(lineBreak, "gu");
   private blockCommentPattern = /\/\*|\*\//g;
   /** Comments skipped before a real token, keyed by that token's start position. */
   private triviaByPos = new Map<number, CommentTrivia[]>();
@@ -357,7 +359,9 @@ export class WeslStream implements Stream<WeslToken> {
   }
 }
 
-/** Count line breaks in a whitespace run (treating \r\n as one). */
+const lineBreaks = new RegExp(lineBreak, "gu");
+
+/** Count line breaks in a whitespace run. */
 function countLineBreaks(text: string): number {
-  return text.match(/\r\n?|[\n\v\f\u{0085}\u{2028}\u{2029}]/gu)?.length ?? 0;
+  return text.match(lineBreaks)?.length ?? 0;
 }
