@@ -375,15 +375,20 @@ const noSemicolon = new Set<Statement["kind"]>([
   "assert",
 ]);
 
-/** Emit a `{ ... }` block, one statement per indented line. */
+/** Emit a `{ ... }` block, one statement per indented line. A block with no
+ *  statements collapses to `{ }` unless it holds dangling inner comments. */
 function emitBlock(e: BlockElem, ctx: EmitContext): void {
   const stmts = filterValidElements(e.body, ctx.conditions);
-  if (stmts.length === 0) {
+  if (stmts.length === 0 && !e.innerComments?.length) {
     ctx.srcBuilder.appendNext("{ }");
     return;
   }
   ctx.srcBuilder.appendNext("{");
   const inner = childIndent(ctx);
+  for (const comment of e.innerComments ?? []) {
+    newLine(inner);
+    emitComment(comment, inner);
+  }
   for (const stmt of stmts) emitStatement(stmt, inner);
   newLine(ctx);
   ctx.srcBuilder.appendNext("}");

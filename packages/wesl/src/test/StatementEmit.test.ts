@@ -21,6 +21,17 @@ test("linked WGSL keeps leading and trailing body comments", async () => {
   expectTrimmedMatch(result, src);
 });
 
+test("linked WGSL keeps a comment in an otherwise empty block", async () => {
+  const src = `
+    fn foo() {
+      // fooImpl
+    }
+  `;
+  const result = await linkTest(src);
+  expect(result).toContain("// fooImpl");
+  expectTrimmedMatch(result, src);
+});
+
 test("structural emit of control flow", async () => {
   const src = `
     fn main() {

@@ -84,12 +84,14 @@ interface Commentable {
  * A comment on the same line as the previous child becomes that child's
  * trailing comment (`commentsAfter`); a comment on its own line leads the next
  * child (`commentsBefore`). Comments before the closing token (`danglingPos`,
- * e.g. `}` or end of file) with no following child trail the last child.
+ * e.g. `}` or end of file) with no following child trail the last child, or, in
+ * an empty container, land in `danglingFallback.innerComments`.
  */
 export function attachComments(
   ctx: ParsingContext,
   children: readonly AbstractElem[],
   danglingPos?: number,
+  danglingFallback?: { innerComments?: CommentElem[] },
 ): void {
   const { stream } = ctx;
   const { srcModule } = ctx.state.stable;
@@ -100,9 +102,13 @@ export function attachComments(
     if (run?.length) splitRun(prev, child, run, srcModule);
     prev = child;
   }
-  if (danglingPos !== undefined && prev) {
-    const run = stream.leadingTrivia(danglingPos);
-    if (run?.length) addComments(prev, "commentsAfter", run, srcModule);
+  if (danglingPos === undefined) return;
+  const run = stream.leadingTrivia(danglingPos);
+  if (!run?.length) return;
+  if (prev) {
+    addComments(prev, "commentsAfter", run, srcModule);
+  } else if (danglingFallback) {
+    danglingFallback.innerComments = run.map(t => makeComment(t, srcModule));
   }
 }
 

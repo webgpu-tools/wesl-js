@@ -537,6 +537,8 @@ export interface EmptyElem extends ElemWithContentsBase, HasAttributes {
 export interface BlockElem extends ElemWithContentsBase, HasAttributes {
   kind: "block";
   body: Statement[];
+  /** Comments inside an otherwise empty block, with no statement to attach to. */
+  innerComments?: CommentElem[];
 }
 
 /** An if / else-if / else chain. `else` nests: else-if is an IfElem, plain else a BlockElem. */

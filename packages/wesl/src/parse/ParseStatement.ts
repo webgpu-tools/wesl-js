@@ -68,10 +68,12 @@ export function parseCompoundStatement(
     options?.noScope ||
     (conditionalBlockFeature && hasConditionalAttr(attributes));
   if (!skipScope) ctx.pushScope();
-  const body = parseBlockStatements(ctx, options?.loopBody);
+  const { body, closePos } = parseBlockStatements(ctx, options?.loopBody);
   if (!skipScope) ctx.popScope();
 
-  return finishStatement("block", startPos, ctx, { body }, attributes);
+  const block = finishStatement("block", startPos, ctx, { body }, attributes);
+  attachComments(ctx, body, closePos, block);
+  return block;
 }
 
 /** Grammar: attribute* compound_statement (for control flow bodies) */
@@ -127,14 +129,16 @@ function hasConditionalAttr(attributes?: AttributeElem[]): boolean {
   return !!attributes && hasConditionalAttribute(attributes);
 }
 
-/** Grammar: statement* '}' (after '{' consumed). Loop bodies may end with continuing. */
+/** Grammar: statement* '}' (after '{' consumed). Loop bodies may end with continuing.
+ *  Returns the parsed statements and the position of the closing '}', so the
+ *  caller can attach comments (including ones dangling in an empty block). */
 function parseBlockStatements(
   ctx: ParsingContext,
   loopBody?: boolean,
-): Statement[] {
+): { body: Statement[]; closePos: number } {
   const { stream } = ctx;
   const body: Statement[] = [];
-  let closePos: number | undefined;
+  let closePos = 0;
   while (true) {
     const close = stream.matchText("}");
     if (close) {
@@ -150,8 +154,7 @@ function parseBlockStatements(
       break;
     }
   }
-  attachComments(ctx, body, closePos);
-  return body;
+  return { body, closePos };
 }
 
 /**
