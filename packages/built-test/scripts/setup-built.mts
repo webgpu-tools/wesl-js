@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import { execSync, spawn } from "node:child_process";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse, stringify } from "yaml";
@@ -110,7 +116,10 @@ function writeWorkspaceYaml(
   timestamp: string,
   weslJsRoot: string,
 ) {
-  const rootYaml = readFileSync(join(weslJsRoot, "pnpm-workspace.yaml"), "utf8");
+  const rootYaml = readFileSync(
+    join(weslJsRoot, "pnpm-workspace.yaml"),
+    "utf8",
+  );
   const overrides = Object.fromEntries(
     packages.map(pkg => [pkg, `file:../temp-packages/${pkg}-${timestamp}.tgz`]),
   );
