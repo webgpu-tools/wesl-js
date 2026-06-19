@@ -16,7 +16,7 @@ interface Commentable {
   commentsAfter?: CommentElem[];
 }
 
-/** Push partial element onto stack for content collection. */
+/** Push an open elem whose scratch buffer collects children parsed beneath it. */
 export function beginElem(
   ctx: ParsingContext,
   kind: OpenElemKind,

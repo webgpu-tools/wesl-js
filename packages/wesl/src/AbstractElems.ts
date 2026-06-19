@@ -529,8 +529,7 @@ export type Statement =
   | LetElem
   | ConstElem;
 
-/** A bare `;` statement. Spans the `;` and emits nothing; kept so the parent's
- * gap-filling does not re-insert a `;` of its own. */
+/** A bare `;` statement. Emits nothing, but kept in the AST as a statement node. */
 export interface EmptyElem extends AbstractElemBase, HasAttributes {
   kind: "empty";
 }
