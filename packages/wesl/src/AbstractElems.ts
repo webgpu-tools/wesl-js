@@ -38,10 +38,10 @@ export type ContainerElem =
   | TypeRefElem;
 
 /**
- * Kinds that can be pushed as an open element during parsing. Statements use the
- * open-elem stack as a scratch buffer for the child elems parsed beneath them
- * (so they don't leak into the enclosing block's contents) even though the
- * finished statement keeps no `contents`.
+ * Kinds that can be pushed as an open element during parsing. Statements and
+ * declarations use the open-elem stack as a scratch buffer for the child elems
+ * parsed beneath them (so they don't leak into the enclosing block's contents)
+ * even though the finished elem keeps no `contents`.
  */
 export type OpenElemKind =
   | ContainerElem["kind"]

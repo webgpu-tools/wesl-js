@@ -74,6 +74,7 @@ function parseVarOrLet(
     { name: typedDecl, init },
     attributes,
   );
+  // template set apart from the shared params: only VarElem (not LetElem) has it.
   if (template && elem.kind === "var") elem.template = template;
   linkDeclIdent(typedDecl, elem);
   return elem;
