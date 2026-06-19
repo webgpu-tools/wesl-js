@@ -218,12 +218,6 @@ function addDoFields(elem: DoBlockElem, str: LineWrapper) {
   listAttributeElems(attributes, str);
 }
 
-function templateParamToString(p: TypeTemplateParameter): string {
-  if (typeof p === "string") return p;
-  if (p.kind === "type") return typeRefElemToString(p);
-  return astToString(p);
-}
-
 function addDirective(elem: DirectiveElem, str: LineWrapper) {
   const { directive, attributes } = elem;
   const { kind } = directive;
@@ -253,6 +247,12 @@ function unknownExpressionToString(elem: UnknownExpressionElem): string {
 
 function attributeName(attr: Attribute): string {
   return attr.kind === "@attribute" ? "@" + attr.name : attr.kind;
+}
+
+function templateParamToString(p: TypeTemplateParameter): string {
+  if (typeof p === "string") return p;
+  if (p.kind === "type") return typeRefElemToString(p);
+  return astToString(p);
 }
 
 /** @return "name: type, ..." for a fn/do parameter list. */
