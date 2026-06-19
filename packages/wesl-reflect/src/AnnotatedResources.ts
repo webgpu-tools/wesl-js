@@ -5,7 +5,7 @@ import type {
   WeslAST,
   WeslJsPlugin,
 } from "wesl";
-import { findAnnotation, firstRefName } from "./Annotations.ts";
+import { findAnnotation, firstRefName, numericParams } from "./Annotations.ts";
 import { buildStructRegistry, type StructRegistry } from "./StructLayout.ts";
 import { typeShape } from "./TypeShape.ts";
 import { originalTypeName } from "./WeslStructs.ts";
@@ -98,7 +98,7 @@ function discoverResource(
     return [discoverBuffer(gvar, src, structs)];
 
   const textureAttr = findAnnotation(gvar, "test_texture");
-  if (textureAttr) return [discoverTexture(gvar, textureAttr, src)];
+  if (textureAttr) return [discoverTexture(gvar, textureAttr)];
 
   const userTextureAttr = findAnnotation(gvar, "texture");
   if (userTextureAttr) return [discoverUserTexture(gvar, userTextureAttr)];
@@ -174,14 +174,13 @@ function discoverBuffer(
 function discoverTexture(
   gvar: GlobalVarElem,
   attr: StandardAttribute,
-  src: string,
 ): DiscoveredTexture {
   const varName = gvar.name.decl.ident.originalName;
-  const params = attr.params ?? [];
-  const source = firstRefName(params[0]) ?? "";
-  const numParams = params
+  const source = firstRefName(attr.params?.[0]) ?? "";
+  // params[0] is the source ref (NaN here); the rest are the dimension ints.
+  const numParams = numericParams(attr)
     .slice(1)
-    .map(p => Number.parseInt(src.slice(p.start, p.end).trim(), 10) || 0);
+    .map(n => n || 0);
   const typeName = gvar.name.typeRef ? originalTypeName(gvar.name.typeRef) : "";
   return { kind: "test_texture", varName, source, params: numParams, typeName };
 }

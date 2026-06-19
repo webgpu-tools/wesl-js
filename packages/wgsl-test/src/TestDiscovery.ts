@@ -1,5 +1,5 @@
 import type { FnElem, WeslAST } from "wesl";
-import { findAnnotation, firstRefName } from "wesl-reflect";
+import { findAnnotation, firstRefName, numericParams } from "wesl-reflect";
 
 export interface TestFunctionInfo {
   name: string;
@@ -43,7 +43,6 @@ export function findTestFunctions(ast: WeslAST): TestFunctionInfo[] {
 
 /** Find all @fragment @snapshot functions in a parsed WESL module. */
 export function findSnapshotFunctions(ast: WeslAST): SnapshotFunctionInfo[] {
-  const src = ast.srcModule.src;
   return ast.moduleElem.contents
     .filter((e): e is FnElem => e.kind === "fn")
     .filter(
@@ -52,7 +51,7 @@ export function findSnapshotFunctions(ast: WeslAST): SnapshotFunctionInfo[] {
     .map(fn => ({
       name: fn.name.ident.originalName,
       snapshotName: extractSnapshotName(fn),
-      extent: extractExtent(fn, src),
+      extent: extractExtent(fn),
       fn,
     }));
 }
@@ -69,12 +68,9 @@ function extractSnapshotName(fn: FnElem): string {
 }
 
 /** Extract extent from @extent(w, h), default [256, 256]. */
-function extractExtent(fn: FnElem, src: string): [number, number] {
+function extractExtent(fn: FnElem): [number, number] {
   const attr = findAnnotation(fn, "extent");
-  if (!attr?.params) return [256, 256];
-  const nums = attr.params.map(p => {
-    const text = src.slice(p.start, p.end).trim();
-    return Number.parseInt(text, 10) || 256;
-  });
+  if (!attr) return [256, 256];
+  const nums = numericParams(attr).map(n => n || 256);
   return [nums[0] ?? 256, nums[1] ?? nums[0] ?? 256];
 }

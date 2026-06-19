@@ -102,6 +102,12 @@ export const layouts = { ${entriesName} };
   return src;
 }
 
+const stageVisibility: Record<string, string> = {
+  compute: "GPUShaderStage.COMPUTE",
+  vertex: "GPUShaderStage.VERTEX",
+  fragment: "GPUShaderStage.FRAGMENT",
+};
+
 /** Shader stage visibility for a binding struct, from the attributes of its
  *  entry function (attached to the struct by the enableBindingStructs transform). */
 function shaderVisiblity(struct: BindingStructElem): string {
@@ -109,27 +115,10 @@ function shaderVisiblity(struct: BindingStructElem): string {
   if (!entryFn) {
     identElemLog(struct.name, "missing entry function for binding struct");
   } else {
-    const { attributes = [] } = entryFn;
-    if (
-      attributes.find(
-        ({ attribute: a }) => a.kind === "@attribute" && a.name === "compute",
-      )
-    ) {
-      return "GPUShaderStage.COMPUTE";
-    }
-    if (
-      attributes.find(
-        ({ attribute: a }) => a.kind === "@attribute" && a.name === "vertex",
-      )
-    ) {
-      return "GPUShaderStage.VERTEX";
-    }
-    if (
-      attributes.find(
-        ({ attribute: a }) => a.kind === "@attribute" && a.name === "fragment",
-      )
-    ) {
-      return "GPUShaderStage.FRAGMENT";
+    for (const { attribute } of entryFn.attributes ?? []) {
+      const visibility =
+        attribute.kind === "@attribute" && stageVisibility[attribute.name];
+      if (visibility) return visibility;
     }
   }
   identElemLog(struct.name, "unknown entry point type for binding struct");
