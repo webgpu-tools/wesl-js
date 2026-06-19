@@ -227,14 +227,13 @@ function parseTemplateElaboratedIdent(
   if (!ctx.stream.nextTemplateStartToken()) return refIdent;
 
   const templateParams = parseTemplateParams(ctx);
-  const typeRef: TypeRefElem = {
+  return {
     kind: "type",
     name: refIdent.ident,
     templateParams,
     start: refIdent.start,
     end: ctx.stream.checkpoint(),
   };
-  return typeRef;
 }
 
 /** Parse postfix operators: member access, indexing, function calls. */
