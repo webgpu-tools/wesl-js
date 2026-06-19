@@ -1,14 +1,9 @@
 #!/usr/bin/env node
 import { execSync, spawn } from "node:child_process";
-import {
-  cpSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse, stringify } from "yaml";
 
 /**
  * Create a test environment for verifying packed npm packages before publishing.
@@ -65,10 +60,7 @@ async function main() {
   );
 
   copyProjectFiles(builtTestPackage, tempBuiltTest);
-  updatePackageJson(tempBuiltTest, timestamp);
-  writeNpmrc(tempBuiltTest);
-  // Write empty pnpm-workspace.yaml to prevent inheriting the monorepo workspace
-  writeFileSync(join(tempBuiltTest, "pnpm-workspace.yaml"), "packages: []\n");
+  writeWorkspaceYaml(tempBuiltTest, timestamp, weslJsRoot);
   run("pnpm install", tempBuiltTest);
 }
 
@@ -99,41 +91,31 @@ function copyProjectFiles(builtTestPackage: string, tempBuiltTest: string) {
   });
 }
 
-/** Replace workspace dependencies with packed .tgz files and add required dev dependencies.  */
-function updatePackageJson(tempBuiltTest: string, timestamp: string) {
-  const packageJsonPath = join(tempBuiltTest, "package.json");
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-
-  // Use pnpm overrides instead of modifying dependencies directly
-  if (!packageJson.pnpm) {
-    packageJson.pnpm = {};
-  }
-  packageJson.pnpm.overrides = Object.fromEntries(
+/**
+ * Write pnpm-workspace.yaml for the temp project, inheriting the root config.
+ *
+ * The temp project copies the root pnpm-workspace.yaml (so `allowBuilds`, the
+ * `minimumReleaseAge` cooldown policy, etc. stay in sync automatically) and
+ * overrides just two fields:
+ *
+ * - `packages: []` roots a fresh workspace at the temp project, so it doesn't
+ *   inherit the surrounding monorepo workspace.
+ * - `overrides` redirects every workspace dependency (e.g. `wesl`,
+ *   `vitest-image-snapshot`) to its freshly packed .tgz, so the install resolves
+ *   the built artifacts instead of the source packages. (pnpm 11 reads this from
+ *   pnpm-workspace.yaml, not the `pnpm` field of package.json.)
+ */
+function writeWorkspaceYaml(
+  tempBuiltTest: string,
+  timestamp: string,
+  weslJsRoot: string,
+) {
+  const rootYaml = readFileSync(join(weslJsRoot, "pnpm-workspace.yaml"), "utf8");
+  const overrides = Object.fromEntries(
     packages.map(pkg => [pkg, `file:../temp-packages/${pkg}-${timestamp}.tgz`]),
   );
-
-  writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-}
-
-/** Write .npmrc with minimumReleaseAge exclusions to match the workspace settings. */
-function writeNpmrc(dir: string) {
-  const excludes = [
-    "wesl",
-    "wesl-*",
-    "lygia",
-    "thimbleberry",
-    "berry-pretty",
-    "@typescript/*",
-    "webgpu",
-    "@webgpu/*",
-    "monobump",
-    "benchforge",
-  ];
-  const lines = [
-    "minimum-release-age=1440",
-    ...excludes.map(p => `minimum-release-age-exclude[]=${p}`),
-  ];
-  writeFileSync(join(dir, ".npmrc"), lines.join("\n") + "\n");
+  const contents = stringify({ ...parse(rootYaml), packages: [], overrides });
+  writeFileSync(join(tempBuiltTest, "pnpm-workspace.yaml"), contents);
 }
 
 function getTimestamp() {

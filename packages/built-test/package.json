@@ -30,6 +30,7 @@
     "vite": "^8.0.1",
     "vitest": "^4.1.0",
     "vitest-image-snapshot": "workspace:x",
-    "wesl-plugin": "workspace:x"
+    "wesl-plugin": "workspace:x",
+    "yaml": "^2.8.2"
   }
 }

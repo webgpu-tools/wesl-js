@@ -11,7 +11,7 @@
     "bump": "monobump",
     "check:lockfile": "pnpm install --frozen-lockfile --lockfile-only",
     "check:versions": "syncpack lint",
-    "ci:check": "run-s lint:all build:all typecheck:all test:unit bench:validate",
+    "ci:check": "run-s lint:all build:all typecheck:all test:unit bench:validate test:built:fast",
     "ci:check-windows": "run-s build:all test:unit",
     "clean": "git clean -fdX && pnpm install",
     "echo:all": "pnpm --filter \"*\" exec pwd",
