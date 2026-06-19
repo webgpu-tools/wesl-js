@@ -8,6 +8,7 @@ import { parseAttributeList } from "./ParseAttribute.ts";
 import { finishStatement, getStartWithAttributes } from "./ParseStatement.ts";
 import { parseSimpleTypeRef } from "./ParseType.ts";
 import {
+  attrsOrUndef,
   createDeclIdentElem,
   expect,
   expectWord,
@@ -76,7 +77,7 @@ function parseStructMember(ctx: ParsingContext): StructMemberElem | null {
     stream.reset(checkpoint);
     return null;
   }
-  const attributes = attrs.length ? attrs : undefined;
+  const attributes = attrsOrUndef(attrs);
 
   const start = getStartWithAttributes(attributes, nameToken.span[0]);
   beginElem(ctx, "member", attributes);

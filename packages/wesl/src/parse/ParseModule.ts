@@ -22,6 +22,7 @@ import {
 import { parseWeslImports } from "./ParseImport.ts";
 import { parseStructDecl } from "./ParseStruct.ts";
 import {
+  attrsOrUndef,
   hasConditionalAttribute,
   parseMany,
   throwParseError,
@@ -117,8 +118,7 @@ function globalDeclName(elem: AbstractElem): string | undefined {
 
 /** Try each declaration parser until one succeeds. */
 function parseDecl(ctx: ParsingContext, attrs: AttributeElem[]): boolean {
-  const attrsOrUndef = attrs.length ? attrs : undefined;
-  const elem = findMap(declParsers, p => p(ctx, attrsOrUndef));
+  const elem = findMap(declParsers, p => p(ctx, attrsOrUndef(attrs)));
   if (elem) {
     recordDecl(ctx, elem, attrs);
     return true;

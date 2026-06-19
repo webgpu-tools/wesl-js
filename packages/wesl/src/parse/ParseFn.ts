@@ -14,6 +14,7 @@ import {
 import { parseSimpleTypeRef } from "./ParseType.ts";
 import {
   attachAttributes,
+  attrsOrUndef,
   createDeclIdentElem,
   expect,
   expectWord,
@@ -109,14 +110,14 @@ function parseFnReturn(ctx: ParsingContext): {
   const returnType = parseSimpleTypeRef(ctx);
   if (!returnType) throwParseError(stream, "Expected type after '->'");
 
-  return { returnType, returnAttributes: attrs.length > 0 ? attrs : undefined };
+  return { returnType, returnAttributes: attrsOrUndef(attrs) };
 }
 
 /** Grammar: param : attribute* optionally_typed_ident */
 function parseFnParam(ctx: ParsingContext): FnParamElem | null {
   const attrs = parseAttributeList(ctx);
   if (ctx.stream.peek()?.kind !== "word") return null;
-  const attributes = attrs.length ? attrs : undefined;
+  const attributes = attrsOrUndef(attrs);
 
   beginElem(ctx, "param", attributes);
   const name = parseTypedDecl(ctx, false);

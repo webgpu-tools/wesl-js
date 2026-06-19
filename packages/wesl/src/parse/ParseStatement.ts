@@ -28,6 +28,7 @@ import {
 import { parseSimpleStatement } from "./ParseSimpleStatement.ts";
 import {
   attachAttributes,
+  attrsOrUndef,
   expect,
   hasConditionalAttribute,
   isConditionalAttribute,
@@ -87,9 +88,8 @@ export function expectCompound(
   loopBody?: boolean,
 ): BlockElem {
   const attrs = parseAttributeList(ctx);
-  const attrsOrUndef = attrs.length > 0 ? attrs : undefined;
   const options = loopBody ? { loopBody } : undefined;
-  const block = parseCompoundStatement(ctx, attrsOrUndef, options);
+  const block = parseCompoundStatement(ctx, attrsOrUndef(attrs), options);
   if (!block) throwParseError(ctx.stream, errorMsg);
   return block;
 }
@@ -188,7 +188,6 @@ function parseStatement(ctx: ParsingContext): Statement | null {
     attributes.length > 0 && hasConditionalAttribute(attributes);
   if (hasConditional) ctx.pushScope("partial");
 
-  const attrsOrUndef = attributes.length > 0 ? attributes : undefined;
   const parsers = [
     parseLocalVarDecl,
     parseLetDecl,
@@ -203,7 +202,7 @@ function parseStatement(ctx: ParsingContext): Statement | null {
     parseContinuingStatement,
     parseSimpleStatement,
   ];
-  const stmt = findMap(parsers, p => p(ctx, attrsOrUndef));
+  const stmt = findMap(parsers, p => p(ctx, attrsOrUndef(attributes)));
   if (!stmt) return null;
 
   finalizeConditional(ctx, hasConditional, attributes);

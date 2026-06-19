@@ -159,6 +159,13 @@ export function attachAttributes<T extends { attributes?: AttributeElem[] }>(
   if (attributes?.length) elem.attributes = attributes;
 }
 
+/** Normalize an empty attribute list to undefined (the elem's "no attributes"). */
+export function attrsOrUndef(
+  attrs: AttributeElem[],
+): AttributeElem[] | undefined {
+  return attrs.length ? attrs : undefined;
+}
+
 /** Link a DeclIdentElem's ident to its parent declaration. */
 export function linkDeclIdentElem(
   declIdentElem: DeclIdentElem,
