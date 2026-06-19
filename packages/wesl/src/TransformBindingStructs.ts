@@ -268,30 +268,16 @@ function refersToBindingStruct(
 
 /** If this identifier ultimately refers to a struct type, return the struct declaration */
 function traceToStruct(ident: RefIdent): StructTrace | undefined {
-  const decl = findDecl(ident);
-  const declElem = decl.declElem;
-  // for now only handle the case where the reference points at a fn parameter
-  if (declElem && declElem.kind === "param") {
-    const name = declElem.name.typeRef?.name;
-    if (typeof name !== "string") {
-      if (name?.std) {
-        return undefined;
-      }
+  const declElem = findDecl(ident).declElem;
+  // LATER handle references other than fn parameters (e.g. a general traceToType()?)
+  if (declElem?.kind !== "param") return undefined;
 
-      const paramDecl = findDecl(name as Ident);
-      const structElem = paramDecl.declElem;
-      if (structElem?.kind === "struct") {
-        return { struct: structElem, intermediates: [declElem] };
-      }
-      return undefined;
-    }
-  } else {
-    // LATER presumably handle other cases? Should this be more general, e.g. traceToType()?
-    // elemLog(
-    //   ident.refIdentElem!,
-    //   `unhandled case in traceToStruct: decl ${declElem.kind} not yet implemented`,
-    // );
-  }
+  const name = declElem.name.typeRef?.name;
+  if (typeof name === "string" || name?.std) return undefined;
+
+  const structElem = findDecl(name as Ident).declElem;
+  if (structElem?.kind !== "struct") return undefined;
+  return { struct: structElem, intermediates: [declElem] };
 }
 
 /** Mutate the member reference elem to instead contain synthetic elem text.

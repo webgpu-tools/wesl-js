@@ -274,72 +274,58 @@ function emitDeclIdent(e: DeclIdentElem, ctx: EmitContext): void {
 }
 
 function emitExpression(e: ExpressionElem, ctx: EmitContext): void {
-  const { kind } = e;
-
-  if (kind === "literal") {
-    ctx.srcBuilder.add(e.value, e.start, e.end);
-    return;
+  const builder = ctx.srcBuilder;
+  switch (e.kind) {
+    case "literal":
+      builder.add(e.value, e.start, e.end);
+      return;
+    case "ref":
+      emitRefIdent(e, ctx);
+      return;
+    case "type":
+      emitTypeRefElem(e, ctx);
+      return;
+    case "binary-expression": {
+      const [start, end] = e.operator.span;
+      emitExpression(e.left, ctx);
+      builder.add(` ${e.operator.value} `, start, end);
+      emitExpression(e.right, ctx);
+      return;
+    }
+    case "unary-expression": {
+      const { value, start, end } = e.operator;
+      builder.add(value, start, end);
+      emitExpression(e.expression, ctx);
+      return;
+    }
+    case "parenthesized-expression":
+      builder.appendNext("(");
+      emitExpression(e.expression, ctx);
+      builder.appendNext(")");
+      return;
+    case "call-expression":
+      emitExpression(e.function, ctx);
+      if (e.templateArgs) emitTemplateArgs(e.templateArgs, ctx);
+      builder.appendNext("(");
+      e.arguments.forEach((arg, i) => {
+        if (i > 0) builder.appendNext(", ");
+        emitExpression(arg, ctx);
+      });
+      builder.appendNext(")");
+      return;
+    case "component-expression":
+      emitExpression(e.base, ctx);
+      builder.appendNext("[");
+      emitExpression(e.access, ctx);
+      builder.appendNext("]");
+      return;
+    case "component-member-expression":
+      emitExpression(e.base, ctx);
+      builder.add("." + e.access.name, e.access.start, e.access.end);
+      return;
+    default:
+      assertUnreachable(e);
   }
-
-  if (kind === "ref") {
-    emitRefIdent(e, ctx);
-    return;
-  }
-
-  if (kind === "type") {
-    emitTypeRefElem(e, ctx);
-    return;
-  }
-
-  if (kind === "binary-expression") {
-    const [start, end] = e.operator.span;
-    emitExpression(e.left, ctx);
-    ctx.srcBuilder.add(` ${e.operator.value} `, start, end);
-    emitExpression(e.right, ctx);
-    return;
-  }
-
-  if (kind === "unary-expression") {
-    const { value, start, end } = e.operator;
-    ctx.srcBuilder.add(value, start, end);
-    emitExpression(e.expression, ctx);
-    return;
-  }
-
-  if (kind === "parenthesized-expression") {
-    ctx.srcBuilder.appendNext("(");
-    emitExpression(e.expression, ctx);
-    ctx.srcBuilder.appendNext(")");
-    return;
-  }
-
-  if (kind === "call-expression") {
-    emitExpression(e.function, ctx);
-    if (e.templateArgs) emitTemplateArgs(e.templateArgs, ctx);
-    ctx.srcBuilder.appendNext("(");
-    e.arguments.forEach((arg, i) => {
-      if (i > 0) ctx.srcBuilder.appendNext(", ");
-      emitExpression(arg, ctx);
-    });
-    ctx.srcBuilder.appendNext(")");
-    return;
-  }
-
-  if (kind === "component-expression") {
-    emitExpression(e.base, ctx);
-    ctx.srcBuilder.appendNext("[");
-    emitExpression(e.access, ctx);
-    ctx.srcBuilder.appendNext("]");
-    return;
-  }
-
-  if (kind === "component-member-expression") {
-    emitExpression(e.base, ctx);
-    ctx.srcBuilder.add("." + e.access.name, e.access.start, e.access.end);
-    return;
-  }
-
-  assertUnreachable(kind);
 }
 
 function emitContents(elem: ContainerElem, ctx: EmitContext): void {
