@@ -26,9 +26,8 @@ export function attributeToString(e: AttributeElem): string {
     if (params === undefined || params.length === 0) {
       return "@" + e.attribute.name;
     } else {
-      return `@${e.attribute.name}(${params
-        .map(param => contentsToString(param))
-        .join(", ")})`;
+      const args = params.map(contentsToString).join(", ");
+      return `@${e.attribute.name}(${args})`;
     }
   } else if (kind === "@builtin") {
     return "@builtin(" + e.attribute.param.name + ")";

@@ -175,9 +175,8 @@ function memberToLayoutEntry(
  */
 function layoutEntry(member: StructMemberElem): string {
   const { typeRef } = member;
-  let entry: string | undefined;
   const { name: typeName } = typeRef;
-  entry = ptrLayoutEntry(typeRef) ?? storageTextureLayoutEntry(typeRef);
+  let entry = ptrLayoutEntry(typeRef) ?? storageTextureLayoutEntry(typeRef);
   if (!entry && typeof typeName !== "string" && typeName.std) {
     entry =
       samplerLayoutEntry(typeRef) ??
@@ -243,8 +242,7 @@ function textureLayoutEntry(typeRef: TypeRefElem): string | undefined {
     const firstParam = typeRef.templateParams?.[0] as TypeRefElem;
     const texelType = (firstParam.name as RefIdent)
       .originalName as WgslTexelType;
-    const sampleType = texelTypeToSampleType(texelType);
-    return sampleType;
+    return texelTypeToSampleType(texelType);
   }
 }
 
