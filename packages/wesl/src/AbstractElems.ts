@@ -15,6 +15,7 @@ export type AbstractElem =
 
 export type GrammarElem =
   | ContainerElem
+  | AttributeElem
   | Statement
   | SwitchClauseElem
   | AliasElem
@@ -29,11 +30,11 @@ export type GrammarElem =
   | DoBlockElem;
 
 /**
- * Elements that still carry a `contents` array (child elems plus gap-covering
- * TextElems). Statements, declarations, and the struct/fn family emit
- * structurally from their typed fields instead and so are absent here.
+ * Root container that still carries a `contents` array (child elems plus
+ * gap-covering TextElems). Statements, declarations, attributes, and the
+ * struct/fn family emit structurally from their typed fields instead.
  */
-export type ContainerElem = AttributeElem | ModuleElem;
+export type ContainerElem = ModuleElem;
 
 /**
  * Kinds that can be pushed as an open element during parsing. Statements and
@@ -242,7 +243,7 @@ export interface AliasElem extends AbstractElemBase, HasAttributes {
 }
 
 /** An attribute like '@compute' or '@binding(0)'. */
-export interface AttributeElem extends ElemWithContentsBase {
+export interface AttributeElem extends AbstractElemBase {
   kind: "attribute";
   attribute: Attribute;
 }

@@ -126,7 +126,7 @@ function attributeElem(
   start: number,
   end: number,
 ): AttributeElem {
-  return { kind: "attribute", attribute, start, end, contents: [] };
+  return { kind: "attribute", attribute, start, end };
 }
 
 /** Parse a standard attribute (not @if/@elif/@else) */
