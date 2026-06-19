@@ -18,9 +18,9 @@ export type GrammarElem =
 
 /**
  * Elements that still carry a `contents` array (child elems plus gap-covering
- * TextElems). Statements emit structurally from their typed fields instead, so
- * they are not here (var/let/const/assert excepted: they still emit from
- * contents via emitLocalDecl).
+ * TextElems). Most statements emit structurally from their typed fields and so
+ * are absent here; the var/let/const/assert decls are the exception, staying in
+ * `contents` and emitting via emitLocalDecl.
  */
 export type ContainerElem =
   | AttributeElem

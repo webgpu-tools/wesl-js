@@ -163,7 +163,7 @@ function finishForUpdate(
 
 /**
  * Construct a for-header sub-node (assign/increment/decrement/call) from its
- * already-parsed lhs/rhs. Emit reads those typed fields, so the node keeps no
+ * already-parsed parts. Emit reads those typed fields, so the node keeps no
  * `contents`.
  */
 function makeForNode<K extends "assign" | "increment" | "decrement" | "call">(
