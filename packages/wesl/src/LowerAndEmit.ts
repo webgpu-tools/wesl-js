@@ -393,9 +393,14 @@ function emitBlock(e: BlockElem, ctx: EmitContext): void {
 function emitStatement(stmt: Statement, ctx: EmitContext): void {
   emitLeadingComments(stmt, ctx);
   newLine(ctx);
+  emitCoreSemi(stmt, ctx);
+  emitTrailingComments(stmt, ctx);
+}
+
+/** Emit a statement's syntax followed by ';' unless its kind takes none. */
+function emitCoreSemi(stmt: Statement, ctx: EmitContext): void {
   emitStatementCore(stmt, ctx);
   if (!noSemicolon.has(stmt.kind)) ctx.srcBuilder.appendNext(";");
-  emitTrailingComments(stmt, ctx);
 }
 
 /** Emit a statement's syntax, without surrounding line breaks, ';', or comments. */
@@ -502,17 +507,13 @@ function emitIf(e: IfElem, ctx: EmitContext): void {
   }
 }
 
-/** for (init; condition; update) { ... }. A var/let/const init carries its own
- *  ';'; an expression init/update does not, so add it explicitly. */
+/** for (init; condition; update) { ... }. The init takes a ';' like any
+ *  statement; the update is the last clause before ')', so it gets none. */
 function emitFor(e: ForElem, ctx: EmitContext): void {
   const builder = ctx.srcBuilder;
   builder.appendNext("for (");
-  if (e.init) {
-    emitStatementCore(e.init, ctx);
-    if (!noSemicolon.has(e.init.kind)) builder.appendNext(";");
-  } else {
-    builder.appendNext(";");
-  }
+  if (e.init) emitCoreSemi(e.init, ctx);
+  else builder.appendNext(";");
   builder.appendNext(" ");
   if (e.condition) emitExpression(e.condition, ctx);
   builder.appendNext("; ");
