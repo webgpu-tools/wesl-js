@@ -301,11 +301,8 @@ test("parse array alias", () => {
         decl %Points3
         type array<ref Point, literal literal(3)>
           ref array
-          text '<'
           ref Point
-          text ', '
           literal literal(3)
-          text '>'
       text '
       '"
   `);
@@ -389,9 +386,7 @@ test("parse type in <template> in fn args", () => {
             decl %a
             type vec2<ref MyStruct>
               ref vec2
-              text '<'
               ref MyStruct
-              text '>'
         block
       text ';'"
   `);
@@ -411,11 +406,8 @@ test("parse simple templated type", () => {
             decl %a
             type array<ref MyStruct, literal literal(4)>
               ref array
-              text '<'
               ref MyStruct
-              text ','
               literal literal(4)
-              text '>'
         block"
   `);
 });
@@ -433,11 +425,8 @@ test("parse with space before template", () => {
             decl %a
             type array<ref MyStruct, literal literal(4)>
               ref array
-              text ' <'
               ref MyStruct
-              text ','
               literal literal(4)
-              text '>'
         block"
   `);
 });
@@ -455,9 +444,10 @@ test("parse nested template that ends with >> ", () => {
             decl %a
             type vec2<array<ref MyStruct, literal literal(4)>>
               ref vec2
-              text '<'
               type array<ref MyStruct, literal literal(4)>
-              text '>'
+                ref array
+                ref MyStruct
+                literal literal(4)
         block"
   `);
 });
@@ -475,11 +465,8 @@ test("parse type in <template> in global var", () => {
           decl %x
           type array<ref MyStruct, literal literal(8)>
             ref array
-            text '<'
             ref MyStruct
-            text ', '
-            literal literal(8)
-            text '>'"
+            literal literal(8)"
   `);
 });
 
@@ -555,9 +542,7 @@ test("parse fn with attributes and suffix comma", () => {
             decl %grid
             type vec3<ref u32>
               ref vec3
-              text '<'
               ref u32
-              text '>'
         param
           attribute @builtin(local_invocation_index)
           typeDecl %localIndex : u32
@@ -817,11 +802,8 @@ test("var<workgroup> work: array<u32, 128>;", ctx => {
           decl %work
           type array<ref u32, literal literal(128)>
             ref array
-            text '<'
             ref u32
-            text ', '
-            literal literal(128)
-            text '>'"
+            literal literal(128)"
   `);
 });
 
@@ -848,9 +830,7 @@ test("var foo: vec2<f32 >= vec2( 0.5, -0.5);", ctx => {
           decl %foo
           type vec2<ref f32>
             ref vec2
-            text '<'
             ref f32
-            text ' >'
         call-expression call"
   `);
 });
@@ -868,11 +848,8 @@ test("fn main() { var tmp: array<i32, 1 << 1>=array(1, 2); }", ctx => {
               decl %tmp
               type array<ref i32, binary-expression binop(<<)>
                 ref array
-                text '<'
                 ref i32
-                text ', '
                 binary-expression binop(<<)
-                text '>'
             call-expression call"
   `);
 });
@@ -948,13 +925,9 @@ test(`parse ptr`, () => {
           decl %particles
           type ptr<ref storage, ref f32, ref read_write>
             ref ptr
-            text '<'
             ref storage
-            text ', '
             ref f32
-            text ', '
             ref read_write
-            text '>'
       text '
       '"
   `);
@@ -975,13 +948,11 @@ test(`parse ptr with internal array`, () => {
           decl %particles
           type ptr<ref storage, array<ref f32>, ref read_write>
             ref ptr
-            text '<'
             ref storage
-            text ', '
             type array<ref f32>
-            text ', '
+              ref array
+              ref f32
             ref read_write
-            text '>'
       text '
       '"
   `);
@@ -1007,13 +978,11 @@ test(`parse binding struct`, () => {
           name particles
           type ptr<ref storage, array<ref f32>, ref read_write>
             ref ptr
-            text '<'
             ref storage
-            text ', '
             type array<ref f32>
-            text ', '
+              ref array
+              ref f32
             ref read_write
-            text '>'
       text '
       '"
   `);
@@ -1183,33 +1152,26 @@ test("binding struct", () => {
           name particles
           type ptr<ref storage, array<ref f32>, ref read_write>
             ref ptr
-            text '<'
             ref storage
-            text ', '
             type array<ref f32>
-            text ', '
+              ref array
+              ref f32
             ref read_write
-            text '>'
         member @group @binding uniforms: ptr<ref uniform, ref Uniforms>
           attribute @group(literal literal(0))
           attribute @binding(literal literal(1))
           name uniforms
           type ptr<ref uniform, ref Uniforms>
             ref ptr
-            text '<'
             ref uniform
-            text ', '
             ref Uniforms
-            text '>'
         member @group @binding tex: texture_2d<ref rgba8unorm>
           attribute @group(literal literal(0))
           attribute @binding(literal literal(2))
           name tex
           type texture_2d<ref rgba8unorm>
             ref texture_2d
-            text '<'
             ref rgba8unorm
-            text '>'
         member @group @binding samp: sampler
           attribute @group(literal literal(0))
           attribute @binding(literal literal(3))

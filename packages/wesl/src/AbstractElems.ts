@@ -34,8 +34,7 @@ export type ContainerElem =
   | UnknownExpressionElem
   | SimpleMemberRef
   | ModuleElem
-  | StuffElem
-  | TypeRefElem;
+  | StuffElem;
 
 /**
  * Kinds that can be pushed as an open element during parsing. Statements and
@@ -513,7 +512,7 @@ export interface StructMemberElem extends AbstractElemBase, HasAttributes {
 export type TypeTemplateParameter = ExpressionElem;
 
 /** A type reference like 'f32', 'MyStruct', or 'ptr<storage, array<f32>, read_only>'. */
-export interface TypeRefElem extends ElemWithContentsBase {
+export interface TypeRefElem extends AbstractElemBase {
   kind: "type";
   name: RefIdent;
   templateParams?: TypeTemplateParameter[];

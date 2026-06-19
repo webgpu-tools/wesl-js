@@ -1,12 +1,7 @@
 import type { TypeRefElem, TypeTemplateParameter } from "../AbstractElems.ts";
-import { beginElem, finishElem } from "./ContentsHelpers.ts";
 import { parseExpression } from "./ParseExpression.ts";
 import { parseModulePath } from "./ParseIdent.ts";
-import {
-  makeRefIdentElem,
-  parseContentExpression,
-  throwParseError,
-} from "./ParseUtil.ts";
+import { makeRefIdentElem, throwParseError } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 import type { WeslStream } from "./WeslStream.ts";
 
@@ -22,29 +17,20 @@ export function parseSimpleTypeRef(ctx: ParsingContext): TypeRefElem | null {
   const { parts, start, end: nameEnd } = path;
   const refIdent = ctx.createRefIdent(parts.join("::"));
 
-  beginElem(ctx, "type");
-
-  const refIdentElem = makeRefIdentElem(ctx, refIdent, start, nameEnd);
+  makeRefIdentElem(ctx, refIdent, start, nameEnd);
   ctx.saveIdent(refIdent);
-  ctx.addElem(refIdentElem);
 
-  // intoContents: a declared type is emitted from this "type" elem's contents,
-  // so its template params must be added there (not just the templateParams field)
   const templateParams = ctx.stream.nextTemplateStartToken()
-    ? parseTemplateParams(ctx, true)
+    ? parseTemplateParams(ctx)
     : undefined;
 
-  return finishElem("type", start, ctx, { name: refIdent, templateParams });
+  const end = ctx.stream.checkpoint();
+  return { kind: "type", name: refIdent, templateParams, start, end };
 }
 
-/**
- * Parse comma-separated template parameters until closing '>'.
- * @param intoContents add each param to the open container's contents
- *   (for declared types, which emit from contents)
- */
+/** Parse comma-separated template parameters until closing '>'. */
 export function parseTemplateParams(
   ctx: ParsingContext,
-  intoContents = false,
 ): TypeTemplateParameter[] {
   const { stream } = ctx;
 
@@ -52,9 +38,9 @@ export function parseTemplateParams(
     throwParseError(stream, "Empty template parameter list '<>'");
   }
 
-  const params = [parseTemplateParam(ctx, intoContents)];
+  const params = [parseTemplateParam(ctx)];
   while (stream.matchText(",")) {
-    params.push(parseTemplateParam(ctx, intoContents));
+    params.push(parseTemplateParam(ctx));
   }
 
   if (!consumeTemplateEnd(stream))
@@ -72,16 +58,10 @@ function consumeTemplateEnd(stream: WeslStream): boolean {
 }
 
 /** Grammar: template_arg_expression : expression */
-function parseTemplateParam(
-  ctx: ParsingContext,
-  intoContents: boolean,
-): TypeTemplateParameter {
+function parseTemplateParam(ctx: ParsingContext): TypeTemplateParameter {
   // parseExpression handles template_elaborated_ident via parsePrimaryExpr
   // inTemplate prevents '>' from being parsed as comparison operator
-  const opts = { inTemplate: true } as const;
-  const expr = intoContents
-    ? parseContentExpression(ctx, opts)
-    : parseExpression(ctx, opts);
+  const expr = parseExpression(ctx, { inTemplate: true });
   if (expr) return expr;
   throwParseError(ctx.stream, "Expected expression in template parameters");
 }

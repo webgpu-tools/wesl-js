@@ -1,7 +1,6 @@
 import type {
   AbstractElem,
   CommentElem,
-  ElemKindMap,
   GrammarElem,
   OpenElemKind,
   TextElem,
@@ -41,18 +40,6 @@ function popOpenElem(ctx: ParsingContext): OpenElem {
   const open = ctx.state.context.openElems.pop();
   if (!open) throw new Error("No open element to close");
   return open;
-}
-
-/** Finish element: get end position, close contents, return complete element. */
-export function finishElem<K extends keyof ElemKindMap>(
-  kind: K,
-  start: number,
-  ctx: ParsingContext,
-  params: Omit<ElemKindMap[K], "kind" | "start" | "end" | "contents">,
-): ElemKindMap[K] {
-  const end = ctx.stream.checkpoint();
-  const contents = finishContents(ctx, start, end);
-  return { kind, start, end, contents, ...params } as ElemKindMap[K];
 }
 
 /** Create a TextElem */

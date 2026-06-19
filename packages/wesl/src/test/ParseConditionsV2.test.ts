@@ -316,9 +316,7 @@ test("@else with struct member", () => {
           name x
           type vec3<ref f32>
             ref vec3
-            text '<'
             ref f32
-            text '>'
       text '
       '"
   `);

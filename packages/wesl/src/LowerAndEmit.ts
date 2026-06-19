@@ -409,14 +409,10 @@ function emitSwitchClause(e: SwitchClauseElem, ctx: EmitContext): void {
   emitTrailingComments(e, ctx);
 }
 
-/**
- * Emit a type reference. Declared types carry their template params in
- * `contents` (with source punctuation as text), so emit from there to preserve
- * spacing. Expression-position types have empty contents, so emit structurally.
- */
+/** Emit a type reference structurally: name plus an optional <...> arg list. */
 function emitTypeRefElem(e: TypeRefElem, ctx: EmitContext): void {
-  if (e.contents.length) emitContents(e, ctx);
-  else emitTypeRef(e, ctx);
+  emitRefIdent(e.name.refIdentElem, ctx);
+  if (e.templateParams) emitTemplateArgs(e.templateParams, ctx);
 }
 
 function emitStuff(e: ContainerElem, ctx: EmitContext): void {
@@ -651,12 +647,6 @@ function emitTrailingComments(e: AbstractElemBase, ctx: EmitContext): void {
     ctx.srcBuilder.appendNext(" ");
     emitComment(c, ctx);
   }
-}
-
-/** Emit a type reference structurally: name plus an optional <...> arg list. */
-function emitTypeRef(e: TypeRefElem, ctx: EmitContext): void {
-  emitRefIdent(e.name.refIdentElem, ctx);
-  if (e.templateParams) emitTemplateArgs(e.templateParams, ctx);
 }
 
 /** Emit contents with leading/trailing whitespace trimmed. */

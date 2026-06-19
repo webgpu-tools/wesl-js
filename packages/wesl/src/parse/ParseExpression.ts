@@ -233,7 +233,6 @@ function parseTemplateElaboratedIdent(
     templateParams,
     start: refIdent.start,
     end: ctx.stream.checkpoint(),
-    contents: [],
   };
   return typeRef;
 }
