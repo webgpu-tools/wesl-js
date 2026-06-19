@@ -25,7 +25,7 @@ export function attributeToString(e: AttributeElem): string {
     if (params === undefined || params.length === 0) {
       return "@" + e.attribute.name;
     } else {
-      const args = params.map(contentsToString).join(", ");
+      const args = params.map(attrParamToString).join(", ");
       return `@${e.attribute.name}(${args})`;
     }
   } else if (kind === "@builtin") {
@@ -65,7 +65,8 @@ export function typeRefToString(t?: TypeRefElem): string {
   return `${refToString(name)}${params}`;
 }
 
-export function contentsToString(
+/** Render a single `@attribute(...)` argument back to source text. */
+function attrParamToString(
   elem: TranslateTimeExpressionElem | UnknownExpressionElem | NameElem,
 ): string {
   if (elem.kind === "translate-time-expression") {
