@@ -14,6 +14,12 @@ test("global diagnostic directive", async () => {
   expectTrimmedMatch(result, src);
 });
 
+test("consecutive top-level directives stay on separate lines", async () => {
+  const src = `requires readonly_and_readwrite_storage_textures;\nenable f16;`;
+  const result = await linkTest(src);
+  expectTrimmedMatch(result, src);
+});
+
 test("@diagnostic attribute on statement", async () => {
   const src = `fn foo() { @diagnostic(info, derivative_uniformity) if true { } }`;
   const result = await linkTest(src);

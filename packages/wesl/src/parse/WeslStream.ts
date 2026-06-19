@@ -142,6 +142,11 @@ export class WeslStream implements Stream<WeslToken> {
             : this.skipBlockComment(token.span[1]);
         pending ??= [];
         const span: Span = [token.span[0], end];
+        // WGSL forbids the null code point anywhere, including inside comments
+        // (a comment body is skipped here, so the `invalid` matcher never sees it).
+        const nullIdx = this.src.indexOf("\0", span[0]);
+        if (nullIdx >= 0 && nullIdx < end)
+          throw new ParseError("Invalid token \\0", [nullIdx, nullIdx + 1]);
         pending.push({ style, span, newlineBefore, blankBefore });
         // this comment is now the reference point for the next comment's flags
         newlineBefore = false;

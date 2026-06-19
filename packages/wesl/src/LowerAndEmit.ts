@@ -257,6 +257,8 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
       return;
 
     case "directive":
+      // each top-level directive on its own line (no source TextElems separate them)
+      ctx.srcBuilder.addNl();
       emitDirective(e, ctx);
       return;
 

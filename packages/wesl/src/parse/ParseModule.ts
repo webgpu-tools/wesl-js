@@ -46,6 +46,10 @@ export function parseModule(ctx: ParsingContext): void {
   parseImports(ctx);
   parseDirectives(ctx);
   while (parseNextDeclaration(ctx)) {}
+  // reject input the declaration loop couldn't consume (e.g. a directive after a
+  // declaration, or stray tokens); otherwise it would be silently dropped
+  if (ctx.stream.peek() !== null)
+    throwParseError(ctx.stream, "Expected a declaration or directive");
 }
 
 /**
