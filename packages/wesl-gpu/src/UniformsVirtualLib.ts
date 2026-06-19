@@ -6,15 +6,6 @@ import {
   isUniformsStruct,
 } from "wesl-reflect";
 
-/** Default env:: module when no @uniforms struct is declared. */
-const defaultEnvSource = `
-  struct Uniforms {
-    resolution: vec2f,
-    time: f32,
-  }
-  @group(0) @binding(0) var<uniform> u: Uniforms;
-`;
-
 /** Result of scanning a shader source for @uniforms. */
 export interface UniformsScan {
   /** Layout metadata (null if using default uniforms). */
@@ -23,6 +14,15 @@ export interface UniformsScan {
   /** Virtual library record to pass to the linker. */
   virtualLibs: Record<string, VirtualLibraryFn>;
 }
+
+/** Default env:: module when no @uniforms struct is declared. */
+const defaultEnvSource = `
+  struct Uniforms {
+    resolution: vec2f,
+    time: f32,
+  }
+  @group(0) @binding(0) var<uniform> u: Uniforms;
+`;
 
 /**
  * Scan entry module source for an @uniforms struct and produce:

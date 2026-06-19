@@ -21,6 +21,14 @@ export interface CommentTrivia {
   blankBefore: boolean;
 }
 
+type InternalTokenKind =
+  | "word"
+  | "number"
+  | "blankspaces"
+  | "commentStart"
+  | "symbol"
+  | "invalid";
+
 // https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
 /** Whitespaces including new lines */
 const blankspaces = /[ \t\n\v\f\r\u{0085}\u{200E}\u{200F}\u{2028}\u{2029}]+/u;
@@ -34,17 +42,6 @@ const symbolSet =
 
 const ident =
   /(?:(?:[_\p{XID_Start}][\p{XID_Continue}]+)|(?:[\p{XID_Start}]))/u;
-
-/** Checks if a word is a valid WGSL ident, and not a keyword */
-export function isIdent(text: string): boolean {
-  if (text.match(ident)?.[0] !== text) {
-    return false;
-  }
-  if (keywordOrReserved.has(text)) {
-    return false;
-  }
-  return true;
-}
 
 const keywordOrReserved = new Set(keywords.concat(reservedWords));
 
@@ -65,14 +62,6 @@ const digits = new RegExp(
 );
 
 const commentStart = /\/\/|\/\*/;
-
-type InternalTokenKind =
-  | "word"
-  | "number"
-  | "blankspaces"
-  | "commentStart"
-  | "symbol"
-  | "invalid";
 const weslMatcher = new RegexMatchers<InternalTokenKind>({
   word: ident,
   number: digits,
@@ -82,6 +71,19 @@ const weslMatcher = new RegexMatchers<InternalTokenKind>({
   // biome-ignore lint/correctness/noEmptyCharacterClassInRegex: TODO
   invalid: /[^]/,
 });
+
+const lineBreaks = new RegExp(lineBreak, "gu");
+
+/** Checks if a word is a valid WGSL ident, and not a keyword */
+export function isIdent(text: string): boolean {
+  if (text.match(ident)?.[0] !== text) {
+    return false;
+  }
+  if (keywordOrReserved.has(text)) {
+    return false;
+  }
+  return true;
+}
 
 /** To mark parts of the grammar implementation that are WESL specific extensions */
 export function weslExtension<T>(combinator: T): T {
@@ -363,8 +365,6 @@ export class WeslStream implements Stream<WeslToken> {
     }
   }
 }
-
-const lineBreaks = new RegExp(lineBreak, "gu");
 
 /** Count line breaks in a whitespace run. */
 function countLineBreaks(text: string): number {

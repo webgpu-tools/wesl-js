@@ -15,8 +15,6 @@ import type { Conditions, Scope, SrcModule } from "./Scope.ts";
 import type { Span } from "./Span.ts";
 import { errorHighlight, offsetToLineNumber } from "./Util.ts";
 
-export type { ParseOptions, WeslExtensions };
-
 /** Partial element being constructed during parsing: a kind tag plus the child
  *  elems collected beneath it. The module keeps these as its `decls`; statements
  *  discard them and emit from their own typed fields. */
@@ -68,6 +66,8 @@ export interface WeslParseContext {
   scope: Scope; // current scope (points somewhere in rootScope)
   openElems: OpenElem[]; // elems that are collecting their contents
 }
+
+export type { ParseOptions, WeslExtensions };
 
 /** Human-readable error when parsing WESL fails. */
 export class WeslParseError extends Error {
