@@ -16,12 +16,10 @@ export function visitAst(
 }
 
 /**
- * Child elems of any AST node: the `contents` array for elems that keep it, or
- * the typed structural fields (attributes plus body / condition / ...) for the
- * statements and declarations that carry no `contents`. Returns [] for leaf elems.
+ * Child elems of any AST node: the typed structural fields (attributes plus
+ * body / condition / decls / ...) in source order. Returns [] for leaf elems.
  */
 export function childElems(elem: AbstractElem): readonly AbstractElem[] {
-  if ("contents" in elem) return elem.contents;
   const fields = structuralFields(elem);
   if (!fields) return [];
   return [...((elem as HasAttributes).attributes ?? []), ...fields];
@@ -38,10 +36,12 @@ export function identElemLog(
   );
 }
 
-/** The child elems held in a statement's or declaration's typed fields, in
- *  source order, or undefined for any kind that still keeps `contents`. */
+/** The child elems held in a node's typed fields, in source order, or undefined
+ *  for leaf kinds that hold no child elems. */
 function structuralFields(elem: AbstractElem): AbstractElem[] | undefined {
   switch (elem.kind) {
+    case "module":
+      return elem.decls;
     case "var":
     case "gvar":
       return [

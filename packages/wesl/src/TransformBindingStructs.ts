@@ -45,10 +45,6 @@ export function lowerBindingStructs(ast: TransformedAST): TransformedAST {
   const newVars = bindingStructs.flatMap(s =>
     transformBindingStruct(s, globalNames),
   );
-  moduleElem.contents = [
-    ...newVars,
-    ...keepNonBindingStructs(moduleElem.contents),
-  ];
   moduleElem.decls = [...newVars, ...keepNonBindingStructs(moduleElem.decls)];
   notableElems.bindingStructs = bindingStructs;
   return { ...clonedAst, moduleElem };

@@ -2,56 +2,34 @@
 
 exports[`parse unicode ident 1`] = `
 "module
-  text '
-  '
   fn Δέλτα()
     decl %Δέλτα
     block
-  text ' 
-  '
   fn réflexion()
     decl %réflexion
     block
-  text ' 
-  '
   fn Кызыл()
     decl %Кызыл
     block
-  text ' 
-  '
   fn 𐰓𐰏𐰇()
     decl %𐰓𐰏𐰇
     block
-  text ' 
-  '
   fn 朝焼け()
     decl %朝焼け
     block
-  text '
-  '
   fn سلام()
     decl %سلام
     block
-  text ' 
-  '
   fn 검정()
     decl %검정
     block
-  text ' 
-  '
   fn שָׁלוֹם()
     decl %שָׁלוֹם
     block
-  text '
-  '
   fn गुलाबी()
     decl %गुलाबी
     block
-  text '
-  '
   fn փիրուզ()
     decl %փիրուզ
-    block
-  text '
-  '"
+    block"
 `;

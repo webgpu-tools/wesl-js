@@ -21,11 +21,7 @@ test("@if(false) enable f16", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
-      directive enable f16 @if
-      text '
-      '"
+      directive enable f16 @if"
   `);
 });
 
@@ -37,13 +33,9 @@ test("@if(false) const_assert true;", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       assert
         attribute @if(false)
-        literal literal(true)
-      text '
-      '"
+        literal literal(true)"
   `);
 });
 
@@ -55,15 +47,11 @@ test("@if(true) var x = 7", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       gvar %x @if
         attribute @if(true)
         typeDecl %x
           decl %x
-        literal literal(7)
-      text '
-      '"
+        literal literal(7)"
   `);
 });
 
@@ -78,8 +66,6 @@ test("conditional statement", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
@@ -90,9 +76,7 @@ test("conditional statement", () => {
           assign @if
             attribute @if(true)
             ref x
-            literal literal(2)
-      text '
-      '"
+            literal literal(2)"
   `);
 });
 
@@ -108,8 +92,6 @@ test("compound statement", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
@@ -118,9 +100,7 @@ test("compound statement", () => {
             let %x
               typeDecl %x
                 decl %x
-              literal literal(1)
-      text '
-      '"
+              literal literal(1)"
   `);
 });
 
@@ -134,8 +114,6 @@ test("conditional local var", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
@@ -143,9 +121,7 @@ test("conditional local var", () => {
             attribute @if(true)
             typeDecl %x
               decl %x
-            literal literal(1)
-      text '
-      '"
+            literal literal(1)"
   `);
 });
 
@@ -157,15 +133,11 @@ test("@if(MOBILE) const x = 1", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       const %x @if
         attribute @if(MOBILE)
         typeDecl %x
           decl %x
-        literal literal(1)
-      text '
-      '"
+        literal literal(1)"
   `);
 });
 
@@ -178,22 +150,16 @@ test("@else after @if", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       const %x @if
         attribute @if(false)
         typeDecl %x
           decl %x
         literal literal(1)
-      text '
-        '
       const %x @else
         attribute @else
         typeDecl %x
           decl %x
-        literal literal(2)
-      text '
-      '"
+        literal literal(2)"
   `);
 });
 
@@ -206,24 +172,18 @@ test("@else with function", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn foo() @if
         attribute @if(DEBUG)
         decl %foo
         block
           return
             literal literal(1)
-      text '
-        '
       fn foo() @else
         attribute @else
         decl %foo
         block
           return
-            literal literal(2)
-      text '
-      '"
+            literal literal(2)"
   `);
 });
 
@@ -238,8 +198,6 @@ test("@else with statement", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
@@ -252,9 +210,7 @@ test("@else with statement", () => {
             attribute @else
             typeDecl %x
               decl %x
-            literal literal(2.0)
-      text '
-      '"
+            literal literal(2.0)"
   `);
 });
 
@@ -269,8 +225,6 @@ test("@else compound statement", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn test()
         decl %test
         block
@@ -285,9 +239,7 @@ test("@else compound statement", () => {
             let %a
               typeDecl %a
                 decl %a
-              literal literal(2)
-      text '
-      '"
+              literal literal(2)"
   `);
 });
 
@@ -302,8 +254,6 @@ test("@else with struct member", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       struct Point
         decl %Point
         member @if x: f32
@@ -316,9 +266,7 @@ test("@else with struct member", () => {
           name x
           type vec3<ref f32>
             ref vec3
-            ref f32
-      text '
-      '"
+            ref f32"
   `);
 });
 
@@ -331,11 +279,7 @@ test("@if with import", () => {
   // Expected output once grammar supports @if on imports:
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
-      import package::debug; @if
-      text '
-      '"
+      import package::debug; @if"
   `);
 });
 
@@ -349,14 +293,8 @@ test("@else with import", () => {
   // Expected output once grammar supports @if/@else on imports:
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       import package::a; @if
-      text '
-        '
-      import package::b; @else
-      text '
-      '"
+      import package::b; @else"
   `);
 });
 
@@ -372,8 +310,6 @@ test("parse @else fn", () => {
   expect(astString).toMatchInlineSnapshot(
     `
     "module
-      text '
-        '
       fn testFn() @if
         attribute @if(FOO)
         decl %testFn
@@ -382,8 +318,6 @@ test("parse @else fn", () => {
             typeDecl %a
               decl %a
             literal literal(0)
-      text '
-        '
       fn testFn() @else
         attribute @else
         decl %testFn
@@ -391,9 +325,7 @@ test("parse @else fn", () => {
           let %a
             typeDecl %a
               decl %a
-            literal literal(1)
-      text '
-      '"
+            literal literal(1)"
   `,
   );
 });

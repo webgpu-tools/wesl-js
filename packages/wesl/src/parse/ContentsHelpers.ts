@@ -32,6 +32,13 @@ export function discardOpenElem(ctx: ParsingContext): void {
   popOpenElem(ctx);
 }
 
+/** Pop the open element and return its collected children, in source order and
+ *  without gap-covering TextElems. Used by the module, which keeps its ordered
+ *  children in a typed `decls` array and emits them structurally. */
+export function finishCollected(ctx: ParsingContext): GrammarElem[] {
+  return popOpenElem(ctx).contents as GrammarElem[];
+}
+
 /** Pop element from stack, fill gaps with TextElems, return contents. */
 export function finishContents(
   ctx: ParsingContext,

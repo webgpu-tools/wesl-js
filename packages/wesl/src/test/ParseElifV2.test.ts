@@ -13,15 +13,11 @@ test("parse @elif basic", () => {
         typeDecl %a
           decl %a
         literal literal(1)
-      text '
-    '
       const %a @elif
         attribute @elif(true)
         typeDecl %a
           decl %a
         literal literal(2)
-      text '
-    '
       const %a @else
         attribute @else
         typeDecl %a
@@ -38,8 +34,6 @@ test("parse @elif with complex condition", () => {
         attribute @if(foo)
         decl %f
         block
-      text '
-    '
       fn f() @elif
         attribute @elif(bar && !baz)
         decl %f
@@ -58,22 +52,16 @@ test("parse multiple @elif", () => {
         typeDecl %x
           decl %x
         literal literal(1)
-      text '
-    '
       const %x @elif
         attribute @elif(b)
         typeDecl %x
           decl %x
         literal literal(2)
-      text '
-    '
       const %x @elif
         attribute @elif(c)
         typeDecl %x
           decl %x
         literal literal(3)
-      text '
-    '
       const %x @else
         attribute @else
         typeDecl %x
@@ -89,8 +77,6 @@ test("parse @elif on import", () => {
   expect(astToString(ast.moduleElem)).toMatchInlineSnapshot(`
     "module
       import a::val; @if
-      text '
-    '
       import b::val; @elif"
   `);
 });

@@ -134,8 +134,7 @@ test("parse struct", () => {
         member zip: u32
           name zip
           type u32
-            ref u32
-      text ' ;'"
+            ref u32"
   `);
 });
 
@@ -149,17 +148,10 @@ test("parse global diagnostic", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       directive diagnostic(off, derivative_uniformity)
-      text '
-
-        '
       fn main()
         decl %main
-        block
-      text '
-        '"
+        block"
   `);
 });
 
@@ -172,8 +164,7 @@ test("parse @attribute before fn", () => {
       fn main() @compute
         attribute @compute
         decl %main
-        block
-      text ' '"
+        block"
   `);
 });
 
@@ -187,15 +178,11 @@ test("parse @compute @workgroup_size(a, b, 1) before fn", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main() @compute @workgroup_size
         attribute @compute
         attribute @workgroup_size(ref a, ref b, literal literal(1))
         decl %main
-        block
-      text '
-        '"
+        block"
   `);
 });
 
@@ -209,8 +196,6 @@ test("parse top level var", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       gvar %u : Uniforms @group @binding
         attribute @group(literal literal(0))
         attribute @binding(literal literal(0))
@@ -219,14 +204,9 @@ test("parse top level var", () => {
           decl %u
           type Uniforms
             ref Uniforms
-      text '      
-
-        '
       fn main()
         decl %main
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -241,26 +221,17 @@ test("parse top level override and const", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       override %x
         typeDecl %x
           decl %x
         literal literal(21)
-      text '
-        '
       const %y
         typeDecl %y
           decl %y
         literal literal(1)
-      text '
-
-        '
       fn main()
         decl %main
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -268,10 +239,7 @@ test("parse root level ;;", () => {
   const src = ";;";
   const ast = parseTest(src);
   const astString = astToString(ast.moduleElem);
-  expect(astString).toMatchInlineSnapshot(`
-    "module
-      text ';;'"
-  `);
+  expect(astString).toMatchInlineSnapshot(`"module"`);
 });
 
 test("parse simple alias", () => {
@@ -295,16 +263,12 @@ test("parse array alias", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       alias %Points3=array<ref Point, literal literal(3)>
         decl %Points3
         type array<ref Point, literal literal(3)>
           ref array
           ref Point
-          literal literal(3)
-      text '
-      '"
+          literal literal(3)"
   `);
 });
 
@@ -330,8 +294,6 @@ test("fnDecl parses :type specifier in fn args", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn foo(a: MyType)
         decl %foo
         param
@@ -339,9 +301,7 @@ test("fnDecl parses :type specifier in fn args", () => {
             decl %a
             type MyType
               ref MyType
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -355,8 +315,6 @@ test("fnDecl parses :type specifier in fn block", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn foo()
         decl %foo
         block
@@ -364,9 +322,7 @@ test("fnDecl parses :type specifier in fn block", () => {
             typeDecl %b : MyType
               decl %b
               type MyType
-                ref MyType
-      text '
-      '"
+                ref MyType"
   `);
 });
 
@@ -377,8 +333,6 @@ test("parse type in <template> in fn args", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn foo(a: vec2<ref MyStruct>)
         decl %foo
         param
@@ -387,8 +341,7 @@ test("parse type in <template> in fn args", () => {
             type vec2<ref MyStruct>
               ref vec2
               ref MyStruct
-        block
-      text ';'"
+        block"
   `);
 });
 
@@ -480,8 +433,6 @@ test("parse for(;;) {} not as a fn call", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
@@ -493,9 +444,7 @@ test("parse for(;;) {} not as a fn call", () => {
             binary-expression binop(<)
             increment
               ref a
-            block
-      text '
-      '"
+            block"
   `);
 });
 
@@ -507,13 +456,9 @@ test("eolf followed by blank line", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn foo()
         decl %foo
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -530,8 +475,6 @@ test("parse fn with attributes and suffix comma", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-      '
       fn main(grid: vec3<ref u32>, localIndex: u32) @compute @workgroup_size
         attribute @compute
         attribute @workgroup_size(ref workgroupThreads, literal literal(1), literal literal(1))
@@ -549,9 +492,7 @@ test("parse fn with attributes and suffix comma", () => {
             decl %localIndex
             type u32
               ref u32
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -590,8 +531,7 @@ test("parse @attribute before fn", () => {
       fn main() @compute
         attribute @compute
         decl %main
-        block
-      text ' '"
+        block"
   `);
 });
 
@@ -647,21 +587,15 @@ test("parse var x: foo::bar;", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-         '
       gvar %x : foo::bar
         name private
         typeDecl %x : foo::bar
           decl %x
           type foo::bar
             ref foo::bar
-      text '
-         '
       fn main()
         decl %main
-        block
-      text '
-      '"
+        block"
   `);
 });
 
@@ -678,8 +612,6 @@ test("parse switch statement", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main(x: i32)
         decl %main
         param
@@ -696,9 +628,7 @@ test("parse switch statement", () => {
                 break
             switch-clause
               block
-                break
-      text '
-      '"
+                break"
   `);
 });
 
@@ -716,9 +646,6 @@ test("parse switch statement-2", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-
-        '
       fn main(x: u32)
         decl %main
         param
@@ -737,9 +664,7 @@ test("parse switch statement-2", () => {
                   block
             switch-clause
               block
-                break
-      text '
-      '"
+                break"
   `);
 });
 
@@ -753,17 +678,13 @@ test("parse struct constructor in assignment", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
           var %x
             typeDecl %x
               decl %x
-            call-expression call
-      text '
-       '"
+            call-expression call"
   `);
 });
 
@@ -777,17 +698,13 @@ test("parse struct.member (component_or_swizzle)", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
           let %x
             typeDecl %x
               decl %x
-            component-member-expression .
-      text '
-      '"
+            component-member-expression ."
   `);
 });
 
@@ -918,8 +835,6 @@ test(`parse ptr`, () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       gvar %particles : ptr<ref storage, ref f32, ref read_write>
         typeDecl %particles : ptr<ref storage, ref f32, ref read_write>
           decl %particles
@@ -927,9 +842,7 @@ test(`parse ptr`, () => {
             ref ptr
             ref storage
             ref f32
-            ref read_write
-      text '
-      '"
+            ref read_write"
   `);
 });
 
@@ -941,8 +854,6 @@ test(`parse ptr with internal array`, () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       gvar %particles : ptr<ref storage, array<ref f32>, ref read_write>
         typeDecl %particles : ptr<ref storage, array<ref f32>, ref read_write>
           decl %particles
@@ -952,9 +863,7 @@ test(`parse ptr with internal array`, () => {
             type array<ref f32>
               ref array
               ref f32
-            ref read_write
-      text '
-      '"
+            ref read_write"
   `);
 });
 
@@ -968,8 +877,6 @@ test(`parse binding struct`, () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       struct Bindings
         decl %Bindings
         member @group @binding particles: ptr<ref storage, array<ref f32>, ref read_write>
@@ -982,9 +889,7 @@ test(`parse binding struct`, () => {
             type array<ref f32>
               ref array
               ref f32
-            ref read_write
-      text '
-      '"
+            ref read_write"
   `);
 });
 
@@ -996,17 +901,13 @@ test(`parse struct reference`, () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn f()
         decl %f
         block
           let %x
             typeDecl %x
               decl %x
-            component-expression []
-      text ';
-      '"
+            component-expression []"
   `);
 });
 
@@ -1020,16 +921,12 @@ test("member reference with extra components", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-      '
       fn foo()
         decl %foo
         block
           assign
             component-expression []
-            component-member-expression .
-      text '
-     '"
+            component-member-expression ."
   `);
 });
 
@@ -1043,17 +940,13 @@ test("parse let declaration", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn vertexMain()
         decl %vertexMain
         block
           let %char
             typeDecl %char
               decl %char
-            call-expression call
-      text '
-      '"
+            call-expression call"
   `);
 });
 
@@ -1067,8 +960,6 @@ test("parse let declaration with type", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn vertexMain()
         decl %vertexMain
         block
@@ -1077,9 +968,7 @@ test("parse let declaration with type", () => {
               decl %char
               type u32
                 ref u32
-            literal literal(0)
-      text '
-      '"
+            literal literal(0)"
   `);
 });
 
@@ -1093,17 +982,13 @@ test("separator in let assignment", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn vertexMain()
         decl %vertexMain
         block
           let %a
             typeDecl %a
               decl %a
-            ref b::c
-      text '
-      '"
+            ref b::c"
   `);
 });
 
@@ -1117,15 +1002,11 @@ test("separator in fn call ", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn vertexMain()
         decl %vertexMain
         block
           call
-            call-expression call
-      text '
-      '"
+            call-expression call"
   `);
 });
 
@@ -1142,8 +1023,6 @@ test("binding struct", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       struct Bindings
         decl %Bindings
         member @group @binding particles: ptr<ref storage, array<ref f32>, ref read_write>
@@ -1177,9 +1056,7 @@ test("binding struct", () => {
           attribute @binding(literal literal(3))
           name samp
           type sampler
-            ref sampler
-      text '
-      '"
+            ref sampler"
   `);
 });
 
@@ -1193,16 +1070,12 @@ test("memberRefs with extra components", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
           assign
             component-expression []
-            component-member-expression .
-      text '
-      '"
+            component-member-expression ."
   `);
 });
 
@@ -1216,16 +1089,12 @@ test("memberRef with ref in array", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
           assign
             component-expression []
-            literal literal(1.0)
-      text '
-      '"
+            literal literal(1.0)"
   `);
 });
 
@@ -1239,15 +1108,11 @@ test("parse inline package reference", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn main()
         decl %main
         block
           call
-            call-expression call
-      text '
-      '"
+            call-expression call"
   `);
 });
 
@@ -1262,8 +1127,6 @@ test("parse @location", () => {
   const astString = astToString(ast.moduleElem);
   expect(astString).toMatchInlineSnapshot(`
     "module
-      text '
-          '
       fn fragmentMain(pos: vec4f) @fragment -> vec4f
         attribute @fragment
         decl %fragmentMain
@@ -1277,8 +1140,6 @@ test("parse @location", () => {
           ref vec4f
         block
           return
-            ref pos
-      text '
-      '"
+            ref pos"
   `);
 });

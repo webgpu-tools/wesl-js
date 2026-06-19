@@ -10,8 +10,6 @@ test("parse fn with line comment", () => {
   const parsed = parseWESL(src);
   expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn binaryOp()
         decl %binaryOp
         block inner['// binOpImpl']"
@@ -41,8 +39,6 @@ test("attach leading and trailing comments to a statement", () => {
   const parsed = parseWESL(src);
   expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn f()
         decl %f
         block
@@ -63,8 +59,6 @@ test("split comments between two statements", () => {
   const parsed = parseWESL(src);
   expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn f()
         decl %f
         block
@@ -88,8 +82,6 @@ test("attach a dangling comment before the closing brace", () => {
   const parsed = parseWESL(src);
   expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
     "module
-      text '
-        '
       fn f()
         decl %f
         block
@@ -112,10 +104,6 @@ const y = 2;`;
         typeDecl %x
           decl %x
         literal literal(1)
-      text '
-
-    // y comment
-    '
       const %y before['// y comment'(blank)]
         typeDecl %y
           decl %y

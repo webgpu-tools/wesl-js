@@ -1,4 +1,4 @@
-import type { GrammarElem, ModuleElem } from "../AbstractElems.ts";
+import type { ModuleElem } from "../AbstractElems.ts";
 import { ParseError } from "../ParseError.ts";
 import type { WeslAST, WeslParseState } from "../ParseWESL.ts";
 import { WeslParseError } from "../ParseWESL.ts";
@@ -7,7 +7,7 @@ import { emptyScope } from "../Scope.ts";
 import {
   attachComments,
   beginElem,
-  finishContents,
+  finishCollected,
 } from "./ContentsHelpers.ts";
 import { checkDoBlockNames, parseModule } from "./ParseModule.ts";
 import { type ParseOptions, ParsingContext } from "./ParsingContext.ts";
@@ -23,13 +23,7 @@ export function parseWesl(
     beginElem(ctx, "module");
     parseModule(ctx);
     const moduleElem = state.stable.moduleElem;
-    moduleElem.contents = finishContents(ctx, 0, moduleElem.end);
-    // the typed `decls` array holds the real children; `contents` additionally
-    // interleaves gap-covering TextElems (kept until module emit flips structural)
-    moduleElem.decls = moduleElem.contents.filter(
-      (c): c is GrammarElem => c.kind !== "text",
-    );
-    // comments attach to real declarations, not the TextElem whitespace fillers
+    moduleElem.decls = finishCollected(ctx);
     attachComments(ctx, moduleElem.decls, srcModule.src.length);
     checkDoBlockNames(moduleElem);
     return state.stable;
@@ -56,7 +50,6 @@ function createParseState(
   const rootScope = emptyScope(null);
   const moduleElem: ModuleElem = {
     kind: "module",
-    contents: [],
     decls: [],
     start: 0,
     end: srcModule.src.length,

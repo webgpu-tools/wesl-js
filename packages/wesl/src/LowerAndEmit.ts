@@ -5,13 +5,13 @@ import type {
   AttributeElem,
   BlockElem,
   CommentElem,
-  ContainerElem,
   DeclIdentElem,
   DirectiveElem,
   ExpressionElem,
   FnElem,
   ForElem,
   IfElem,
+  ModuleElem,
   NameElem,
   RefIdentElem,
   Statement,
@@ -403,16 +403,11 @@ function emitTypeRef(e: TypeRefElem, ctx: EmitContext): void {
   if (e.templateParams) emitTemplateArgs(e.templateParams, ctx);
 }
 
-function emitModule(e: ContainerElem, ctx: EmitContext): void {
-  // Skip whitespace-only text elements at module level
-  const validElements = filterValidElements(e.contents, ctx.conditions);
-  for (const child of validElements) {
-    if (child.kind === "text") {
-      const text = child.srcModule.src.slice(child.start, child.end);
-      if (text.trim() === "") continue;
-    }
-    lowerAndEmitElem(child, ctx);
-  }
+function emitModule(e: ModuleElem, ctx: EmitContext): void {
+  // The module's typed children emit structurally, each handling its own
+  // leading blank lines (emitRootElemNl / emitRootDecl); no TextElems remain.
+  const validElements = filterValidElements(e.decls, ctx.conditions);
+  for (const child of validElements) lowerAndEmitElem(child, ctx);
 }
 
 /** Emit one statement on its own line, with attached leading/trailing comments. */

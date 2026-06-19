@@ -14,7 +14,7 @@ export type AbstractElem =
   | UnknownExpressionElem;
 
 export type GrammarElem =
-  | ContainerElem
+  | ModuleElem
   | AttributeElem
   | Statement
   | SwitchClauseElem
@@ -30,20 +30,13 @@ export type GrammarElem =
   | DoBlockElem;
 
 /**
- * Root container that still carries a `contents` array (child elems plus
- * gap-covering TextElems). Statements, declarations, attributes, and the
- * struct/fn family emit structurally from their typed fields instead.
- */
-export type ContainerElem = ModuleElem;
-
-/**
  * Kinds that can be pushed as an open element during parsing. Statements and
  * declarations use the open-elem stack as a scratch buffer for the child elems
  * parsed beneath them (so they don't leak into the enclosing block's contents)
  * even though the finished elem keeps no `contents`.
  */
 export type OpenElemKind =
-  | ContainerElem["kind"]
+  | "module"
   | Statement["kind"]
   | "switch-clause"
   | "gvar"
@@ -455,11 +448,10 @@ export interface GlobalVarElem extends AbstractElemBase, HasAttributes {
 }
 
 /** An entire file. */
-export interface ModuleElem extends ElemWithContentsBase {
+export interface ModuleElem extends AbstractElemBase {
   kind: "module";
   /** Top-level children (imports, directives, declarations, and any synthetic
-   *  vars added by transforms) in source order, excluding the gap-covering
-   *  TextElems still held in `contents`. */
+   *  vars added by transforms) in source order. */
   decls: AbstractElem[];
 }
 
