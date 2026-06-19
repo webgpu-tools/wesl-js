@@ -24,7 +24,7 @@ export function parseWesl(
     parseModule(ctx);
     const moduleElem = state.stable.moduleElem;
     moduleElem.contents = finishContents(ctx, 0, moduleElem.end);
-    // attach comments to the real declarations, skipping interleaved whitespace
+    // comments attach to real declarations, not the TextElem whitespace fillers
     const decls = moduleElem.contents.filter(c => c.kind !== "text");
     attachComments(ctx, decls, srcModule.src.length);
     checkDoBlockNames(moduleElem);

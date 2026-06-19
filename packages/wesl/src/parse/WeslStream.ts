@@ -12,7 +12,6 @@ export type WeslToken<Kind extends WeslTokenKind = WeslTokenKind> =
 
 /** A comment skipped by the tokenizer, recorded as leading trivia of the next token. */
 export interface CommentTrivia {
-  /** line comment (//) vs block comment. */
   style: "line" | "block";
   /** Source span of the comment text (excluding the trailing newline of a line comment). */
   span: Span;
