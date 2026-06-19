@@ -84,8 +84,10 @@ test("@elif on functions", async () => {
   `;
 
   const expected = `
-    fn compute() -> u32 { return 2; }
-    
+    fn compute() -> u32 {
+      return 2;
+    }
+
     fn main() -> u32 {
       return compute();
     }
