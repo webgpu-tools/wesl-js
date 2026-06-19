@@ -110,6 +110,9 @@ export class WeslStream implements Stream<WeslToken> {
   leadingTrivia(pos: number): CommentTrivia[] | undefined {
     return this.triviaByPos.get(pos);
   }
+  private recordTrivia(pos: number, pending?: CommentTrivia[]): void {
+    if (pending) this.triviaByPos.set(pos, pending);
+  }
 
   nextToken(): WeslToken | null {
     let pending: CommentTrivia[] | undefined;
@@ -119,7 +122,7 @@ export class WeslStream implements Stream<WeslToken> {
       const token = this.stream.nextToken();
       if (token === null) {
         // trailing comments at end of file: key them past the last position
-        if (pending) this.triviaByPos.set(this.src.length, pending);
+        this.recordTrivia(this.src.length, pending);
         return null;
       }
 
@@ -137,27 +140,20 @@ export class WeslStream implements Stream<WeslToken> {
             ? this.lineCommentEnd(token.span[1])
             : this.skipBlockComment(token.span[1]);
         pending ??= [];
-        pending.push({
-          style,
-          span: [token.span[0], end],
-          newlineBefore,
-          blankBefore,
-        });
+        const span: Span = [token.span[0], end];
+        pending.push({ style, span, newlineBefore, blankBefore });
         newlineBefore = false;
         blankBefore = false;
         this.stream.reset(end);
-      } else if (kind === "word") {
-        const returnToken = token as TypedToken<typeof kind | "keyword">;
-        if (keywordOrReserved.has(token.text)) {
-          returnToken.kind = "keyword";
-        }
-        if (pending) this.triviaByPos.set(token.span[0], pending);
-        return returnToken;
       } else if (kind === "invalid") {
         throw new ParseError("Invalid token " + token.text, token.span);
       } else {
-        if (pending) this.triviaByPos.set(token.span[0], pending);
-        return token as TypedToken<typeof kind>;
+        this.recordTrivia(token.span[0], pending);
+        const result = token as WeslToken;
+        if (kind === "word" && keywordOrReserved.has(token.text)) {
+          result.kind = "keyword";
+        }
+        return result;
       }
     }
   }
