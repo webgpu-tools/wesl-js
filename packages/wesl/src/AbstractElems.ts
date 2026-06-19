@@ -13,34 +13,29 @@ export type GrammarElem =
   | ContainerElem
   | Statement
   | SwitchClauseElem
+  | AliasElem
+  | GlobalVarElem
+  | OverrideElem
   | TerminalElem
   | DoBlockElem;
 
 /**
  * Elements that still carry a `contents` array (child elems plus gap-covering
- * TextElems). Most statements emit structurally from their typed fields and so
- * are absent here; the var/let/const/assert decls are the exception, staying in
- * `contents` and emitting via emitLocalDecl.
+ * TextElems). Statements and declarations emit structurally from their typed
+ * fields instead and so are absent here.
  */
 export type ContainerElem =
   | AttributeElem
-  | AliasElem
-  | ConstAssertElem
-  | ConstElem
   | UnknownExpressionElem
   | SimpleMemberRef
   | FnElem
   | TypedDeclElem
-  | GlobalVarElem
-  | LetElem
   | ModuleElem
-  | OverrideElem
   | FnParamElem
   | StructElem
   | StructMemberElem
   | StuffElem
-  | TypeRefElem
-  | VarElem;
+  | TypeRefElem;
 
 /**
  * Kinds that can be pushed as an open element during parsing. Statements use the
@@ -51,7 +46,10 @@ export type ContainerElem =
 export type OpenElemKind =
   | ContainerElem["kind"]
   | Statement["kind"]
-  | "switch-clause";
+  | "switch-clause"
+  | "gvar"
+  | "override"
+  | "alias";
 
 /** Map from element kind string to element type, for type-safe element construction. */
 export type ElemKindMap = {
@@ -234,7 +232,7 @@ export interface TypedDeclElem extends ElemWithContentsBase {
 }
 
 /** An alias statement. */
-export interface AliasElem extends ElemWithContentsBase, HasAttributes {
+export interface AliasElem extends AbstractElemBase, HasAttributes {
   kind: "alias";
   name: DeclIdentElem;
   typeRef: TypeRefElem;
@@ -296,13 +294,13 @@ export interface ElseAttribute {
 export type ConditionalAttribute = IfAttribute | ElifAttribute | ElseAttribute;
 
 /** A const_assert statement. */
-export interface ConstAssertElem extends ElemWithContentsBase, HasAttributes {
+export interface ConstAssertElem extends AbstractElemBase, HasAttributes {
   kind: "assert";
   expression: ExpressionElem;
 }
 
 /** A const declaration. */
-export interface ConstElem extends ElemWithContentsBase, HasAttributes {
+export interface ConstElem extends AbstractElemBase, HasAttributes {
   kind: "const";
   name: TypedDeclElem;
   init?: ExpressionElem;
@@ -444,7 +442,7 @@ export interface FnElem extends ElemWithContentsBase, HasAttributes {
 }
 
 /** A global variable declaration (at the root level). */
-export interface GlobalVarElem extends ElemWithContentsBase, HasAttributes {
+export interface GlobalVarElem extends AbstractElemBase, HasAttributes {
   kind: "gvar";
   name: TypedDeclElem;
   /** Address-space / access-mode enumerants, e.g. `<storage, read_write>`. */
@@ -458,7 +456,7 @@ export interface ModuleElem extends ElemWithContentsBase {
 }
 
 /** An override declaration. */
-export interface OverrideElem extends ElemWithContentsBase, HasAttributes {
+export interface OverrideElem extends AbstractElemBase, HasAttributes {
   kind: "override";
   name: TypedDeclElem;
   init?: ExpressionElem;
@@ -515,7 +513,7 @@ export interface TypeRefElem extends ElemWithContentsBase {
 }
 
 /** A variable declaration. */
-export interface VarElem extends ElemWithContentsBase, HasAttributes {
+export interface VarElem extends AbstractElemBase, HasAttributes {
   kind: "var";
   name: TypedDeclElem;
   /** Address-space / access-mode enumerants, e.g. `<storage, read_write>`. */
@@ -523,7 +521,7 @@ export interface VarElem extends ElemWithContentsBase, HasAttributes {
   init?: ExpressionElem;
 }
 
-export interface LetElem extends ElemWithContentsBase, HasAttributes {
+export interface LetElem extends AbstractElemBase, HasAttributes {
   kind: "let";
   name: TypedDeclElem;
   init?: ExpressionElem;

@@ -83,8 +83,6 @@ export function annotatedResourcesPlugin(
         const groupAttr = makeStandardAttr("group", 0, anchor);
         const bindingAttr = makeStandardAttr("binding", binding, anchor);
         elem.attributes = [...(elem.attributes ?? []), groupAttr, bindingAttr];
-        // Emission reads attributes from contents when present, so prepend there too.
-        elem.contents = [groupAttr, bindingAttr, ...elem.contents];
       }
       return ast;
     },

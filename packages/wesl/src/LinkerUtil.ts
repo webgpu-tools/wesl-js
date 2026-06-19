@@ -27,10 +27,25 @@ export function childElems(elem: AbstractElem): readonly AbstractElem[] {
   return [...((elem as HasAttributes).attributes ?? []), ...fields];
 }
 
-/** The child elems held in a statement's typed fields, in source order, or
- *  undefined for any non-statement kind. */
+/** The child elems held in a statement's or declaration's typed fields, in
+ *  source order, or undefined for any kind that still keeps `contents`. */
 function structuralFields(elem: AbstractElem): AbstractElem[] | undefined {
   switch (elem.kind) {
+    case "var":
+    case "gvar":
+      return [
+        ...(elem.template ?? []),
+        elem.name,
+        ...(elem.init ? [elem.init] : []),
+      ];
+    case "let":
+    case "const":
+    case "override":
+      return [elem.name, ...(elem.init ? [elem.init] : [])];
+    case "alias":
+      return [elem.name, elem.typeRef];
+    case "assert":
+      return [elem.expression];
     case "block":
       return elem.body;
     case "if":

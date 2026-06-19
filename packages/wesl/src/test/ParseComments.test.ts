@@ -47,12 +47,9 @@ test("attach leading and trailing comments to a statement", () => {
         decl %f
         block
           let %x before['// leading'] after['// trailing']
-            text 'let '
             typeDecl %x
               decl %x
-            text ' = '
-            literal literal(1)
-            text ';'"
+            literal literal(1)"
   `);
 });
 
@@ -72,19 +69,13 @@ test("split comments between two statements", () => {
         decl %f
         block
           let %x after['// after x']
-            text 'let '
             typeDecl %x
               decl %x
-            text ' = '
             literal literal(1)
-            text ';'
           let %y before['// before y']
-            text 'let '
             typeDecl %y
               decl %y
-            text ' = '
-            literal literal(2)
-            text ';'"
+            literal literal(2)"
   `);
 });
 
@@ -103,12 +94,9 @@ test("attach a dangling comment before the closing brace", () => {
         decl %f
         block
           let %x after['// dangling']
-            text 'let '
             typeDecl %x
               decl %x
-            text ' = '
-            literal literal(1)
-            text ';'"
+            literal literal(1)"
   `);
 });
 
@@ -121,22 +109,16 @@ const y = 2;`;
   expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
     "module
       const %x
-        text 'const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(1)
-        text ';'
       text '
 
     // y comment
     '
       const %y before['// y comment'(blank)]
-        text 'const '
         typeDecl %y
           decl %y
-        text ' = '
-        literal literal(2)
-        text ';'"
+        literal literal(2)"
   `);
 });

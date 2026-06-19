@@ -41,9 +41,7 @@ test("@if(false) const_assert true;", () => {
         '
       assert
         attribute @if(false)
-        text ' const_assert '
         literal literal(true)
-        text ';'
       text '
       '"
   `);
@@ -61,12 +59,9 @@ test("@if(true) var x = 7", () => {
         '
       gvar %x @if
         attribute @if(true)
-        text ' var '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(7)
-        text ';'
       text '
       '"
   `);
@@ -89,12 +84,9 @@ test("conditional statement", () => {
         decl %main
         block
           var %x
-            text 'var '
             typeDecl %x
               decl %x
-            text ' = '
             literal literal(1)
-            text ';'
           assign @if
             attribute @if(true)
             ref x
@@ -124,12 +116,9 @@ test("compound statement", () => {
           block @if
             attribute @if(false)
             let %x
-              text 'let '
               typeDecl %x
                 decl %x
-              text ' = '
               literal literal(1)
-              text ';'
       text '
       '"
   `);
@@ -152,12 +141,9 @@ test("conditional local var", () => {
         block
           var %x @if
             attribute @if(true)
-            text ' var '
             typeDecl %x
               decl %x
-            text ' = '
             literal literal(1)
-            text ';'
       text '
       '"
   `);
@@ -175,12 +161,9 @@ test("@if(MOBILE) const x = 1", () => {
         '
       const %x @if
         attribute @if(MOBILE)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(1)
-        text ';'
       text '
       '"
   `);
@@ -199,22 +182,16 @@ test("@else after @if", () => {
         '
       const %x @if
         attribute @if(false)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(1)
-        text ';'
       text '
         '
       const %x @else
         attribute @else
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(2)
-        text ';'
       text '
       '"
   `);
@@ -268,20 +245,14 @@ test("@else with statement", () => {
         block
           let %x @if
             attribute @if(A)
-            text ' let '
             typeDecl %x
               decl %x
-            text ' = '
             literal literal(1.0)
-            text ';'
           let %x @else
             attribute @else
-            text ' let '
             typeDecl %x
               decl %x
-            text ' = '
             literal literal(2.0)
-            text ';'
       text '
       '"
   `);
@@ -306,21 +277,15 @@ test("@else compound statement", () => {
           block @if
             attribute @if(MOBILE)
             let %a
-              text 'let '
               typeDecl %a
                 decl %a
-              text ' = '
               literal literal(1)
-              text ';'
           block @else
             attribute @else
             let %a
-              text 'let '
               typeDecl %a
                 decl %a
-              text ' = '
               literal literal(2)
-              text ';'
       text '
       '"
   `);
@@ -427,12 +392,9 @@ test("parse @else fn", () => {
         decl %testFn
         block
           let %a
-            text 'let '
             typeDecl %a
               decl %a
-            text ' = '
             literal literal(0)
-            text ';'
       text '
         '
       fn testFn() @else
@@ -440,12 +402,9 @@ test("parse @else fn", () => {
         decl %testFn
         block
           let %a
-            text 'let '
             typeDecl %a
               decl %a
-            text ' = '
             literal literal(1)
-            text ';'
       text '
       '"
   `,

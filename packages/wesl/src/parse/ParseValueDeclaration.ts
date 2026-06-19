@@ -8,7 +8,11 @@ import type {
   TypeRefElem,
 } from "../AbstractElems.ts";
 import type { Scope } from "../Scope.ts";
-import { beginElem, finishContents } from "./ContentsHelpers.ts";
+import {
+  beginElem,
+  discardOpenElem,
+  finishContents,
+} from "./ContentsHelpers.ts";
 import { getStartWithAttributes } from "./ParseStatement.ts";
 import { parseSimpleTypeRef } from "./ParseType.ts";
 import {
@@ -92,7 +96,7 @@ function parseValueDecl<K extends ValueDeclKind>(
   expect(stream, ";", `${keyword} declaration`);
 
   const endPos = stream.checkpoint();
-  const contents = finishContents(ctx, startPos, endPos);
+  discardOpenElem(ctx);
   typedDecl.decl.ident.dependentScope = ctx.currentScope();
   ctx.popScope();
 
@@ -102,7 +106,6 @@ function parseValueDecl<K extends ValueDeclKind>(
     init,
     start: startPos,
     end: endPos,
-    contents,
   };
   attachAttributes(elem, attributes);
   linkDeclIdent(typedDecl, elem);

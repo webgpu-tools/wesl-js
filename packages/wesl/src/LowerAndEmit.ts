@@ -20,6 +20,7 @@ import type {
   SwitchElem,
   SyntheticElem,
   TextElem,
+  TypedDeclElem,
   TypeRefElem,
   WhileElem,
 } from "./AbstractElems.ts";
@@ -422,7 +423,7 @@ function emitStatementCore(stmt: Statement, ctx: EmitContext): void {
     stmt.kind === "const" ||
     stmt.kind === "assert"
   ) {
-    emitLocalDecl(stmt, ctx);
+    emitValueDecl(stmt, ctx);
     return;
   }
   // a block prints its own attributes (before its '{'); everything else prints
@@ -494,16 +495,76 @@ function emitStatementCore(stmt: Statement, ctx: EmitContext): void {
   }
 }
 
-/** Emit a local declaration (var/let/const/assert) from its source contents,
- *  which still carry the keyword, initializer punctuation, and trailing ';'. */
-function emitLocalDecl(
-  e: Extract<Statement, { kind: "var" | "let" | "const" | "assert" }>,
-  ctx: EmitContext,
-): void {
-  const attrsInContents =
-    e.contents.length > 0 && e.contents[0].kind === "attribute";
-  if (!attrsInContents) emitAttributes(e.attributes, ctx);
-  emitContents(e, ctx);
+/** Declarations emitted structurally (var/let/const/override/gvar/alias/assert),
+ *  in either local-statement or root-declaration position. */
+type ValueDeclElem = Extract<
+  AbstractElem,
+  { kind: "var" | "gvar" | "let" | "const" | "override" | "alias" | "assert" }
+>;
+
+/** Emit a declaration from its typed fields, including its trailing ';':
+ *  `[attrs] var<...> name: T = init;`, `const name = init;`, `override n;`,
+ *  `alias name = T;`, `const_assert expr;`. */
+function emitValueDecl(e: ValueDeclElem, ctx: EmitContext): void {
+  emitAttributes(e.attributes, ctx);
+  const builder = ctx.srcBuilder;
+  switch (e.kind) {
+    case "var":
+    case "gvar":
+      builder.appendNext("var");
+      if (e.template) emitVarTemplate(e.template, ctx);
+      builder.appendNext(" ");
+      emitTypedDecl(e.name, ctx);
+      emitInit(e.init, ctx);
+      break;
+    case "let":
+    case "const":
+    case "override":
+      builder.appendNext(`${e.kind} `);
+      emitTypedDecl(e.name, ctx);
+      emitInit(e.init, ctx);
+      break;
+    case "alias":
+      builder.appendNext("alias ");
+      emitDeclIdent(e.name, ctx);
+      builder.appendNext(" = ");
+      emitTypeRefElem(e.typeRef, ctx);
+      break;
+    case "assert":
+      builder.appendNext("const_assert ");
+      emitExpression(e.expression, ctx);
+      break;
+    default:
+      assertUnreachable(e);
+  }
+  builder.appendNext(";");
+}
+
+/** Emit a var's `<address_space[, access_mode]>` enumerant template. */
+function emitVarTemplate(template: NameElem[], ctx: EmitContext): void {
+  const builder = ctx.srcBuilder;
+  builder.appendNext("<");
+  template.forEach((name, i) => {
+    if (i > 0) builder.appendNext(", ");
+    emitName(name, ctx);
+  });
+  builder.appendNext(">");
+}
+
+/** Emit a declared identifier with its optional `: type` annotation. */
+function emitTypedDecl(name: TypedDeclElem, ctx: EmitContext): void {
+  emitDeclIdent(name.decl, ctx);
+  if (name.typeRef) {
+    ctx.srcBuilder.appendNext(": ");
+    emitTypeRefElem(name.typeRef, ctx);
+  }
+}
+
+/** Emit a ` = init` clause, or nothing when there is no initializer. */
+function emitInit(init: ExpressionElem | undefined, ctx: EmitContext): void {
+  if (!init) return;
+  ctx.srcBuilder.appendNext(" = ");
+  emitExpression(init, ctx);
 }
 
 /** if / else-if / else: a nested IfElem prints as `else if`, a BlockElem as `else`. */
@@ -628,19 +689,13 @@ function emitComment(c: CommentElem, ctx: EmitContext): void {
 
 function emitRootDecl(
   e: Extract<
-    ContainerElem,
+    ValueDeclElem,
     { kind: "override" | "const" | "assert" | "alias" | "gvar" }
   >,
   ctx: EmitContext,
 ): void {
   emitRootElemNl(ctx);
-  const attrsInContents =
-    e.contents.length > 0 && e.contents[0].kind === "attribute";
-  if (!attrsInContents) {
-    emitAttributes(e.attributes, ctx);
-  }
-
-  emitContentsWithTrimming(e, ctx);
+  emitValueDecl(e, ctx);
 }
 
 /** Emit newlines between root elements. */

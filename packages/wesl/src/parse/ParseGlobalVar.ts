@@ -6,11 +6,10 @@ import type {
   GlobalVarElem,
   NameElem,
 } from "../AbstractElems.ts";
-import { beginElem, finishElem } from "./ContentsHelpers.ts";
-import { getStartWithAttributes } from "./ParseStatement.ts";
+import { beginElem } from "./ContentsHelpers.ts";
+import { finishStatement, getStartWithAttributes } from "./ParseStatement.ts";
 import { parseSimpleTypeRef } from "./ParseType.ts";
 import {
-  attachAttributes,
   createDeclIdentElem,
   expect,
   expectExpression,
@@ -54,12 +53,13 @@ export function parseGlobalVarDecl(
   typedDecl.decl.ident.dependentScope = ctx.currentScope();
   ctx.popScope();
 
-  const varElem = finishElem("gvar", startPos, ctx, {
-    name: typedDecl,
-    template,
-    init,
-  });
-  attachAttributes(varElem, attributes);
+  const varElem = finishStatement(
+    "gvar",
+    startPos,
+    ctx,
+    { name: typedDecl, template, init },
+    attributes,
+  );
   linkDeclIdent(typedDecl, varElem);
   return varElem;
 }
@@ -95,11 +95,13 @@ export function parseAliasDecl(
 
   expect(stream, ";", "alias declaration");
 
-  const aliasElem = finishElem("alias", startPos, ctx, {
-    name: declIdentElem,
-    typeRef,
-  });
-  attachAttributes(aliasElem, attributes);
+  const aliasElem = finishStatement(
+    "alias",
+    startPos,
+    ctx,
+    { name: declIdentElem, typeRef },
+    attributes,
+  );
   linkDeclIdentElem(declIdentElem, aliasElem);
   return aliasElem;
 }
@@ -117,9 +119,7 @@ export function parseConstAssert(
   const expression = expectExpression(ctx);
   expect(ctx.stream, ";", "const_assert expression");
 
-  const elem = finishElem("assert", startPos, ctx, { expression });
-  attachAttributes(elem, attributes);
-  return elem;
+  return finishStatement("assert", startPos, ctx, { expression }, attributes);
 }
 
 /**

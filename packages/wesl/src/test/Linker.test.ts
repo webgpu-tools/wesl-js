@@ -114,7 +114,7 @@ test("type inside fn with same name as fn", async () => {
   // illegal but shouldn't hang
   const src = `
     fn foo() {
-      var a:foo;
+      var a: foo;
     }
     fn bar() { }
   `;

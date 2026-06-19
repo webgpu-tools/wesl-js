@@ -4,11 +4,10 @@ import type {
   LetElem,
   VarElem,
 } from "../AbstractElems.ts";
-import { beginElem, finishElem } from "./ContentsHelpers.ts";
+import { beginElem } from "./ContentsHelpers.ts";
 import { parseTemplateList } from "./ParseGlobalVar.ts";
-import { getStartWithAttributes } from "./ParseStatement.ts";
+import { finishStatement, getStartWithAttributes } from "./ParseStatement.ts";
 import {
-  attachAttributes,
   expect,
   expectExpression,
   linkDeclIdent,
@@ -68,9 +67,14 @@ function parseVarOrLet(
 
   expect(stream, ";", `${keyword} declaration`);
 
-  const elem = finishElem(keyword, startPos, ctx, { name: typedDecl, init });
+  const elem = finishStatement(
+    keyword,
+    startPos,
+    ctx,
+    { name: typedDecl, init },
+    attributes,
+  );
   if (template && elem.kind === "var") elem.template = template;
-  attachAttributes(elem, attributes);
   linkDeclIdent(typedDecl, elem);
   return elem;
 }

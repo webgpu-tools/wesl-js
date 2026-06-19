@@ -10,32 +10,23 @@ test("parse @elif basic", () => {
     "module
       const %a @if
         attribute @if(false)
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
         literal literal(1)
-        text ';'
       text '
     '
       const %a @elif
         attribute @elif(true)
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
         literal literal(2)
-        text ';'
       text '
     '
       const %a @else
         attribute @else
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
-        literal literal(3)
-        text ';'"
+        literal literal(3)"
   `);
 });
 
@@ -64,42 +55,30 @@ test("parse multiple @elif", () => {
     "module
       const %x @if
         attribute @if(a)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(1)
-        text ';'
       text '
     '
       const %x @elif
         attribute @elif(b)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(2)
-        text ';'
       text '
     '
       const %x @elif
         attribute @elif(c)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(3)
-        text ';'
       text '
     '
       const %x @else
         attribute @else
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
-        literal literal(4)
-        text ';'"
+        literal literal(4)"
   `);
 });
 

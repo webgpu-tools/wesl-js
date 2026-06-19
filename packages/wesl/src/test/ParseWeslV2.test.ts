@@ -60,15 +60,12 @@ test("parse global var", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       gvar %x : i32
-        text 'var '
         typeDecl %x : i32
           decl %x
           text ': '
           type i32
             ref i32
-        text ' = '
-        literal literal(1)
-        text ';'"
+        literal literal(1)"
   `);
 });
 
@@ -79,12 +76,9 @@ test("parse alias", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       alias %Num=i32
-        text 'alias '
         decl %Num
-        text ' = '
         type i32
-          ref i32
-        text ';'"
+          ref i32"
   `);
 });
 
@@ -95,12 +89,9 @@ test("parse const", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       const %y
-        text 'const '
         typeDecl %y
           decl %y
-        text ' = '
-        literal literal(11u)
-        text ';'"
+        literal literal(11u)"
   `);
 });
 
@@ -111,13 +102,11 @@ test("parse override ", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       override %z : f32
-        text 'override '
         typeDecl %z : f32
           decl %z
           text ': '
           type f32
-            ref f32
-        text ';'"
+            ref f32"
   `);
 });
 
@@ -128,9 +117,7 @@ test("parse const_assert", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       assert
-        text 'const_assert '
-        binary-expression binop(<)
-        text ';'"
+        binary-expression binop(<)"
   `);
 });
 
@@ -234,15 +221,13 @@ test("parse top level var", () => {
         '
       gvar %u : Uniforms @group @binding
         attribute @group(literal literal(0))
-        text ' '
         attribute @binding(literal literal(0))
-        text ' var<uniform> '
+        name uniform
         typeDecl %u : Uniforms
           decl %u
           text ': '
           type Uniforms
             ref Uniforms
-        text ';'
       text '      
 
         '
@@ -268,21 +253,15 @@ test("parse top level override and const", () => {
       text '
         '
       override %x
-        text 'override '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(21)
-        text ';'
       text '
         '
       const %y
-        text 'const '
         typeDecl %y
           decl %y
-        text ' = '
         literal literal(1)
-        text ';'
       text '
 
         '
@@ -311,12 +290,9 @@ test("parse simple alias", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       alias %NewType=OldType
-        text 'alias '
         decl %NewType
-        text ' = '
         type OldType
-          ref OldType
-        text ';'"
+          ref OldType"
   `);
 });
 
@@ -331,9 +307,7 @@ test("parse array alias", () => {
       text '
         '
       alias %Points3=array<ref Point, literal literal(3)>
-        text 'alias '
         decl %Points3
-        text ' = '
         type array<ref Point, literal literal(3)>
           ref array
           text '<'
@@ -341,7 +315,6 @@ test("parse array alias", () => {
           text ', '
           literal literal(3)
           text '>'
-        text ';'
       text '
       '"
   `);
@@ -401,13 +374,11 @@ test("fnDecl parses :type specifier in fn block", () => {
         decl %foo
         block
           var %b : MyType
-            text 'var '
             typeDecl %b : MyType
               decl %b
               text ':'
               type MyType
                 ref MyType
-            text ';'
       text '
       '"
   `);
@@ -514,7 +485,7 @@ test("parse type in <template> in global var", () => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       gvar %x : array<ref MyStruct, literal literal(8)>
-        text 'var<private> '
+        name private
         typeDecl %x : array<ref MyStruct, literal literal(8)>
           decl %x
           text ':'
@@ -524,8 +495,7 @@ test("parse type in <template> in global var", () => {
             ref MyStruct
             text ', '
             literal literal(8)
-            text '>'
-        text ';'"
+            text '>'"
   `);
 });
 
@@ -546,12 +516,9 @@ test("parse for(;;) {} not as a fn call", () => {
         block
           for
             var %a
-              text 'var '
               typeDecl %a
                 decl %a
-              text ' = '
               literal literal(1)
-              text ';'
             binary-expression binop(<)
             increment
               ref a
@@ -699,15 +666,12 @@ test("parse let x: foo::bar; ", () => {
         decl %main
         block
           let %x : foo::bar
-            text 'let '
             typeDecl %x : foo::bar
               decl %x
               text ': '
               type foo::bar
                 ref foo::bar
-            text ' = '
-            literal literal(1)
-            text ';'"
+            literal literal(1)"
   `);
 });
 
@@ -724,13 +688,12 @@ test("parse var x: foo::bar;", () => {
       text '
          '
       gvar %x : foo::bar
-        text 'var<private> '
+        name private
         typeDecl %x : foo::bar
           decl %x
           text ': '
           type foo::bar
             ref foo::bar
-        text ';'
       text '
          '
       fn main()
@@ -837,12 +800,9 @@ test("parse struct constructor in assignment", () => {
         decl %main
         block
           var %x
-            text 'var '
             typeDecl %x
               decl %x
-            text ' = '
             call-expression call
-            text ';'
       text '
        '"
   `);
@@ -864,12 +824,9 @@ test("parse struct.member (component_or_swizzle)", () => {
         decl %main
         block
           let %x
-            text 'let '
             typeDecl %x
               decl %x
-            text ' = '
             component-member-expression .
-            text ';'
       text '
       '"
   `);
@@ -881,7 +838,7 @@ test("var<workgroup> work: array<u32, 128>;", ctx => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       gvar %work : array<ref u32, literal literal(128)>
-        text 'var<workgroup> '
+        name workgroup
         typeDecl %work : array<ref u32, literal literal(128)>
           decl %work
           text ': '
@@ -891,8 +848,7 @@ test("var<workgroup> work: array<u32, 128>;", ctx => {
             ref u32
             text ', '
             literal literal(128)
-            text '>'
-        text ';'"
+            text '>'"
   `);
 });
 
@@ -915,7 +871,6 @@ test("var foo: vec2<f32 >= vec2( 0.5, -0.5);", ctx => {
   expect(astString).toMatchInlineSnapshot(`
     "module
       gvar %foo : vec2<ref f32>
-        text 'var '
         typeDecl %foo : vec2<ref f32>
           decl %foo
           text ': '
@@ -924,9 +879,7 @@ test("var foo: vec2<f32 >= vec2( 0.5, -0.5);", ctx => {
             text '<'
             ref f32
             text ' >'
-        text '= '
-        call-expression call
-        text ';'"
+        call-expression call"
   `);
 });
 
@@ -939,7 +892,6 @@ test("fn main() { var tmp: array<i32, 1 << 1>=array(1, 2); }", ctx => {
         decl %main
         block
           var %tmp : array<ref i32, binary-expression binop(<<)>
-            text 'var '
             typeDecl %tmp : array<ref i32, binary-expression binop(<<)>
               decl %tmp
               text ': '
@@ -950,9 +902,7 @@ test("fn main() { var tmp: array<i32, 1 << 1>=array(1, 2); }", ctx => {
                 text ', '
                 binary-expression binop(<<)
                 text '>'
-            text '='
-            call-expression call
-            text ';'"
+            call-expression call"
   `);
 });
 
@@ -1023,7 +973,6 @@ test(`parse ptr`, () => {
       text '
         '
       gvar %particles : ptr<ref storage, ref f32, ref read_write>
-        text 'var '
         typeDecl %particles : ptr<ref storage, ref f32, ref read_write>
           decl %particles
           text ': '
@@ -1036,7 +985,6 @@ test(`parse ptr`, () => {
             text ', '
             ref read_write
             text '>'
-        text ';'
       text '
       '"
   `);
@@ -1053,7 +1001,6 @@ test(`parse ptr with internal array`, () => {
       text '
         '
       gvar %particles : ptr<ref storage, array<ref f32>, ref read_write>
-        text 'var '
         typeDecl %particles : ptr<ref storage, array<ref f32>, ref read_write>
           decl %particles
           text ': '
@@ -1066,7 +1013,6 @@ test(`parse ptr with internal array`, () => {
             text ', '
             ref read_write
             text '>'
-        text ';'
       text '
       '"
   `);
@@ -1126,12 +1072,9 @@ test(`parse struct reference`, () => {
         decl %f
         block
           let %x
-            text 'let '
             typeDecl %x
               decl %x
-            text ' = '
             component-expression []
-            text ';'
       text ';
       '"
   `);
@@ -1176,12 +1119,9 @@ test("parse let declaration", () => {
         decl %vertexMain
         block
           let %char
-            text 'let '
             typeDecl %char
               decl %char
-            text ' = '
             call-expression call
-            text ';'
       text '
       '"
   `);
@@ -1203,15 +1143,12 @@ test("parse let declaration with type", () => {
         decl %vertexMain
         block
           let %char : u32
-            text 'let '
             typeDecl %char : u32
               decl %char
               text ' : '
               type u32
                 ref u32
-            text ' = '
             literal literal(0)
-            text ';'
       text '
       '"
   `);
@@ -1233,12 +1170,9 @@ test("separator in let assignment", () => {
         decl %vertexMain
         block
           let %a
-            text 'let '
             typeDecl %a
               decl %a
-            text ' = '
             ref b::c
-            text ';'
       text '
       '"
   `);
