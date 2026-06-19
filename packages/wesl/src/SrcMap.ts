@@ -122,11 +122,6 @@ export class SrcMap {
   }
 }
 
-/** sort entries in place by src start position */
-function sortSrc(entries: SrcMapEntry[]): void {
-  entries.sort((a, b) => a.srcStart - b.srcStart);
-}
-
 /** Incrementally append to a string, tracking source references */
 export class SrcMapBuilder {
   #fragments: string[] = [];
@@ -200,4 +195,9 @@ export class SrcMapBuilder {
     map.compact();
     return map;
   }
+}
+
+/** sort entries in place by src start position */
+function sortSrc(entries: SrcMapEntry[]): void {
+  entries.sort((a, b) => a.srcStart - b.srcStart);
 }
