@@ -97,20 +97,31 @@ export function attachComments(
   for (const child of children) {
     if (!("start" in child)) continue; // synthetic elems have no source position
     const run = stream.leadingTrivia(child.start);
-    if (run?.length) {
-      // first child has no previous sibling, so its whole run leads it
-      const split = prev ? firstOwnLine(run) : 0;
-      if (prev && split > 0)
-        addComments(prev, "commentsAfter", run.slice(0, split), srcModule);
-      if (split < run.length)
-        addComments(child, "commentsBefore", run.slice(split), srcModule);
-    }
+    if (run?.length) splitRun(prev, child, run, srcModule);
     prev = child;
   }
   if (danglingPos !== undefined && prev) {
     const run = stream.leadingTrivia(danglingPos);
     if (run?.length) addComments(prev, "commentsAfter", run, srcModule);
   }
+}
+
+/**
+ * Split a comment run between the previous child (trailing) and this child
+ * (leading) at the first comment that begins its own line. With no previous
+ * child, the whole run leads this child.
+ */
+function splitRun(
+  prev: Commentable | undefined,
+  child: Commentable,
+  run: CommentTrivia[],
+  srcModule: SrcModule,
+): void {
+  const split = prev ? firstOwnLine(run) : 0;
+  if (prev && split > 0)
+    addComments(prev, "commentsAfter", run.slice(0, split), srcModule);
+  if (split < run.length)
+    addComments(child, "commentsBefore", run.slice(split), srcModule);
 }
 
 /** Index of the first comment that begins its own line (after a line break). */

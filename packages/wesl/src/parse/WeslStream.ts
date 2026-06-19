@@ -142,6 +142,7 @@ export class WeslStream implements Stream<WeslToken> {
         pending ??= [];
         const span: Span = [token.span[0], end];
         pending.push({ style, span, newlineBefore, blankBefore });
+        // this comment is now the reference point for the next comment's flags
         newlineBefore = false;
         blankBefore = false;
         this.stream.reset(end);
