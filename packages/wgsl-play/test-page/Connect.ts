@@ -9,8 +9,15 @@ const connectCondPlayer =
   document.querySelector<WgslPlay>("#connectCondPlayer")!;
 const connectCondEditor =
   document.querySelector<WgslEdit>("#connectCondEditor")!;
-document.querySelector("#set-connect-red")!.addEventListener("click", () => {
-  connectCondEditor.conditions = { RED: true };
+const setConnectRed =
+  document.querySelector<HTMLButtonElement>("#set-connect-red")!;
+let connectRed = false;
+setConnectRed.addEventListener("click", () => {
+  connectRed = !connectRed;
+  connectCondEditor.conditions = { RED: connectRed };
+  setConnectRed.textContent = connectRed
+    ? "Unset RED condition"
+    : "Set RED condition";
 });
 
 const connectExtPlayer = document.querySelector<WgslPlay>("#connectExtPlayer")!;
