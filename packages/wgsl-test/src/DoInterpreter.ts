@@ -326,15 +326,16 @@ function interpretAssign(
   local.value = applyBinary(op, local.value, rhs, block);
 }
 
-/** `i++` / `i--` on a scalar local; u32-wraps the result. */
+/** `i++` / `i--` on a scalar local; u32-wraps the result. Modeled as +/- 1
+ *  (not + -1) so a decrement past zero wraps as u32, matching `i - 1u`. */
 function interpretIncDec(
   stmt: IncrementElem | DecrementElem,
   block: DoBlockElem,
   scope: Scope,
 ): void {
   const local = resolveAssignTarget(stmt.target, block, scope);
-  const delta = stmt.kind === "increment" ? 1 : -1;
-  local.value = applyBinary("+", local.value, delta, block);
+  const op = stmt.kind === "increment" ? "+" : "-";
+  local.value = applyBinary(op, local.value, 1, block);
 }
 
 /** Resolve a mutable scalar local from an lhs/target expression. Rejects

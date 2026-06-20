@@ -511,6 +511,33 @@ do test_infinite() {
   ).rejects.toThrow(/exceeded 1000 iterations/);
 });
 
+test("decrementing a u32 below zero wraps like subtraction", async () => {
+  // `i--` at i == 0 must match `i - 1u` (4294967295), not yield -1. Observe
+  // via a comparison so we don't dispatch billions of workgroups.
+  const src = `
+@buffer var<storage, read_write> data: array<u32, 4>;
+
+@compute @workgroup_size(1) fn fill_at(@builtin(workgroup_id) g: vec3u) {
+  data[g.x] = g.x + 1u;
+}
+
+@test @entry
+do test_dec_wrap() {
+  var i = 0u;
+  i--;
+  if i > 1000u { fill_at(2, 1, 1); } else { fill_at(1, 1, 1); }
+}
+`;
+  const ast = parseTest(src);
+  const result = await runDoBlock({
+    device,
+    ast,
+    shaderSrc: src,
+    blockName: "test_dec_wrap",
+  });
+  expect(result.data).toEqual([1, 2, 0, 0]);
+});
+
 test("u32 subtraction underflow wraps modulo 2^32, not to a negative", async () => {
   // `i - 1u` with i == 0 is 4294967295 in WGSL u32, not -1. Observe via a
   // comparison so we don't dispatch billions of workgroups: only the wrapped
