@@ -46,10 +46,14 @@ import env::u;
     </div>
 
     <!-- mouse tracking test (?link) -->
-    <div class="section">
+    <div class="section demo">
       <h3>Mouse tracking (?link)</h3>
-      <p>Hover and click. Uses <code>@auto(mouse_pos)</code> and <code>@auto(mouse_button)</code>.</p>
-      <wgsl-play id="mousePlayer" pixel-ratio="0.01" style="width: 512px; height: 512px"></wgsl-play>
+      <p>Hover and click. Uses <code>@auto(mouse_pos)</code> and <code>@auto(mouse_button)</code>. Source is loaded from a file via <code>?link</code>.</p>
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="mouseSource" theme="dark"></wgsl-edit>
+      </details>
+      <wgsl-play id="mousePlayer" from="mouseSource" pixel-ratio="0.01" style="width: 512px; height: 512px"></wgsl-play>
     </div>
 
     <script type="module" src="./Uniforms.ts"></script>
