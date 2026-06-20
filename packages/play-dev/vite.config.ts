@@ -16,6 +16,8 @@ export default defineConfig({
     outDir: "dist",
     target: "es2024",
     emptyOutDir: true,
+    // app bundle includes CodeMirror + wesl, ~600kB is expected; warn only on real growth
+    chunkSizeWarningLimit: 700,
   },
   server: {
     port: 9111,
