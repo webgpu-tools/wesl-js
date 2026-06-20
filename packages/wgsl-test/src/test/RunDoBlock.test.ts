@@ -296,6 +296,25 @@ do test_continuing() {
   expect(result.data).toEqual([4, 0, 0, 0]);
 });
 
+test("integer division by zero is rejected, not silently NaN", async () => {
+  const src = `
+@buffer var<storage, read_write> data: array<u32, 1>;
+
+@compute @workgroup_size(1) fn step() { data[0] = 1u; }
+
+@test @entry
+do test_div_zero() {
+  var d = 0u;
+  let q = 4u / d;
+  step(1, 1, 1);
+}
+`;
+  const ast = parseTest(src);
+  await expect(
+    runDoBlock({ device, ast, shaderSrc: src, blockName: "test_div_zero" }),
+  ).rejects.toThrow(/division by zero/);
+});
+
 test("a non-terminating loop fails fast at the iteration ceiling", async () => {
   const src = `
 @buffer var<storage, read_write> data: array<u32, 1>;

@@ -317,7 +317,7 @@ function interpretAssign(
     return;
   }
   const op = stmt.op.value.slice(0, -1); // strip trailing '=' => binary op
-  local.value = applyBinary(op, local.value, rhs);
+  local.value = applyBinary(op, local.value, rhs, block);
 }
 
 /** `i++` / `i--` on a scalar local; u32-wraps the result. */
@@ -328,7 +328,7 @@ function interpretIncDec(
 ): void {
   const local = resolveAssignTarget(stmt.target, block, scope);
   const delta = stmt.kind === "increment" ? 1 : -1;
-  local.value = applyBinary("+", local.value, delta);
+  local.value = applyBinary("+", local.value, delta, block);
 }
 
 /** Resolve a mutable scalar local from an lhs/target expression. Rejects
@@ -565,11 +565,16 @@ function evalBinary(
   if (op === "||")
     return truthy(l) ? 1 : boolBit(truthy(evalExpr(expr.right, block, scope)));
   const r = evalExpr(expr.right, block, scope);
-  return applyBinary(op, l, r);
+  return applyBinary(op, l, r, block);
 }
 
 /** Apply a binary arithmetic/comparison/bitwise op to two evaluated scalars. */
-function applyBinary(op: string, l: number, r: number): number {
+function applyBinary(
+  op: string,
+  l: number,
+  r: number,
+  block: DoBlockElem,
+): number {
   switch (op) {
     case "+":
       return wrapInt(l + r, l, r);
@@ -578,8 +583,10 @@ function applyBinary(op: string, l: number, r: number): number {
     case "*":
       return wrapInt(l * r, l, r);
     case "/":
+      if (r === 0) throw blockError(block, "integer division by zero");
       return wrapInt(Math.trunc(l / r), l, r);
     case "%":
+      if (r === 0) throw blockError(block, "integer remainder by zero");
       return wrapInt(l % r, l, r);
     case "<":
       return boolBit(l < r);
