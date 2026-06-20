@@ -11,11 +11,13 @@
     <nav class="test-nav"><a href="./">&larr; index</a></nav>
 
     <!-- connectFrom: multi-file internal imports via wgsl-edit -->
-    <div class="section">
+    <div class="section demo">
       <h3>connectFrom (multi-file)</h3>
       <p>Tests <code>&lt;wgsl-play from="multifileEditor"&gt;</code> with multi-file wgsl-edit</p>
-      <wgsl-edit id="multifileEditor" theme="dark">
-        <script type="text/wesl" data-name="main.wesl">
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="multifileEditor" theme="dark">
+          <script type="text/wesl" data-name="main.wesl">
 import package::util::gradient;
 import env::u;
 
@@ -24,40 +26,46 @@ import env::u;
   let color = gradient(uv);
   return vec4f(color, 1.0);
 }
-        </script>
-        <script type="text/wesl" data-name="util.wesl">
+          </script>
+          <script type="text/wesl" data-name="util.wesl">
 fn gradient(uv: vec2f) -> vec3f {
   return vec3f(uv, 0.3);
 }
-        </script>
-      </wgsl-edit>
+          </script>
+        </wgsl-edit>
+      </details>
       <wgsl-play id="multifilePlayer" from="multifileEditor"></wgsl-play>
     </div>
 
     <!-- connectFrom: condition toggle via editor -->
-    <div class="section">
+    <div class="section demo">
       <h3>connectFrom + conditions</h3>
       <p>Tests condition toggle via editor propagates to connected player</p>
       <div class="controls">
         <button type="button" id="set-connect-red">Set RED condition</button>
       </div>
-      <wgsl-edit id="connectCondEditor" theme="dark">
-        <script type="text/wesl">
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="connectCondEditor" theme="dark">
+          <script type="text/wesl">
 @fragment fn fs_main() -> @location(0) vec4f {
   @if(RED) { return vec4f(1.0, 0.0, 0.0, 1.0); }
   @else { return vec4f(0.0, 1.0, 0.0, 1.0); }
 }
-        </script>
-      </wgsl-edit>
+          </script>
+        </wgsl-edit>
+      </details>
       <wgsl-play id="connectCondPlayer" from="connectCondEditor"></wgsl-play>
     </div>
 
     <!-- connectFrom: external dep fetching -->
-    <div class="section">
+    <div class="section demo">
       <h3>connectFrom + external deps</h3>
       <p>Tests that connectFrom fetches external deps</p>
-      <wgsl-edit id="connectExtEditor" theme="dark">
-        <script type="text/wesl">
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="connectExtEditor" theme="dark">
+          <script type="text/wesl">
 import random_wgsl::pcg_2u_3f;
 import env::u;
 
@@ -66,48 +74,55 @@ import env::u;
   let color = pcg_2u_3f(seed);
   return vec4f(color, 1.0);
 }
-        </script>
-      </wgsl-edit>
+          </script>
+        </wgsl-edit>
+      </details>
       <wgsl-play id="connectExtPlayer" from="connectExtEditor"></wgsl-play>
     </div>
 
     <!-- connectFrom: dynamic npm package loading -->
-    <div class="section">
+    <div class="section demo">
       <h3>connectFrom + dynamic npm loading</h3>
       <p>Tests dynamically adding an npm package reference to wgsl-edit</p>
       <div class="controls">
         <button type="button" id="inject-dynamic-npm">Inject random_wgsl</button>
       </div>
-      <wgsl-edit id="dynamicNpmEditor" theme="dark">
-        <script type="text/wesl">
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="dynamicNpmEditor" theme="dark">
+          <script type="text/wesl">
 import env::u;
 
 @fragment fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let uv = pos.xy / u.resolution;
   return vec4f(uv, 0.5, 1.0);
 }
-        </script>
-      </wgsl-edit>
+          </script>
+        </wgsl-edit>
+      </details>
       <wgsl-play id="dynamicNpmPlayer" from="dynamicNpmEditor"></wgsl-play>
     </div>
 
     <!-- editor.link() with virtualLibs -->
-    <div class="section">
+    <div class="section demo">
       <h3>editor.link() with virtualLibs</h3>
       <p>Tests <code>editor.link({ virtualLibs: { env: () => envSrc } })</code></p>
       <div class="controls">
         <button type="button" id="link-virtual-libs">Link with virtualLibs</button>
       </div>
-      <wgsl-edit id="virtualLibsEditor" gpu-lint="off" theme="dark">
-        <script type="text/wesl">
+      <details class="source-panel">
+        <summary>Show source</summary>
+        <wgsl-edit id="virtualLibsEditor" gpu-lint="off" theme="dark">
+          <script type="text/wesl">
 import env::u;
 
 @fragment fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let uv = pos.xy / u.resolution;
   return vec4f(uv, 0.5, 1.0);
 }
-        </script>
-      </wgsl-edit>
+          </script>
+        </wgsl-edit>
+      </details>
       <pre id="virtual-libs-output">Not linked yet</pre>
     </div>
 
