@@ -9,6 +9,9 @@
   "repository": "github:webgpu-tools/wesl-js",
   "scripts": {
     "build": "tsdown",
+    "build:cases": "vite build test-page --config vite.config.ts",
+    "deploy:cases": "pnpm build:cases && wrangler pages deploy --project-name wgsl-play-cases --branch main site",
+    "preview:cases": "vite preview test-page --config vite.config.ts",
     "dev": "vite test-page --config vite.config.ts",
     "prepublishOnly": "run-s build",
     "test": "vitest",
@@ -52,6 +55,7 @@
     "@playwright/test": "^1.53.2",
     "nanotar": "^0.2.0",
     "preact": "^10.27.2",
-    "wesl-plugin": "workspace:x"
+    "wesl-plugin": "workspace:x",
+    "wrangler": "^4.77.0"
   }
 }

@@ -872,6 +872,9 @@ importers:
       wesl-plugin:
         specifier: workspace:x
         version: link:../wesl-plugin
+      wrangler:
+        specifier: ^4.77.0
+        version: 4.87.0(@cloudflare/workers-types@4.20260617.1)
 
   packages/wgsl-studio:
     dependencies:
