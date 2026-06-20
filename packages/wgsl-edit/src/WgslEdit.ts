@@ -159,6 +159,7 @@ export class WgslEdit extends HTMLElement {
   private _pendingSource: string | null = null;
   private _theme: Theme = "auto";
   private _mediaQuery: MediaQueryList | null = null;
+  private _visibilityObserver: IntersectionObserver | null = null;
   private _lineNumbers = false;
 
   private _files: Map<string, FileState> = new Map();
@@ -208,14 +209,28 @@ export class WgslEdit extends HTMLElement {
   connectedCallback(): void {
     this.initEditor();
     this.loadInitialContent();
+    this.observeVisibility();
     const props = ["conditions", "source", "sources", "project", "autosave"];
     for (const p of props) upgradeProperty(this, p);
   }
 
   disconnectedCallback(): void {
     this.connectLintSource(null);
+    this._visibilityObserver?.disconnect();
+    this._visibilityObserver = null;
     this.editorView?.destroy();
     this.editorView = null;
+  }
+
+  /** CodeMirror can't measure while hidden (e.g. inside a closed <details>),
+   *  so it lays out at the wrong height. Re-measure whenever we become visible. */
+  private observeVisibility(): void {
+    if (typeof IntersectionObserver === "undefined") return;
+    this._visibilityObserver = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting))
+        this.editorView?.requestMeasure();
+    });
+    this._visibilityObserver.observe(this);
   }
 
   attributeChangedCallback(
