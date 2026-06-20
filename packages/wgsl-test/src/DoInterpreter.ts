@@ -518,7 +518,7 @@ function evalUnary(
   const v = evalExpr(expr.expression, block, scope);
   switch (expr.operator.value) {
     case "-":
-      return wrapInt(-v, v);
+      return -v | 0; // unary minus is signed (i32); u32 has no negation
     case "~":
       return ~v >>> 0;
     case "!":
@@ -585,15 +585,16 @@ function applyBinary(op: string, l: number, r: number): number {
 }
 
 /**
- * Wrap an integer arithmetic result at the 32-bit boundary. Do-block counters
- * are u32 (`var i = 0u`), so wrap to u32 via `>>> 0`. If any operand or the
- * result is negative we wrap as i32 via `| 0` instead, keeping `i - 1` style
- * math sane. Non-integer results pass through unwrapped so a stray float
- * surfaces as-is.
+ * Wrap an integer arithmetic result at the 32-bit boundary. The interpreter
+ * doesn't track signedness, so we infer it from the operands: a negative
+ * operand means i32 math, so keep the signed result via `| 0`; otherwise the
+ * operands are u32 and an underflowing result wraps modulo 2^32 via `>>> 0`
+ * (so `0u - 1u` == 4294967295, matching WGSL). Non-integer results pass
+ * through unwrapped so a stray float surfaces as-is.
  */
 function wrapInt(result: number, ...operands: number[]): number {
   if (!Number.isInteger(result)) return result;
-  if (operands.some(o => o < 0) || result < 0) return result | 0;
+  if (operands.some(o => o < 0)) return result | 0;
   return result >>> 0;
 }
 
