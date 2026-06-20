@@ -2,20 +2,9 @@ import { defineConfig } from "tsdown";
 
 const sharedNeverBundle = [
   "../lib/weslBundle.js",
+  /^node:/, // node builtins (CLI targets node22; "neutral" platform won't externalize these on its own)
   "fs",
   "module",
-  "node:assert",
-  "node:events",
-  "node:fs",
-  "node:fs/promises",
-  "node:module",
-  "node:path",
-  "node:process",
-  "node:stream",
-  "node:string_decoder",
-  "node:url",
-  "node:util",
-  "node:v8",
   "pngjs",
   "thimbleberry",
   "vitest",
