@@ -2,6 +2,7 @@
 import { execSync, spawn } from "node:child_process";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -77,10 +78,28 @@ async function pack(
   tempPackages: string,
 ): Promise<void> {
   const outputFile = join(tempPackages, `${packageName}-${timestamp}.tgz`);
-  await runAsync(
-    `pnpm --filter ${packageName} pack --out ${outputFile} 2>&1 | tail -1`,
-    packagesRoot,
-  );
+  const cmd = `pnpm --filter ${packageName} pack --out ${outputFile}`;
+
+  // Pack can fail transiently when many `pnpm` processes run in parallel (store
+  // lock contention), so retry once. Capture output instead of piping through
+  // `tail`, which would hide the real exit code and turn a pack failure into a
+  // confusing ENOENT later during `pnpm install`.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const { code, output } = await runCapture(cmd, packagesRoot);
+    if (code === 0 && existsSync(outputFile)) {
+      console.log(outputFile);
+      return;
+    }
+    if (attempt === 2) {
+      const tarball = existsSync(outputFile) ? "present" : "missing";
+      throw new Error(
+        `Failed to pack ${packageName} (exit ${code}, tarball ${tarball}):\n${output}`,
+      );
+    }
+    console.warn(
+      `pack ${packageName} failed (attempt ${attempt}), retrying...`,
+    );
+  }
 }
 
 /** copy directory except .git,node_modules,scripts */
@@ -146,13 +165,17 @@ function run(cmd: string, cwd?: string) {
   }
 }
 
-function runAsync(cmd: string, cwd?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("sh", ["-c", cmd], { cwd, stdio: "inherit" });
-    child.on("close", code => {
-      if (code === 0) resolve();
-      else reject(new Error(`Failed to run: ${cmd}`));
-    });
+/** Run a command, capturing combined stdout+stderr and the exit code. */
+function runCapture(
+  cmd: string,
+  cwd?: string,
+): Promise<{ code: number; output: string }> {
+  return new Promise(resolve => {
+    const child = spawn("sh", ["-c", cmd], { cwd });
+    let output = "";
+    child.stdout?.on("data", d => (output += d));
+    child.stderr?.on("data", d => (output += d));
+    child.on("close", code => resolve({ code: code ?? 1, output }));
   });
 }
 
