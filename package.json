@@ -23,6 +23,7 @@
     "lint:all": "run-s lint:biome check:versions",
     "lint:biome": "biome check --error-on-warnings",
     "lint:oxlint": "oxlint",
+    "local_deps": "rimraf node_modules/.pnpm-workspace-state-v1.json && cross-env CI=true LOCAL_DEPS=1 pnpm install --no-frozen-lockfile",
     "preinstall": "git submodule update --init --recursive",
     "prep:examples": "tsx scripts/prep-examples.ts",
     "prepublishOnly:all": "pnpm --filter \"./packages/**\" prepublishOnly",
