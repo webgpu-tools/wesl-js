@@ -1,6 +1,7 @@
 import type {
   Attribute,
   AttributeElem,
+  ConditionalAttribute,
   DeclarationElem,
   DeclIdentElem,
   ExpressionElem,
@@ -45,25 +46,22 @@ export function expectWord(
   return token as WeslToken<"word">;
 }
 
-/** Parse a required expression, adding it to the open container's contents. */
+/** Parse a required expression, throwing if absent. */
 export function expectExpression(
   ctx: ParsingContext,
   errorMsg = "Expected expression",
 ): ExpressionElem {
   const expr = parseExpression(ctx);
   if (!expr) throwParseError(ctx.stream, errorMsg);
-  ctx.addElem(expr);
   return expr;
 }
 
-/** Parse an optional expression, adding it to the open container's contents. */
+/** Parse an optional expression. */
 export function parseContentExpression(
   ctx: ParsingContext,
   opts?: ExpressionOpts,
 ): ExpressionElem | null {
-  const expr = parseExpression(ctx, opts);
-  if (expr) ctx.addElem(expr);
-  return expr;
+  return parseExpression(ctx, opts);
 }
 
 /** Throw a ParseError at the current/next token position. */
@@ -151,12 +149,27 @@ export function hasConditionalAttribute(attributes: AttributeElem[]): boolean {
   return attributes.some(attr => isConditionalAttribute(attr.attribute));
 }
 
+/** The first conditional (@if, @elif, @else) attribute in the list, if any. */
+export function conditionalAttribute(
+  attributes: AttributeElem[],
+): ConditionalAttribute | undefined {
+  const found = attributes.find(a => isConditionalAttribute(a.attribute));
+  return found?.attribute as ConditionalAttribute | undefined;
+}
+
 /** Attach non-empty attributes array to element. */
 export function attachAttributes<T extends { attributes?: AttributeElem[] }>(
   elem: T,
   attributes?: AttributeElem[],
 ): void {
   if (attributes?.length) elem.attributes = attributes;
+}
+
+/** Normalize an empty attribute list to undefined (the elem's "no attributes"). */
+export function attrsOrUndef(
+  attrs: AttributeElem[],
+): AttributeElem[] | undefined {
+  return attrs.length ? attrs : undefined;
 }
 
 /** Link a DeclIdentElem's ident to its parent declaration. */

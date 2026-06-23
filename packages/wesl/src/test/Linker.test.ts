@@ -14,6 +14,12 @@ test("global diagnostic directive", async () => {
   expectTrimmedMatch(result, src);
 });
 
+test("consecutive top-level directives stay on separate lines", async () => {
+  const src = `requires readonly_and_readwrite_storage_textures;\nenable f16;`;
+  const result = await linkTest(src);
+  expectTrimmedMatch(result, src);
+});
+
 test("@diagnostic attribute on statement", async () => {
   const src = `fn foo() { @diagnostic(info, derivative_uniformity) if true { } }`;
   const result = await linkTest(src);
@@ -54,7 +60,9 @@ test("link an alias", async () => {
   const src = /* wgsl */ `
     alias Num = f32;
 
-    fn main() { Num(1.0); }
+    fn main() {
+      Num(1.0);
+    }
   `;
   const result = await linkTest(src);
   expectTrimmedMatch(result, src);
@@ -112,9 +120,9 @@ test("type inside fn with same name as fn", async () => {
   // illegal but shouldn't hang
   const src = `
     fn foo() {
-      var a:foo;
+      var a: foo;
     }
-    fn bar() {}
+    fn bar() { }
   `;
   const result = await linkTest(src);
   expectTrimmedMatch(result, src);
@@ -183,8 +191,12 @@ test("cross-module @location attribute const", async () => {
   `;
   const result = await linkTest(main, file1);
   const expected = `
-    fn main() { let x = foo(); }
-    fn foo() -> @location(loc) vec4f { return vec4f(); }
+    fn main() {
+      let x = foo();
+    }
+    fn foo() -> @location(loc) vec4f {
+      return vec4f();
+    }
     const loc = 0;
   `;
   expectTrimmedMatch(result, expected);
@@ -207,7 +219,9 @@ test("link with library bundle (tests CompositeResolver)", async () => {
   ];
   const result = await linkTestOpts({ libs }, main);
   const expected = `
-    fn main() { helper(); }
+    fn main() {
+      helper();
+    }
     fn helper() { }
   `;
   expectTrimmedMatch(result, expected);
@@ -221,7 +235,9 @@ test("inline ref in array size from another module", async () => {
   const file1 = `const SIZE = 4;`;
   const result = await linkTest(main, file1);
   const expected = `
-    fn main() { var a: array<f32, SIZE>; }
+    fn main() {
+      var a: array<f32, SIZE>;
+    }
     const SIZE = 4;
   `;
   expectTrimmedMatch(result, expected);

@@ -7,6 +7,7 @@ export * from "./discovery/FindUnboundIdents.ts";
 export * from "./discovery/PackageNameUtils.ts";
 export * from "./LinkedWesl.ts";
 export * from "./Linker.ts";
+export * from "./LinkerUtil.ts";
 export * from "./LiveDeclarations.ts";
 export { debug, log, srcLog, validation, withLoggerAsync } from "./Logging.ts";
 export * from "./Mangler.ts";

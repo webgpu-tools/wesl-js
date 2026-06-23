@@ -10,32 +10,19 @@ test("parse @elif basic", () => {
     "module
       const %a @if
         attribute @if(false)
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
         literal literal(1)
-        text ';'
-      text '
-    '
       const %a @elif
         attribute @elif(true)
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
         literal literal(2)
-        text ';'
-      text '
-    '
       const %a @else
         attribute @else
-        text ' const '
         typeDecl %a
           decl %a
-        text ' = '
-        literal literal(3)
-        text ';'"
+        literal literal(3)"
   `);
 });
 
@@ -46,15 +33,11 @@ test("parse @elif with complex condition", () => {
       fn f() @if
         attribute @if(foo)
         decl %f
-        statement
-          text '{}'
-      text '
-    '
+        block
       fn f() @elif
         attribute @elif(bar && !baz)
         decl %f
-        statement
-          text '{}'"
+        block"
   `);
 });
 
@@ -66,42 +49,24 @@ test("parse multiple @elif", () => {
     "module
       const %x @if
         attribute @if(a)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(1)
-        text ';'
-      text '
-    '
       const %x @elif
         attribute @elif(b)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(2)
-        text ';'
-      text '
-    '
       const %x @elif
         attribute @elif(c)
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
         literal literal(3)
-        text ';'
-      text '
-    '
       const %x @else
         attribute @else
-        text ' const '
         typeDecl %x
           decl %x
-        text ' = '
-        literal literal(4)
-        text ';'"
+        literal literal(4)"
   `);
 });
 
@@ -112,8 +77,8 @@ test("parse @elif on import", () => {
   expect(astToString(ast.moduleElem)).toMatchInlineSnapshot(`
     "module
       import a::val; @if
-      text '
-    '
-      import b::val; @elif"
+        attribute @if(false)
+      import b::val; @elif
+        attribute @elif(true)"
   `);
 });

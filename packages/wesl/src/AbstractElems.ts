@@ -2,50 +2,58 @@ import type { DeclIdent, RefIdent, Scope, SrcModule } from "./Scope.ts";
 import type { Span } from "./Span.ts";
 
 /**
- * AST structures describing 'interesting' parts of WESL source.
- *
- * Parts needing further analysis are pulled into these structures.
- * Uninteresting parts are 'TextElem' nodes, copied to output WGSL.
+ * AST structures describing WESL source. Each element holds its interesting
+ * parts as typed child fields (name, type, init, body, ...); emit walks those
+ * fields and reconstructs the surrounding WGSL syntax rather than copying spans.
  */
-export type AbstractElem = GrammarElem | SyntheticElem | ExpressionElem;
+export type AbstractElem =
+  | GrammarElem
+  | SyntheticElem
+  | ExpressionElem
+  | UnknownExpressionElem;
 
-export type GrammarElem = ContainerElem | TerminalElem | DoBlockElem;
-
-export type ContainerElem =
-  | AttributeElem
-  | AliasElem
-  | ConstAssertElem
-  | ConstElem
-  | ContinuingElem
-  | UnknownExpressionElem
-  | SimpleMemberRef
-  | FnElem
-  | TypedDeclElem
-  | GlobalVarElem
-  | LetElem
+export type GrammarElem =
   | ModuleElem
+  | AttributeElem
+  | Statement
+  | SwitchClauseElem
+  | AliasElem
+  | GlobalVarElem
   | OverrideElem
-  | FnParamElem
   | StructElem
   | StructMemberElem
-  | StuffElem
-  | TypeRefElem
-  | VarElem
-  | StatementElem
-  | SwitchClauseElem;
+  | FnElem
+  | FnParamElem
+  | TypedDeclElem
+  | TerminalElem
+  | DoBlockElem;
 
 /** Map from element kind string to element type, for type-safe element construction. */
 export type ElemKindMap = {
   alias: AliasElem;
   assert: ConstAssertElem;
+  block: BlockElem;
   const: ConstElem;
   continuing: ContinuingElem;
+  if: IfElem;
+  for: ForElem;
+  while: WhileElem;
+  loop: LoopElem;
+  switch: SwitchElem;
+  return: ReturnElem;
+  break: BreakElem;
+  continue: ContinueElem;
+  discard: DiscardElem;
+  assign: AssignElem;
+  increment: IncrementElem;
+  decrement: DecrementElem;
+  call: CallElem;
+  empty: EmptyElem;
   gvar: GlobalVarElem;
   let: LetElem;
   member: StructMemberElem;
   override: OverrideElem;
   param: FnParamElem;
-  statement: StatementElem;
   struct: StructElem;
   "switch-clause": SwitchClauseElem;
   type: TypeRefElem;
@@ -69,7 +77,6 @@ export type TerminalElem =
   | DeclIdentElem //
   | NameElem
   | RefIdentElem
-  | TextElem
   | ImportElem;
 
 export type GlobalDeclarationElem =
@@ -93,10 +100,25 @@ export interface AbstractElemBase {
   kind: AbstractElem["kind"];
   start: number;
   end: number;
+  /** Comments leading this element (on their own line above it). */
+  commentsBefore?: CommentElem[];
+  /** Comments trailing this element (on the same line after it). */
+  commentsAfter?: CommentElem[];
 }
 
-export interface ElemWithContentsBase extends AbstractElemBase {
-  contents: AbstractElem[];
+/**
+ * A source comment attached to an element as leading or trailing trivia.
+ * Not part of the {@link AbstractElem} union: comments are node metadata
+ * (in `commentsBefore` / `commentsAfter`), never `contents` children.
+ */
+export interface CommentElem {
+  kind: "comment";
+  style: "line" | "block";
+  start: number;
+  end: number;
+  srcModule: SrcModule;
+  /** Preserve one blank line above this comment (leading comments only). */
+  blankBefore?: boolean;
 }
 
 export interface HasAttributes {
@@ -104,12 +126,6 @@ export interface HasAttributes {
 }
 
 /* ------   Terminal Elements  (don't contain other elements)  ------   */
-
-/** Raw text copied to linked WGSL (e.g., 'var' or '@diagnostic(off,derivative_uniformity)'). */
-export interface TextElem extends AbstractElemBase {
-  kind: "text";
-  srcModule: SrcModule;
-}
 
 /** A name that doesn't need to be an Ident (e.g., struct member, diagnostic rule). */
 export interface NameElem extends AbstractElemBase {
@@ -171,10 +187,10 @@ export interface SyntheticElem {
   text: string;
 }
 
-/* ------   Container Elements  (contain other elements)  ------   */
+/* ------   Composite Elements  (hold child elements in typed fields)  ------   */
 
 /** A declaration identifier with an optional type. */
-export interface TypedDeclElem extends ElemWithContentsBase {
+export interface TypedDeclElem extends AbstractElemBase {
   kind: "typeDecl";
   decl: DeclIdentElem;
   typeRef?: TypeRefElem; // LATER Consider a variant for fn params and alias where typeRef is required
@@ -182,14 +198,14 @@ export interface TypedDeclElem extends ElemWithContentsBase {
 }
 
 /** An alias statement. */
-export interface AliasElem extends ElemWithContentsBase, HasAttributes {
+export interface AliasElem extends AbstractElemBase, HasAttributes {
   kind: "alias";
   name: DeclIdentElem;
   typeRef: TypeRefElem;
 }
 
 /** An attribute like '@compute' or '@binding(0)'. */
-export interface AttributeElem extends ElemWithContentsBase {
+export interface AttributeElem extends AbstractElemBase {
   kind: "attribute";
   attribute: Attribute;
 }
@@ -244,19 +260,22 @@ export interface ElseAttribute {
 export type ConditionalAttribute = IfAttribute | ElifAttribute | ElseAttribute;
 
 /** A const_assert statement. */
-export interface ConstAssertElem extends ElemWithContentsBase, HasAttributes {
+export interface ConstAssertElem extends AbstractElemBase, HasAttributes {
   kind: "assert";
+  expression: ExpressionElem;
 }
 
 /** A const declaration. */
-export interface ConstElem extends ElemWithContentsBase, HasAttributes {
+export interface ConstElem extends AbstractElemBase, HasAttributes {
   kind: "const";
   name: TypedDeclElem;
+  init?: ExpressionElem;
 }
 
 /** An expression without special handling, used in attribute parameters. */
-export interface UnknownExpressionElem extends ElemWithContentsBase {
+export interface UnknownExpressionElem extends AbstractElemBase {
   kind: "expression";
+  expression: ExpressionElem;
 }
 
 /** An expression that can be safely evaluated at compile time. */
@@ -374,110 +393,248 @@ export interface DoBlockElem extends AbstractElemBase, HasAttributes {
   kind: "do";
   name: NameElem;
   params: FnParamElem[];
-  body: StatementElem;
-  attributes?: AttributeElem[];
+  body: BlockElem;
 }
 
 /** A function declaration. */
-export interface FnElem extends ElemWithContentsBase, HasAttributes {
-  // LATER doesn't need contents
+export interface FnElem extends AbstractElemBase, HasAttributes {
   kind: "fn";
   name: DeclIdentElem;
   params: FnParamElem[];
-  body: StatementElem;
+  body: BlockElem;
   returnAttributes?: AttributeElem[];
   returnType?: TypeRefElem;
 }
 
 /** A global variable declaration (at the root level). */
-export interface GlobalVarElem extends ElemWithContentsBase, HasAttributes {
+export interface GlobalVarElem extends AbstractElemBase, HasAttributes {
   kind: "gvar";
   name: TypedDeclElem;
+  /** Address-space / access-mode enumerants, e.g. `<storage, read_write>`. */
+  template?: NameElem[];
+  init?: ExpressionElem;
 }
 
 /** An entire file. */
-export interface ModuleElem extends ElemWithContentsBase {
+export interface ModuleElem extends AbstractElemBase {
   kind: "module";
+  /** Top-level children (imports, directives, declarations, and any synthetic
+   *  vars added by transforms) in source order. */
+  decls: AbstractElem[];
 }
 
 /** An override declaration. */
-export interface OverrideElem extends ElemWithContentsBase, HasAttributes {
+export interface OverrideElem extends AbstractElemBase, HasAttributes {
   kind: "override";
   name: TypedDeclElem;
+  init?: ExpressionElem;
 }
 
 /** A parameter in a function declaration. */
-export interface FnParamElem extends ElemWithContentsBase, HasAttributes {
+export interface FnParamElem extends AbstractElemBase, HasAttributes {
   kind: "param";
   name: TypedDeclElem;
 }
 
-/** Simple struct references like `myStruct.bar` (for binding struct transforms). */
-export interface SimpleMemberRef extends ElemWithContentsBase {
-  kind: "memberRef";
-  name: RefIdentElem;
-  member: NameElem;
-  extraComponents?: StuffElem;
-}
-
 /** A struct declaration. */
-export interface StructElem extends ElemWithContentsBase, HasAttributes {
+export interface StructElem extends AbstractElemBase, HasAttributes {
   kind: "struct";
   name: DeclIdentElem;
   members: StructMemberElem[];
-  bindingStruct?: true; // used later during binding struct transformation
-}
-
-/** Generic container of other elements. */
-export interface StuffElem extends ElemWithContentsBase {
-  kind: "stuff";
-}
-
-/** A struct declaration marked as a binding struct. */
-export interface BindingStructElem extends StructElem {
-  bindingStruct: true;
-  entryFn?: FnElem;
 }
 
 /** A member of a struct declaration. */
-export interface StructMemberElem extends ElemWithContentsBase, HasAttributes {
+export interface StructMemberElem extends AbstractElemBase, HasAttributes {
   kind: "member";
   name: NameElem;
   typeRef: TypeRefElem;
-  mangledVarName?: string; // root name if transformed to a var (for binding struct transformation)
 }
 
 export type TypeTemplateParameter = ExpressionElem;
 
 /** A type reference like 'f32', 'MyStruct', or 'ptr<storage, array<f32>, read_only>'. */
-export interface TypeRefElem extends ElemWithContentsBase {
+export interface TypeRefElem extends AbstractElemBase {
   kind: "type";
   name: RefIdent;
   templateParams?: TypeTemplateParameter[];
 }
 
 /** A variable declaration. */
-export interface VarElem extends ElemWithContentsBase, HasAttributes {
+export interface VarElem extends AbstractElemBase, HasAttributes {
   kind: "var";
   name: TypedDeclElem;
+  /** Address-space / access-mode enumerants, e.g. `<storage, read_write>`. */
+  template?: NameElem[];
+  init?: ExpressionElem;
 }
 
-export interface LetElem extends ElemWithContentsBase, HasAttributes {
+export interface LetElem extends AbstractElemBase, HasAttributes {
   kind: "let";
   name: TypedDeclElem;
+  init?: ExpressionElem;
 }
 
-export interface StatementElem extends ElemWithContentsBase, HasAttributes {
-  kind: "statement";
+/* ------   Statement Elements  ------ */
+
+/** Any WGSL statement inside a function or block body. */
+export type Statement =
+  | BlockElem
+  | IfElem
+  | ForElem
+  | WhileElem
+  | LoopElem
+  | ContinuingElem
+  | SwitchElem
+  | ReturnElem
+  | BreakElem
+  | ContinueElem
+  | DiscardElem
+  | AssignElem
+  | IncrementElem
+  | DecrementElem
+  | CallElem
+  | ConstAssertElem
+  | EmptyElem
+  | VarElem
+  | LetElem
+  | ConstElem;
+
+/** A bare `;` statement. Emits nothing, but kept in the AST as a statement node. */
+export interface EmptyElem extends AbstractElemBase, HasAttributes {
+  kind: "empty";
 }
 
-export interface ContinuingElem extends ElemWithContentsBase, HasAttributes {
+/** A `{ ... }` compound statement. */
+export interface BlockElem extends AbstractElemBase, HasAttributes {
+  kind: "block";
+  body: Statement[];
+  /** Comments inside an otherwise empty block, with no statement to attach to. */
+  innerComments?: CommentElem[];
+}
+
+/** An if / else-if / else chain. `else` nests: else-if is an IfElem, plain else a BlockElem. */
+export interface IfElem extends AbstractElemBase, HasAttributes {
+  kind: "if";
+  condition: ExpressionElem;
+  body: BlockElem;
+  else?: IfElem | BlockElem;
+}
+
+/** A for loop. */
+export interface ForElem extends AbstractElemBase, HasAttributes {
+  kind: "for";
+  init?: ForInit;
+  condition?: ExpressionElem;
+  update?: ForUpdate;
+  body: BlockElem;
+}
+
+export type ForInit =
+  | VarElem
+  | LetElem
+  | ConstElem
+  | AssignElem
+  | IncrementElem
+  | DecrementElem
+  | CallElem;
+export type ForUpdate = AssignElem | IncrementElem | DecrementElem | CallElem;
+
+/** A while loop. */
+export interface WhileElem extends AbstractElemBase, HasAttributes {
+  kind: "while";
+  condition: ExpressionElem;
+  body: BlockElem;
+}
+
+/** A loop, optionally ending with a continuing block. */
+export interface LoopElem extends AbstractElemBase, HasAttributes {
+  kind: "loop";
+  body: BlockElem;
+  continuing?: ContinuingElem;
+}
+
+/** A continuing block, optionally ending with `break if expr`. */
+export interface ContinuingElem extends AbstractElemBase, HasAttributes {
   kind: "continuing";
+  body: BlockElem;
+  breakIf?: ExpressionElem;
 }
 
-/** Statement or continuing - used in loop body parsing. */
-export type BlockStatement = StatementElem | ContinuingElem;
+/** A switch statement. */
+export interface SwitchElem extends AbstractElemBase, HasAttributes {
+  kind: "switch";
+  selector: ExpressionElem;
+  clauses: SwitchClauseElem[];
+  /** Attributes on the switch body, between the selector and `{`. */
+  bodyAttributes?: AttributeElem[];
+}
 
-export interface SwitchClauseElem extends ElemWithContentsBase, HasAttributes {
+/** A case or default clause. `"default"` sentinel marks the default selector. */
+export interface SwitchClauseElem extends AbstractElemBase, HasAttributes {
   kind: "switch-clause";
+  selectors: (ExpressionElem | "default")[];
+  body: BlockElem;
+}
+
+/** A return statement, with an optional value. */
+export interface ReturnElem extends AbstractElemBase, HasAttributes {
+  kind: "return";
+  value?: ExpressionElem;
+}
+
+/** A break statement, or `break if expr`. */
+export interface BreakElem extends AbstractElemBase, HasAttributes {
+  kind: "break";
+  condition?: ExpressionElem;
+}
+
+/** A continue statement. */
+export interface ContinueElem extends AbstractElemBase, HasAttributes {
+  kind: "continue";
+}
+
+/** A discard statement. */
+export interface DiscardElem extends AbstractElemBase, HasAttributes {
+  kind: "discard";
+}
+
+/** Assignment, compound assignment, or phony `_ = expr`. */
+export interface AssignElem extends AbstractElemBase, HasAttributes {
+  kind: "assign";
+  lhs: ExpressionElem | PhonyTarget;
+  op: AssignOp;
+  rhs: ExpressionElem;
+}
+
+/** `i++` */
+export interface IncrementElem extends AbstractElemBase, HasAttributes {
+  kind: "increment";
+  target: ExpressionElem;
+}
+
+/** `i--` */
+export interface DecrementElem extends AbstractElemBase, HasAttributes {
+  kind: "decrement";
+  target: ExpressionElem;
+}
+
+/** A bare function call statement. */
+export interface CallElem extends AbstractElemBase, HasAttributes {
+  kind: "call";
+  call: FunctionCallExpression;
+}
+
+/** The `_` discard target of a phony assignment; never enters the ident system. */
+export interface PhonyTarget {
+  kind: "phony";
+  span: Span;
+}
+
+/** An assignment operator. Uses a span tuple (not inline start/end) to match
+ * BinaryOperator's smaller V8 size class; see the note there. */
+export interface AssignOp {
+  value:
+    | ("=" | "+=" | "-=" | "*=" | "/=" | "%=")
+    | ("&=" | "|=" | "^=" | "<<=" | ">>=");
+  span: Span;
 }

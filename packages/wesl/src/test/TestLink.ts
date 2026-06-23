@@ -3,9 +3,15 @@ import type { WgslTestSrc } from "wesl-testsuite";
 import { link } from "../Linker.ts";
 import { type ManglerFn, underscoreMangle } from "../Mangler.ts";
 import { mapValues } from "../Util.ts";
-import { expectTrimmedMatch, trimSrc } from "./TrimmedMatch.ts";
+import { expectTokenMatch } from "./TestUtil.ts";
+import { trimSrc } from "./TrimmedMatch.ts";
 
-/** Link wesl sources and compare linked wgsl vs expectations (ignores whitespace). */
+/**
+ * Link wesl sources and compare the linked wgsl against expectations.
+ * These cases verify linking (imports, mangling, conditional compilation,
+ * tree-shaking), not layout, so the comparison is token-based: whitespace and
+ * comments are ignored, leaving line layout to the emit-specific tests.
+ */
 export async function testLink(
   weslSrc: Record<string, string>,
   rootModuleName: string,
@@ -13,7 +19,7 @@ export async function testLink(
   mangler?: ManglerFn,
 ): Promise<void> {
   const resultMap = await link({ weslSrc, rootModuleName, mangler });
-  expectTrimmedMatch(resultMap.dest, expectedWgsl);
+  expectTokenMatch(resultMap.dest, expectedWgsl);
 }
 
 type CaseMap = Map<string, WgslTestSrc>;
@@ -43,6 +49,16 @@ const knownFormattingDifferences: Record<string, string> = {
   "@if on break statement": `
     fn foo() { while true {  break; } }
     fn bar() { while true {  } }`,
+  "@if on switch statement": `
+    fn func() {
+      switch 0 { default: { let foo = 10; } }
+    }`,
+  "@if on switch clause": `
+    fn func() {
+      switch 0 {
+        default: { let foo = 10; }
+      }
+    }`,
 };
 
 /** Test linking a single case from a shared test suite (ImportCases, etc.) */

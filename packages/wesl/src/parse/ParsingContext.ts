@@ -50,12 +50,9 @@ export class ParsingContext {
     return this.state.context.scope;
   }
 
-  addElem(elem: AbstractElem): void {
-    const { openElems } = this.state.context;
-    if (openElems.length > 0) {
-      const open = openElems[openElems.length - 1];
-      open.contents.push(elem);
-    }
+  /** Append a top-level declaration to the module, in source order. */
+  addModuleDecl(elem: AbstractElem): void {
+    this.state.stable.moduleElem.decls.push(elem);
   }
 
   pushScope(kind: Scope["kind"] = "scope"): void {

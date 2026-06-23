@@ -10,6 +10,7 @@ import { parseAttributeList } from "./ParseAttribute.ts";
 import { getStartWithAttributes } from "./ParseStatement.ts";
 import {
   attachAttributes,
+  attrsOrUndef,
   expect,
   expectWord,
   makeNameElem,
@@ -22,8 +23,7 @@ import type { WeslStream, WeslToken } from "./WeslStream.ts";
 export function parseDirective(ctx: ParsingContext): DirectiveElem | null {
   const { stream } = ctx;
   const startPos = stream.checkpoint();
-  const attributes = parseAttributeList(ctx);
-  const attrs = attributes.length > 0 ? attributes : undefined;
+  const attrs = attrsOrUndef(parseAttributeList(ctx));
 
   const result =
     parseExtensionDirective(ctx, "enable", attrs) ||

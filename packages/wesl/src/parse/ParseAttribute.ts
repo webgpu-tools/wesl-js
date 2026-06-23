@@ -6,7 +6,6 @@ import type {
   DiagnosticRule,
   ElifAttribute,
   ElseAttribute,
-  ExpressionElem,
   IfAttribute,
   InterpolateAttribute,
   NameElem,
@@ -15,15 +14,14 @@ import type {
   UnknownExpressionElem,
 } from "../AbstractElems.ts";
 import { ParseError } from "../ParseError.ts";
-import { beginElem, finishContents } from "./ContentsHelpers.ts";
 import { parseExpression } from "./ParseExpression.ts";
 import {
   expect,
   expectWord,
   makeNameElem,
   parseCommaList,
-  parseContentExpression,
   parseMany,
+  throwParseError,
 } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 
@@ -95,17 +93,21 @@ function parseConditionalAttribute<T>(
   if (!stream.matchSequence("@", keyword)) return null;
 
   expect(stream, "(", `@${keyword}`);
+  // Past `@keyword(` we're committed: a missing/invalid condition is a hard
+  // parse error, not a backtrack (the stream is already advanced past `(`).
   const expr = parseExpression(ctx, true);
-  if (!expr) return null;
+  if (!expr) throwParseError(stream, `Expected expression after @${keyword}(`);
 
   stream.matchText(",");
   expect(stream, ")", `@${keyword} expression`);
 
-  const translateTimeExpr = makeTranslateTimeExpressionElem({
-    value: expr,
+  // TODO remove translate-time once we drop v1
+  const translateTimeExpr: TranslateTimeExpressionElem = {
+    kind: "translate-time-expression",
+    expression: expr,
     start: startPos,
     end: stream.checkpoint(),
-  });
+  };
   return makeAttr(translateTimeExpr);
 }
 
@@ -126,7 +128,7 @@ function attributeElem(
   start: number,
   end: number,
 ): AttributeElem {
-  return { kind: "attribute", attribute, start, end, contents: [] };
+  return { kind: "attribute", attribute, start, end };
 }
 
 /** Parse a standard attribute (not @if/@elif/@else) */
@@ -167,20 +169,6 @@ function parseStandardAttribute(ctx: ParsingContext): AttributeElem | null {
 
   const stdAttr: StandardAttribute = { kind: "@attribute", name, params };
   return attributeElem(stdAttr, startPos, stream.checkpoint());
-}
-
-// TODO remove translate-time once we drop v1
-function makeTranslateTimeExpressionElem(args: {
-  value: ExpressionElem;
-  start: number;
-  end: number;
-}): TranslateTimeExpressionElem {
-  return {
-    kind: "translate-time-expression",
-    expression: args.value,
-    start: args.start,
-    end: args.end,
-  };
 }
 
 function parseBuiltinAttribute(
@@ -258,9 +246,7 @@ function parseNameElem(ctx: ParsingContext): NameElem {
 function parseAttrParam(ctx: ParsingContext): UnknownExpressionElem {
   const { stream } = ctx;
   const start = stream.checkpoint();
-  beginElem(ctx, "expression");
-  parseContentExpression(ctx);
-  const end = stream.checkpoint();
-  const contents = finishContents(ctx, start, end);
-  return { kind: "expression", start, end, contents };
+  const expression = parseExpression(ctx);
+  if (!expression) throwParseError(stream, "Expected attribute parameter");
+  return { kind: "expression", expression, start, end: stream.checkpoint() };
 }

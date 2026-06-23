@@ -199,7 +199,6 @@ function parseParenExpr(
   if (!expression) throwParseError(stream, "Expected expression after '('");
 
   const close = expect(stream, ")", "expression");
-
   const start = open.span[0];
   const end = close.span[1];
   return { kind: "parenthesized-expression", expression, start, end };
@@ -227,15 +226,13 @@ function parseTemplateElaboratedIdent(
   if (!ctx.stream.nextTemplateStartToken()) return refIdent;
 
   const templateParams = parseTemplateParams(ctx);
-  const typeRef: TypeRefElem = {
+  return {
     kind: "type",
     name: refIdent.ident,
     templateParams,
     start: refIdent.start,
     end: ctx.stream.checkpoint(),
-    contents: [],
   };
-  return typeRef;
 }
 
 /** Parse postfix operators: member access, indexing, function calls. */
@@ -285,8 +282,6 @@ function parseIndexAccess(
 ): ComponentExpression | null {
   const { stream } = ctx;
   if (!stream.matchText("[")) return null;
-  // bare parseExpression: the index belongs in ComponentExpression.access,
-  // not in the enclosing container's contents
   const indexExpr = parseExpression(ctx);
   if (!indexExpr) throwParseError(stream, "Expected expression in array index");
   const closeBracket = expect(stream, "]", "array index");

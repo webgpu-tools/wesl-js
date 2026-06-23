@@ -1,9 +1,12 @@
-import type { AttributeElem, LetElem, VarElem } from "../AbstractElems.ts";
-import { beginElem, finishElem } from "./ContentsHelpers.ts";
-import { skipTemplateList } from "./ParseGlobalVar.ts";
-import { getStartWithAttributes } from "./ParseStatement.ts";
+import type {
+  AttributeElem,
+  ExpressionElem,
+  LetElem,
+  VarElem,
+} from "../AbstractElems.ts";
+import { parseTemplateList } from "./ParseGlobalVar.ts";
+import { finishStatement, getStartWithAttributes } from "./ParseStatement.ts";
 import {
-  attachAttributes,
   expect,
   expectExpression,
   linkDeclIdent,
@@ -44,26 +47,27 @@ function parseVarOrLet(
   if (!token) return null;
 
   const startPos = getStartWithAttributes(attributes, token.span[0]);
-  beginElem(ctx, keyword, attributes);
-  if (hasTemplate) skipTemplateList(ctx);
+  const template = hasTemplate ? parseTemplateList(ctx) : undefined;
 
   const typedDecl = parseTypedDecl(ctx, false);
   if (!typedDecl)
     throwParseError(stream, `Expected identifier after '${keyword}'`);
-  ctx.addElem(typedDecl);
 
+  let init: ExpressionElem | undefined;
   if (requiresInit) {
     const msg = `${keyword} identifier (${keyword} requires initialization)`;
     expect(stream, "=", msg);
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   } else if (stream.matchText("=")) {
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   }
 
   expect(stream, ";", `${keyword} declaration`);
 
-  const elem = finishElem(keyword, startPos, ctx, { name: typedDecl });
-  attachAttributes(elem, attributes);
+  const params = { name: typedDecl, init };
+  const elem = finishStatement(keyword, startPos, ctx, params, attributes);
+  // template lives outside the shared fields: only VarElem (not LetElem) has it.
+  if (template && elem.kind === "var") elem.template = template;
   linkDeclIdent(typedDecl, elem);
   return elem;
 }

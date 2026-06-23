@@ -15,8 +15,10 @@ fn main() { bar(); }
 
   const linked = await linkTestOpts({ mangler: underscoreMangle }, main, file1);
   const expected = `
-    fn main() { package_file1_bar(); }
-    fn package_file1_bar() {}
+    fn main() {
+      package_file1_bar();
+    }
+    fn package_file1_bar() { }
   `;
   expectTrimmedMatch(linked, expected);
 });
@@ -38,8 +40,10 @@ fn main() { bar(); }
   });
 
   const expected = `
-    fn main() { package_container_file1_bar(); }
-    fn package_container_file1_bar() {}
+    fn main() {
+      package_container_file1_bar();
+    }
+    fn package_container_file1_bar() { }
   `;
   expectTrimmedMatch(linked.dest, expected);
 });

@@ -1,13 +1,11 @@
 import type {
   AbstractElem,
-  Attribute,
   AttributeElem,
-  ConditionalAttribute,
   ConstAssertElem,
-  DoBlockElem,
   GlobalDeclarationElem,
   ModuleElem,
 } from "../AbstractElems.ts";
+import { declsOfKind } from "../LinkerUtil.ts";
 import { ParseError } from "../ParseError.ts";
 import { findMap } from "../Util.ts";
 import { parseAttributeList } from "./ParseAttribute.ts";
@@ -22,6 +20,8 @@ import {
 import { parseWeslImports } from "./ParseImport.ts";
 import { parseStructDecl } from "./ParseStruct.ts";
 import {
+  attrsOrUndef,
+  conditionalAttribute,
   hasConditionalAttribute,
   parseMany,
   throwParseError,
@@ -45,24 +45,38 @@ export function parseModule(ctx: ParsingContext): void {
   parseImports(ctx);
   parseDirectives(ctx);
   while (parseNextDeclaration(ctx)) {}
+  // reject input the declaration loop couldn't consume (e.g. a directive after a
+  // declaration, or stray tokens); otherwise it would be silently dropped
+  if (ctx.stream.peek() !== null)
+    throwParseError(ctx.stream, "Expected a declaration or directive");
 }
 
 /**
- * Reject a module that declares the same name as both a `do` block and a
- * fn/global (`do` blocks share the module's declaration namespace). This is a
- * small module-local pass, deliberately not part of bindIdents.
+ * Reject a module that gives a `do` block a name that clashes with a fn/global
+ * or with another `do` block (`do` blocks share the module's declaration
+ * namespace, and runners key blocks by name so a duplicate would silently
+ * shadow the earlier one). This is a small module-local pass, deliberately not
+ * part of bindIdents.
  */
 export function checkDoBlockNames(moduleElem: ModuleElem): void {
-  const doBlocks = moduleElem.contents.filter(
-    (e): e is DoBlockElem => e.kind === "do",
-  );
+  const doBlocks = declsOfKind(moduleElem, "do");
   if (doBlocks.length === 0) return;
 
-  const declNames = new Set(moduleElem.contents.map(globalDeclName));
-  const conflict = doBlocks.find(b => declNames.has(b.name.name));
-  if (conflict) {
-    const { name, start, end } = conflict.name;
-    throw new ParseError(`'${name}' declared as both fn and do`, [start, end]);
+  const declNames = new Set(moduleElem.decls.map(globalDeclName));
+  const seen = new Set<string>();
+  for (const block of doBlocks) {
+    const { name, start, end } = block.name;
+    if (declNames.has(name))
+      throw new ParseError(`'${name}' declared as both fn and do`, [
+        start,
+        end,
+      ]);
+    if (seen.has(name))
+      throw new ParseError(`'${name}' declared as do more than once`, [
+        start,
+        end,
+      ]);
+    seen.add(name);
   }
 }
 
@@ -70,7 +84,7 @@ export function checkDoBlockNames(moduleElem: ModuleElem): void {
 function parseImports(ctx: ParsingContext): void {
   const importElems = parseWeslImports(ctx);
   for (const importElem of importElems) {
-    ctx.addElem(importElem);
+    ctx.addModuleDecl(importElem);
     ctx.state.stable.imports.push(importElem.imports);
   }
 }
@@ -78,7 +92,7 @@ function parseImports(ctx: ParsingContext): void {
 /** Grammar: global_directive : diagnostic_directive | enable_directive | requires_directive */
 function parseDirectives(ctx: ParsingContext): void {
   const directives = parseMany(ctx, parseDirective);
-  for (const elem of directives) ctx.addElem(elem);
+  for (const elem of directives) ctx.addModuleDecl(elem);
 }
 
 /** Parse one declaration, return true if more may exist. */
@@ -117,13 +131,10 @@ function globalDeclName(elem: AbstractElem): string | undefined {
 
 /** Try each declaration parser until one succeeds. */
 function parseDecl(ctx: ParsingContext, attrs: AttributeElem[]): boolean {
-  const attrsOrUndef = attrs.length ? attrs : undefined;
-  const elem = findMap(declParsers, p => p(ctx, attrsOrUndef));
-  if (elem) {
-    recordDecl(ctx, elem, attrs);
-    return true;
-  }
-  return false;
+  const elem = findMap(declParsers, p => p(ctx, attrsOrUndef(attrs)));
+  if (!elem) return false;
+  recordDecl(ctx, elem, attrs);
+  return true;
 }
 
 /** Pop conditional scope and attach the conditional attribute. */
@@ -132,9 +143,7 @@ function finalizeConditional(
   attrs: AttributeElem[],
 ): void {
   const partialScope = ctx.popScope();
-  partialScope.condAttribute = findMap(attrs, ({ attribute }) =>
-    isConditionalAttribute(attribute) ? attribute : undefined,
-  );
+  partialScope.condAttribute = conditionalAttribute(attrs);
 }
 
 /** Record a parsed declaration, extending start to include attributes. */
@@ -144,14 +153,10 @@ function recordDecl(
   attrs: AttributeElem[],
 ): void {
   if (attrs.length && elem.start > attrs[0].start) elem.start = attrs[0].start;
-  ctx.addElem(elem);
+  ctx.addModuleDecl(elem);
   if (elem.kind === "assert") {
     const { stable } = ctx.state;
     stable.moduleAsserts ??= [];
     stable.moduleAsserts.push(elem);
   }
-}
-
-function isConditionalAttribute(a: Attribute): a is ConditionalAttribute {
-  return a.kind === "@if" || a.kind === "@elif" || a.kind === "@else";
 }

@@ -21,7 +21,6 @@ function mockElem(testId: string, attributes?: AttributeElem[]): TestElem {
     kind: "alias",
     testId,
     attributes,
-    contents: [],
     start: 0,
     end: 0,
   } as TestElem;
@@ -50,7 +49,6 @@ function ifAttr(condition: boolean): AttributeElem {
   return {
     kind: "attribute",
     attribute: ifAttribute,
-    contents: [],
     start: 0,
     end: 0,
   };
@@ -64,7 +62,6 @@ function elseAttr(): AttributeElem {
   return {
     kind: "attribute",
     attribute: elseAttribute,
-    contents: [],
     start: 0,
     end: 0,
   };
@@ -177,7 +174,6 @@ test("complex nested attributes", () => {
   const standardAttr = (name: string): AttributeElem => ({
     kind: "attribute",
     attribute: { kind: "@attribute", name, params: [] },
-    contents: [],
     start: 0,
     end: 0,
   });

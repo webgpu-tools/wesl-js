@@ -16,8 +16,6 @@ const bevyBulkTest = {
   },
 };
 
-await fetchBulkTest(bevyBulkTest, fixturesDir);
-
 // Constants needed by various Bevy modules
 const bevyConstants = {
   MAX_CASCADES_PER_LIGHT: 4,
@@ -36,6 +34,7 @@ const conditionalFiles: Record<string, Conditions> = {
   "./pbr/decal/clustered.wesl": { CLUSTERED_DECALS_ARE_USABLE: true },
   "./pbr/decal/forward.wesl": { DEPTH_PREPASS: true },
   "./pbr/morph.wesl": { MORPH_TARGETS: true },
+  "./pbr/irradiance_volume.wesl": { IRRADIANCE_VOLUMES_ARE_USABLE: true },
 };
 
 // LATER: binding_array is a WGSL extension not yet supported
@@ -44,8 +43,21 @@ const skipFiles = [
   "./pbr/decal/clustered.wesl", // imports mesh_view_bindings which uses binding_array
 ];
 
-// Files that only contain imports (re-export modules) - always produce empty output
-const importOnlyFiles = ["./sprite/mesh2d_view_types.wesl"];
+// Files that produce empty WGSL with the default conditions: either pure
+// re-export modules (imports only), or modules whose every top-level decl is
+// behind an `@if` that is off by default (and whose only enabling condition
+// pulls in an as-yet-unsupported WGSL extension, so we can't link it non-empty).
+const emptyOutputFiles = [
+  "./sprite/mesh2d_view_types.wesl", // imports only
+  "./pbr/meshlet_visibility_buffer_resolve.wesl", // all decls behind @if(MESHLET_MESH_MATERIAL_PASS); enabling it needs binding_array (r64uint)
+];
+
+await fetchBulkTest(bevyBulkTest, fixturesDir);
+
+const weslSrc = await loadBevyBundle();
+const allFiles = Object.keys(weslSrc)
+  .filter(f => !skipFiles.includes(f))
+  .sort();
 
 async function loadBevyBundle(): Promise<Record<string, string>> {
   const bevyDir = new URL(
@@ -75,11 +87,6 @@ async function loadDir(
   }
 }
 
-const weslSrc = await loadBevyBundle();
-const allFiles = Object.keys(weslSrc)
-  .filter(f => !skipFiles.includes(f))
-  .sort();
-
 allFiles.forEach(file => {
   test(`bevy: link ${file}`, async () => {
     const conditions = conditionalFiles[file] ?? {};
@@ -91,7 +98,7 @@ allFiles.forEach(file => {
     );
 
     const wgsl = result.dest;
-    if (importOnlyFiles.includes(file)) {
+    if (emptyOutputFiles.includes(file)) {
       expect(wgsl).toBe("");
     } else {
       expect(wgsl.length).toBeGreaterThan(0);

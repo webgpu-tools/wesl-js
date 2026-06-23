@@ -2,16 +2,15 @@ import type {
   AttributeElem,
   ConstElem,
   ElemKindMap,
+  ExpressionElem,
   OverrideElem,
   TypedDeclElem,
   TypeRefElem,
 } from "../AbstractElems.ts";
 import type { Scope } from "../Scope.ts";
-import { beginElem, finishContents } from "./ContentsHelpers.ts";
-import { getStartWithAttributes } from "./ParseStatement.ts";
+import { finishStatement, getStartWithAttributes } from "./ParseStatement.ts";
 import { parseSimpleTypeRef } from "./ParseType.ts";
 import {
-  attachAttributes,
   createDeclIdentElem,
   expect,
   expectExpression,
@@ -27,7 +26,7 @@ export function parseConstDecl(
   ctx: ParsingContext,
   attributes?: AttributeElem[],
 ): ConstElem | null {
-  return parseValueDecl(ctx, "const", true, isModuleScope(ctx), attributes);
+  return parseValueDecl(ctx, "const", true, ctx.isModuleScope(), attributes);
 }
 
 /** Grammar: 'override' optionally_typed_ident ( '=' expression )? */
@@ -47,16 +46,13 @@ export function parseTypedDecl(
   if (!nameToken) return null;
   const start = nameToken.span[0];
 
-  beginElem(ctx, "typeDecl");
   const decl = createDeclIdentElem(ctx, nameToken, isGlobal);
-  ctx.addElem(decl);
   ctx.saveIdent(decl.ident);
 
   const { typeRef, typeScope } = parseOptionalType(ctx);
 
   const end = ctx.stream.checkpoint();
-  const contents = finishContents(ctx, start, end);
-  return { kind: "typeDecl", decl, typeRef, typeScope, start, end, contents };
+  return { kind: "typeDecl", decl, typeRef, typeScope, start, end };
 }
 
 /** Shared parser for const/override declarations. */
@@ -73,44 +69,36 @@ function parseValueDecl<K extends ValueDeclKind>(
 
   const startPos = getStartWithAttributes(attributes, token.span[0]);
   ctx.pushScope("partial");
-  beginElem(ctx, keyword, attributes);
 
   const typedDecl = parseTypedDecl(ctx, isGlobal);
   if (!typedDecl)
     throwParseError(stream, `Expected identifier after '${keyword}'`);
-  ctx.addElem(typedDecl);
 
+  let init: ExpressionElem | undefined;
   if (requiresInit) {
     expect(stream, "=", `${keyword} identifier`);
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   } else if (stream.matchText("=")) {
-    expectExpression(ctx);
+    init = expectExpression(ctx);
   }
 
   expect(stream, ";", `${keyword} declaration`);
 
-  const endPos = stream.checkpoint();
-  const contents = finishContents(ctx, startPos, endPos);
   typedDecl.decl.ident.dependentScope = ctx.currentScope();
   ctx.popScope();
 
-  const elem: ConstElem | OverrideElem = {
-    kind: keyword,
-    name: typedDecl,
-    start: startPos,
-    end: endPos,
-    contents,
-  };
-  attachAttributes(elem, attributes);
+  // const/override share these fields; cast keyword to the union so the params
+  // type-check against the concrete elems rather than the opaque generic K.
+  const fields = { name: typedDecl, init };
+  const elem = finishStatement(
+    keyword as ValueDeclKind,
+    startPos,
+    ctx,
+    fields,
+    attributes,
+  ) as ElemKindMap[K];
   linkDeclIdent(typedDecl, elem);
-  return elem as ElemKindMap[K];
-}
-
-/** @return true if ctx is at module level (not inside fn/block) */
-function isModuleScope(ctx: ParsingContext): boolean {
-  let scope = ctx.currentScope();
-  while (scope.kind === "partial" && scope.parent) scope = scope.parent;
-  return scope.parent === null;
+  return elem;
 }
 
 /** Parse optional ': type' annotation, managing scope for type references. */
@@ -123,7 +111,6 @@ function parseOptionalType(ctx: ParsingContext): {
   ctx.pushScope();
   const typeRef = parseSimpleTypeRef(ctx);
   if (!typeRef) throwParseError(ctx.stream, "Expected type after ':'");
-  ctx.addElem(typeRef);
   const typeScope = ctx.currentScope();
   ctx.popScope();
   return { typeRef, typeScope };

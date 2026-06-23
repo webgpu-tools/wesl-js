@@ -2,17 +2,18 @@ import type {
   AbstractElem,
   Attribute,
   AttributeElem,
+  CommentElem,
   DirectiveElem,
   DoBlockElem,
   FnElem,
   FnParamElem,
-  StuffElem,
   TypedDeclElem,
   TypeRefElem,
   TypeTemplateParameter,
   UnknownExpressionElem,
 } from "../AbstractElems.ts";
 import { assertUnreachable } from "../Assertions.ts";
+import { childElems } from "../LinkerUtil.ts";
 import {
   diagnosticControlToString,
   expressionToString,
@@ -27,15 +28,21 @@ export function astToString(elem: AbstractElem, indent = 0): string {
   const str = new LineWrapper(indent, maxLineLength);
   str.add(kind);
   addElemFields(elem, str);
-  let childStrings: string[] = [];
-  if ("contents" in elem) {
-    childStrings = elem.contents.map(e => astToString(e, indent + 2));
-  }
-  if (childStrings.length) {
+  addCommentFields(elem, str);
+  const children = childElems(elem);
+  if (children.length) {
     str.nl();
+    const childStrings = children.map(e => astToString(e, indent + 2));
     str.addBlock(childStrings.join("\n"), false);
   }
 
+  return str.result;
+}
+
+/** @return string representation of an attribute (for test/debug) */
+export function attributeToString(attr: Attribute): string {
+  const str = new LineWrapper(0, maxLineLength);
+  addAttributeFields(attr, str);
   return str.result;
 }
 
@@ -45,16 +52,14 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
   // no-op kinds (handled elsewhere or no additional fields)
   if (
     kind === "assert" ||
+    kind === "expression" ||
     kind === "module" ||
     kind === "param" ||
-    kind === "stuff" ||
     kind === "switch-clause"
   ) {
     return;
   }
-  if (kind === "text") {
-    str.add(` '${elem.srcModule.src.slice(elem.start, elem.end)}'`);
-  } else if (
+  if (
     kind === "var" ||
     kind === "let" ||
     kind === "gvar" ||
@@ -70,11 +75,6 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
     str.add(` ${elem.name.name}: ${typeRefElemToString(elem.typeRef)}`);
   } else if (kind === "name") {
     str.add(" " + elem.name);
-  } else if (kind === "memberRef") {
-    const extra = elem.extraComponents
-      ? debugContentsToString(elem.extraComponents)
-      : "";
-    str.add(` ${elem.name.ident.originalName}.${elem.member.name}${extra}`);
   } else if (kind === "fn") {
     addFnFields(elem, str);
   } else if (kind === "do") {
@@ -86,20 +86,8 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
     );
   } else if (kind === "attribute") {
     addAttributeFields(elem.attribute, str);
-  } else if (kind === "expression") {
-    const contents = elem.contents
-      .map(e =>
-        e.kind === "text"
-          ? `'${e.srcModule.src.slice(e.start, e.end)}'`
-          : astToString(e),
-      )
-      .join(" ");
-    str.add(" " + contents);
   } else if (kind === "type") {
-    const nameStr =
-      typeof elem.name === "string" ? elem.name : elem.name.originalName;
-    const params = elem.templateParams?.map(templateParamToString).join(", ");
-    str.add(params ? ` ${nameStr}<${params}>` : ` ${nameStr}`);
+    str.add(" " + typeRefElemToString(elem));
   } else if (kind === "synthetic") {
     str.add(` '${elem.text}'`);
   } else if (kind === "import") {
@@ -113,7 +101,25 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
     str.add(" %" + elem.ident.originalName);
   } else if (kind === "directive") {
     addDirective(elem, str);
-  } else if (kind === "statement" || kind === "continuing") {
+  } else if (
+    // statement kinds: the debug printer shows only their attributes
+    kind === "block" ||
+    kind === "if" ||
+    kind === "for" ||
+    kind === "while" ||
+    kind === "loop" ||
+    kind === "continuing" ||
+    kind === "switch" ||
+    kind === "return" ||
+    kind === "break" ||
+    kind === "continue" ||
+    kind === "discard" ||
+    kind === "assign" ||
+    kind === "increment" ||
+    kind === "decrement" ||
+    kind === "call" ||
+    kind === "empty"
+  ) {
     listAttributeElems(elem.attributes, str);
   } else if (kind === "literal") {
     str.add(` literal(${elem.value})`);
@@ -132,6 +138,18 @@ function addElemFields(elem: AbstractElem, str: LineWrapper): void {
   } else {
     assertUnreachable(kind);
   }
+}
+
+/** Show attached leading/trailing comments to verify comment attachment. */
+function addCommentFields(elem: AbstractElem, str: LineWrapper): void {
+  // SyntheticElem has no source position and so carries no comments
+  if (!("start" in elem)) return;
+  const { commentsBefore, commentsAfter } = elem;
+  if (commentsBefore?.length)
+    str.add(commentsToString("before", commentsBefore));
+  if (commentsAfter?.length) str.add(commentsToString("after", commentsAfter));
+  if ("innerComments" in elem && elem.innerComments?.length)
+    str.add(commentsToString("inner", elem.innerComments));
 }
 
 function addAttributeFields(attr: Attribute, str: LineWrapper) {
@@ -159,19 +177,30 @@ function addAttributeFields(attr: Attribute, str: LineWrapper) {
   }
 }
 
-/** @return string representation of an attribute (for test/debug) */
-export function attributeToString(attr: Attribute): string {
-  const str = new LineWrapper(0, maxLineLength);
-  addAttributeFields(attr, str);
-  return str.result;
-}
-
 function addTypedDeclIdent(elem: TypedDeclElem, str: LineWrapper) {
   const { decl, typeRef } = elem;
   str.add(" %" + decl.ident.originalName);
   if (typeRef) {
     str.add(" : " + typeRefElemToString(typeRef));
   }
+}
+
+/** show attribute names in short form to verify collection */
+function listAttributeElems(
+  attrs: AttributeElem[] | undefined,
+  str: LineWrapper,
+): void {
+  attrs?.forEach(a => {
+    str.add(" " + attributeName(a.attribute));
+  });
+}
+
+function typeRefElemToString(elem: TypeRefElem): string {
+  if (!elem) return "?type?";
+  const nameStr =
+    typeof elem.name === "string" ? elem.name : elem.name.originalName;
+  const params = elem.templateParams?.map(templateParamToString).join(", ");
+  return params ? `${nameStr}<${params}>` : nameStr;
 }
 
 function addFnFields(elem: FnElem, str: LineWrapper) {
@@ -185,29 +214,6 @@ function addDoFields(elem: DoBlockElem, str: LineWrapper) {
   const { name, params, attributes } = elem;
   str.add(` ${name.name}(${paramListToString(params)})`);
   listAttributeElems(attributes, str);
-}
-
-/** @return "name: type, ..." for a fn/do parameter list. */
-function paramListToString(params: FnParamElem[]): string {
-  const paramStrs = params.map(p => {
-    const { originalName } = p.name.decl.ident;
-    return `${originalName}: ${typeRefElemToString(p.name.typeRef!)}`;
-  });
-  return paramStrs.join(", ");
-}
-
-/** show attribute names in short form to verify collection */
-function listAttributeElems(
-  attrs: AttributeElem[] | undefined,
-  str: LineWrapper,
-): void {
-  attrs?.forEach(a => {
-    str.add(" " + attributeName(a.attribute));
-  });
-}
-
-function attributeName(attr: Attribute): string {
-  return attr.kind === "@attribute" ? "@" + attr.name : attr.kind;
 }
 
 function addDirective(elem: DirectiveElem, str: LineWrapper) {
@@ -225,39 +231,34 @@ function addDirective(elem: DirectiveElem, str: LineWrapper) {
   listAttributeElems(attributes, str);
 }
 
-// LATER Temp hack while I clean up the expression parsing
+function commentsToString(label: string, comments: CommentElem[]): string {
+  const texts = comments.map(c => {
+    const text = c.srcModule.src.slice(c.start, c.end);
+    return c.blankBefore ? `'${text}'(blank)` : `'${text}'`;
+  });
+  return ` ${label}[${texts.join(", ")}]`;
+}
+
 function unknownExpressionToString(elem: UnknownExpressionElem): string {
-  if (!("contents" in elem)) return astToString(elem);
-  return elem.contents
-    .map(e => {
-      if (e.kind === "text")
-        return `'${e.srcModule.src.slice(e.start, e.end)}'`;
-      return astToString(e);
-    })
-    .join(" ");
+  return astToString(elem.expression);
+}
+
+function attributeName(attr: Attribute): string {
+  return attr.kind === "@attribute" ? "@" + attr.name : attr.kind;
 }
 
 function templateParamToString(p: TypeTemplateParameter): string {
   if (typeof p === "string") return p;
   if (p.kind === "type") return typeRefElemToString(p);
-  // ExpressionElem - use astToString for expression elements
-  return astToString(p);
+  // template params render inline inside <...>, so keep expressions on one line
+  return expressionToString(p);
 }
 
-function typeRefElemToString(elem: TypeRefElem): string {
-  if (!elem) return "?type?";
-  const nameStr =
-    typeof elem.name === "string" ? elem.name : elem.name.originalName;
-  const params = elem.templateParams?.map(templateParamToString).join(", ");
-  return params ? `${nameStr}<${params}>` : nameStr;
-}
-
-export function debugContentsToString(elem: StuffElem): string {
-  return elem.contents
-    .map(c => {
-      if (c.kind === "text") return c.srcModule.src.slice(c.start, c.end);
-      if (c.kind === "ref") return c.ident.originalName; // not using mapped decl name for debug
-      return `?${c.kind}?`;
-    })
-    .join(" ");
+/** @return "name: type, ..." for a fn/do parameter list. */
+function paramListToString(params: FnParamElem[]): string {
+  const paramStrs = params.map(p => {
+    const { originalName } = p.name.decl.ident;
+    return `${originalName}: ${typeRefElemToString(p.name.typeRef!)}`;
+  });
+  return paramStrs.join(", ");
 }

@@ -88,14 +88,8 @@ export class SrcMap {
       const { src, position: srcStart } = this.destToSrc(e.srcStart);
       const { src: endSrc, position: srcEnd } = this.destToSrc(e.srcEnd);
       if (endSrc !== src) throw new Error("NYI, need to split");
-      const newEntry: SrcMapEntry = {
-        src,
-        srcStart,
-        srcEnd,
-        destStart: e.destStart,
-        destEnd: e.destEnd,
-      };
-      return newEntry;
+      const { destStart, destEnd } = e;
+      return { src, srcStart, srcEnd, destStart, destEnd };
     });
 
     const otherSources = other.entries.filter(
@@ -120,11 +114,6 @@ export class SrcMap {
       position: entry.srcStart + destPos - entry.destStart,
     };
   }
-}
-
-/** sort entries in place by src start position */
-function sortSrc(entries: SrcMapEntry[]): void {
-  entries.sort((a, b) => a.srcStart - b.srcStart);
 }
 
 /** Incrementally append to a string, tracking source references */
@@ -191,12 +180,6 @@ export class SrcMapBuilder {
     this.add("\n", srcStart, srcEnd);
   }
 
-  /** copy a string fragment from the src to the destination string */
-  addCopy(srcStart: number, srcEnd: number): void {
-    const fragment = this.source.text.slice(srcStart, srcEnd);
-    this.add(fragment, srcStart, srcEnd);
-  }
-
   /** return a SrcMap */
   static build(builders: SrcMapBuilder[]): SrcMap {
     const map = new SrcMap(
@@ -206,4 +189,9 @@ export class SrcMapBuilder {
     map.compact();
     return map;
   }
+}
+
+/** sort entries in place by src start position */
+function sortSrc(entries: SrcMapEntry[]): void {
+  entries.sort((a, b) => a.srcStart - b.srcStart);
 }

@@ -4,7 +4,7 @@ import type { WeslAST, WeslParseState } from "../ParseWESL.ts";
 import { WeslParseError } from "../ParseWESL.ts";
 import type { SrcModule } from "../Scope.ts";
 import { emptyScope } from "../Scope.ts";
-import { beginElem, finishContents } from "./ContentsHelpers.ts";
+import { attachComments } from "./AttachComments.ts";
 import { checkDoBlockNames, parseModule } from "./ParseModule.ts";
 import { type ParseOptions, ParsingContext } from "./ParsingContext.ts";
 import { WeslStream } from "./WeslStream.ts";
@@ -16,10 +16,9 @@ export function parseWesl(
 ): WeslAST {
   const { ctx, state } = createParseState(srcModule, options);
   try {
-    beginElem(ctx, "module");
     parseModule(ctx);
-    const moduleElem = state.stable.moduleElem;
-    moduleElem.contents = finishContents(ctx, 0, moduleElem.end);
+    const { moduleElem } = state.stable;
+    attachComments(ctx, moduleElem);
     checkDoBlockNames(moduleElem);
     return state.stable;
   } catch (e) {
@@ -37,20 +36,17 @@ export function parseWesl(
 function createParseState(
   srcModule: SrcModule,
   parseOptions?: ParseOptions,
-): {
-  ctx: ParsingContext;
-  state: WeslParseState;
-} {
+): { ctx: ParsingContext; state: WeslParseState } {
   const stream = new WeslStream(srcModule.src);
   const rootScope = emptyScope(null);
   const moduleElem: ModuleElem = {
     kind: "module",
-    contents: [],
+    decls: [],
     start: 0,
     end: srcModule.src.length,
   };
   const state: WeslParseState = {
-    context: { scope: rootScope, openElems: [] },
+    context: { scope: rootScope },
     stable: { srcModule, moduleElem, rootScope, imports: [], parseOptions },
   };
   const ctx = new ParsingContext(stream, state, parseOptions);
