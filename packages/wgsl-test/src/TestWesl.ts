@@ -102,6 +102,14 @@ interface DoTestFileParams {
   constants?: LinkParams["constants"];
 }
 
+interface SnapshotTestArgs {
+  params: TestWeslParams;
+  shaderSrc: string;
+  ast: WeslAST;
+  testFns: TestFunctionInfo[];
+  snapshotFns: SnapshotFunctionInfo[];
+}
+
 /** Size of TestResult struct in bytes (u32 + u32 + padding + vec4f + vec4f = 48). */
 const testResultSize = 48;
 
@@ -123,32 +131,21 @@ export async function testWesl(params: TestWeslParams): Promise<void> {
     });
   }
 
-  // Register `@test @entry do` blocks
+  // Register `@test do` blocks
   for (const d of doTests) {
     test(testDisplayName(d.name), async () => {
       await expectWesl({ ...params, testName: d.name });
     });
   }
 
-  // Register @fragment @snapshot tests
   if (snapshotFns.length > 0) {
-    const resources = findAnnotatedResources(ast);
-    const snapshotParams = await buildSnapshotParams({
-      runParams: params,
+    await registerSnapshotTests({
+      params,
       shaderSrc,
-      resources,
+      ast,
       testFns,
       snapshotFns,
     });
-    const { imageMatcher } = await importImageSnapshot();
-    const { expect: vitestExpect } = await importVitest();
-    imageMatcher();
-    for (const snap of snapshotFns) {
-      test(testDisplayName(snap.name, snap.snapshotName), async () => {
-        const imageData = await renderSnapshotImage(snap, snapshotParams);
-        await vitestExpect(imageData).toMatchImage(snap.snapshotName);
-      });
-    }
   }
 }
 
@@ -225,7 +222,7 @@ export async function runWesl(runParams: RunWeslParams): Promise<TestResult[]> {
     results.push(await runSingleComputeTest(fn, computeParams));
   }
 
-  // Run @test @entry do blocks; a clean dispatch counts as a pass.
+  // Run @test do blocks; a clean dispatch counts as a pass.
   const doParams: DoTestFileParams = {
     ast,
     shaderSrc,
@@ -269,6 +266,28 @@ export async function runWesl(runParams: RunWeslParams): Promise<TestResult[]> {
   }
 
   return results;
+}
+
+/** Register each @fragment @snapshot function as a vitest image-comparison test. */
+async function registerSnapshotTests(args: SnapshotTestArgs): Promise<void> {
+  const { params, shaderSrc, ast, testFns, snapshotFns } = args;
+  const resources = findAnnotatedResources(ast);
+  const snapshotParams = await buildSnapshotParams({
+    runParams: params,
+    shaderSrc,
+    resources,
+    testFns,
+    snapshotFns,
+  });
+  const { imageMatcher } = await importImageSnapshot();
+  const { test, expect: vitestExpect } = await importVitest();
+  imageMatcher();
+  for (const snap of snapshotFns) {
+    test(testDisplayName(snap.name, snap.snapshotName), async () => {
+      const imageData = await renderSnapshotImage(snap, snapshotParams);
+      await vitestExpect(imageData).toMatchImage(snap.snapshotName);
+    });
+  }
 }
 
 /** Load and parse a WESL module to extract @test functions. */
@@ -386,7 +405,7 @@ fn _weslTestEntry() {
   return parseTestResult(testFn.name, readbacks.get("result")!);
 }
 
-/** Run a `@test @entry do` block; passes if dispatch completes (no assertions yet). */
+/** Run a `@test do` block; passes if dispatch completes (no assertions yet). */
 async function runSingleDoBlockTest(
   info: DoBlockInfo,
   params: DoTestFileParams,
