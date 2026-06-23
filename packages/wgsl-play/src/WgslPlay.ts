@@ -725,6 +725,7 @@ export class WgslPlay extends HTMLElement {
     if (this._fetchSources || this._fetchLibs) {
       const { weslSrc, libs } = await fetchDependencies(mainSource, {
         shaderRoot: this.getConfigOverrides()?.shaderRoot,
+        rootModuleName: this._rootModuleName,
         existingSources: this._weslSrc,
         fetchLibs: this._fetchLibs,
         fetchSources: this._fetchSources,

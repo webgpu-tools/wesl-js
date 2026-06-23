@@ -45,6 +45,9 @@ export interface FetchOptions {
   shaderRoot?: string;
   /** URL path of the source file (for super:: resolution). */
   currentPath?: string;
+  /** Module path of the root source (e.g. "package::effects::main").
+   * Takes precedence over currentPath; defaults to "package::main". */
+  rootModuleName?: string;
   /** Pre-existing sources to include. */
   existingSources?: Record<string, string>;
   /** Fetch library packages from npm (default: true). */
@@ -66,9 +69,9 @@ export async function fetchDependencies(
   const fetchLibs = options?.fetchLibs ?? true;
   const fetchSources = options?.fetchSources ?? true;
 
-  const rootModuleName = currentPath
-    ? urlToModulePath(currentPath, shaderRoot)
-    : "package::main";
+  const rootModuleName =
+    options?.rootModuleName ??
+    (currentPath ? urlToModulePath(currentPath, shaderRoot) : "package::main");
   const initialSources = {
     ...existingSources,
     [rootModuleName]: rootModuleSource,
