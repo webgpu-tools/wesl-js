@@ -515,8 +515,8 @@ importers:
   packages/wesl-bench:
     dependencies:
       benchforge:
-        specifier: ^0.2.8
-        version: 0.2.8
+        specifier: ^0.2.13
+        version: 0.2.13
       wesl:
         specifier: workspace:*
         version: link:../wesl
@@ -3528,8 +3528,8 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
-  benchforge@0.2.8:
-    resolution: {integrity: sha512-TYf4F/IKJ+NUDzXnEpFxsus7iGFqVQaMUe+qxl36ksURxTnl3NvDXgteamEVPw6AJ9dkfrr9hgx7krXQKS1bUA==}
+  benchforge@0.2.13:
+    resolution: {integrity: sha512-9qoq7feJNMvPBpqFa3CklBQkyT5r8jV8uGKsTGd7eSoaGHTSNO3puM2eIUanafqzaHmtmrPsJOFfMgluyW5LXw==}
     hasBin: true
 
   berry-pretty@0.0.4:
@@ -4873,8 +4873,8 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nanoid@3.3.12:
-    resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
+  nanoid@3.3.15:
+    resolution: {integrity: sha512-y7Wygv/7mEOvxTuEQDB8StXdMRBWf1kR/tlhAzBRUFkB2jfcLOAxO/SHmOO2zgz1pVgK29/kyupn059/bCHdjA==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -6224,8 +6224,8 @@ packages:
     resolution: {integrity: sha512-7pRTIA9Qc1caZ0bZ6RYRGbHJthJWuakf+WmHK0rVeLkNrrGhfoabBNdue6kdINI6r4if7ocq9aD/n7xwKOdzOA==}
     engines: {node: '>=10'}
 
-  yargs@16.2.0:
-    resolution: {integrity: sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw==}
+  yargs@16.2.2:
+    resolution: {integrity: sha512-Nt9ZJjXTv5R8MHbqby/wXQ6Gi0Bb3TcYZkR1bzuL4yB2OxWPkXknz513gEF0GoA6tn00UpbPvERW8rzCuWCA6w==}
     engines: {node: '>=10'}
 
   yargs@17.7.2:
@@ -8310,7 +8310,7 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  benchforge@0.2.8:
+  benchforge@0.2.13:
     dependencies:
       esbuild: 0.27.7
       open: 11.0.0
@@ -9799,7 +9799,7 @@ snapshots:
       strip-json-comments: 3.1.1
       supports-color: 8.1.1
       workerpool: 6.5.1
-      yargs: 16.2.0
+      yargs: 16.2.2
       yargs-parser: 20.2.9
       yargs-unparser: 2.0.0
 
@@ -9815,7 +9815,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  nanoid@3.3.12: {}
+  nanoid@3.3.15: {}
 
   nanotar@0.2.0: {}
 
@@ -10147,7 +10147,7 @@ snapshots:
 
   postcss@8.5.15:
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.15
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -11388,7 +11388,7 @@ snapshots:
       flat: 5.0.2
       is-plain-obj: 2.1.0
 
-  yargs@16.2.0:
+  yargs@16.2.2:
     dependencies:
       cliui: 7.0.4
       escalade: 3.2.0
