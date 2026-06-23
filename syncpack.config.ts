@@ -1,5 +1,22 @@
 import type { RcFile } from "syncpack";
 export default {
+  // Scope to the real workspace (mirrors pnpm-workspace.yaml). syncpack's `*`
+  // matches across path separators, so without the negations below it also
+  // scans gitignored artifacts like the downloaded VS Code app under
+  // packages/wgsl-studio/.vscode-test, whose bundled manifests (deps newer than
+  // ours, extensions named diff/yaml/typescript) pollute version analysis and
+  // break `check:versions`.
+  source: [
+    "package.json",
+    "packages/*/package.json",
+    "packages/test_pkg/*/package.json",
+    "packages/wesl-packager/src/test/multi_package/package.json",
+    "packages/wesl-plugin/test/*/package.json",
+    "examples/*/package.json",
+    "!**/.vscode-test/**",
+    "!**/_baseline/**",
+    "!**/temp-built-test/**",
+  ],
   sortFirst: [
     "name",
     "description",
