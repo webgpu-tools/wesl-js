@@ -7,7 +7,7 @@ function bindModules(weslSrc: Record<string, string>): StructElem[] {
   const resolver = new RecordResolver(weslSrc, { debugWeslRoot: "test" });
   bindAndTransform({ rootModuleName: "test", resolver });
   return [...resolver.allModules()].flatMap(([, ast]) =>
-    ast.moduleElem.contents.filter((e): e is StructElem => e.kind === "struct"),
+    ast.moduleElem.decls.filter((e): e is StructElem => e.kind === "struct"),
   );
 }
 

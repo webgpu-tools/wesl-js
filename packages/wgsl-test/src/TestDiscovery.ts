@@ -1,5 +1,5 @@
-import type { FnElem, WeslAST } from "wesl";
-import { findAnnotation } from "wesl-reflect";
+import { declsOfKind, type FnElem, type WeslAST } from "wesl";
+import { findAnnotation, firstRefName, numericParams } from "wesl-reflect";
 
 export interface TestFunctionInfo {
   name: string;
@@ -21,8 +21,7 @@ export function testDisplayName(name: string, description?: string): string {
 
 /** Find all functions marked with @test attribute (excluding @snapshot fns). */
 export function findTestFunctions(ast: WeslAST): TestFunctionInfo[] {
-  return ast.moduleElem.contents
-    .filter((e): e is FnElem => e.kind === "fn")
+  return declsOfKind(ast.moduleElem, "fn")
     .filter(fn => findAnnotation(fn, "test") && !findAnnotation(fn, "snapshot"))
     .filter(fn => {
       if (fn.params.length > 0) {
@@ -43,42 +42,33 @@ export function findTestFunctions(ast: WeslAST): TestFunctionInfo[] {
 
 /** Find all @fragment @snapshot functions in a parsed WESL module. */
 export function findSnapshotFunctions(ast: WeslAST): SnapshotFunctionInfo[] {
-  const src = ast.srcModule.src;
-  return ast.moduleElem.contents
-    .filter((e): e is FnElem => e.kind === "fn")
+  return declsOfKind(ast.moduleElem, "fn")
     .filter(
       fn => findAnnotation(fn, "fragment") && findAnnotation(fn, "snapshot"),
     )
     .map(fn => ({
       name: fn.name.ident.originalName,
       snapshotName: extractSnapshotName(fn),
-      extent: extractExtent(fn, src),
+      extent: extractExtent(fn),
       fn,
     }));
 }
 
 /** Extract description from @test(description) attribute. */
 function getTestDescription(fn: FnElem): string | undefined {
-  const param = findAnnotation(fn, "test")?.params?.[0];
-  const ref = param?.contents.find(c => c.kind === "ref");
-  return ref?.kind === "ref" ? ref.ident.originalName : undefined;
+  return firstRefName(findAnnotation(fn, "test")?.params?.[0]);
 }
 
 /** Extract snapshot name from @snapshot(name) or fall back to fn name. */
 function extractSnapshotName(fn: FnElem): string {
   const param = findAnnotation(fn, "snapshot")?.params?.[0];
-  const ref = param?.contents.find(c => c.kind === "ref");
-  if (ref?.kind === "ref") return ref.ident.originalName;
-  return fn.name.ident.originalName;
+  return firstRefName(param) ?? fn.name.ident.originalName;
 }
 
 /** Extract extent from @extent(w, h), default [256, 256]. */
-function extractExtent(fn: FnElem, src: string): [number, number] {
+function extractExtent(fn: FnElem): [number, number] {
   const attr = findAnnotation(fn, "extent");
-  if (!attr?.params) return [256, 256];
-  const nums = attr.params.map(p => {
-    const text = src.slice(p.start, p.end).trim();
-    return Number.parseInt(text, 10) || 256;
-  });
+  if (!attr) return [256, 256];
+  const nums = numericParams(attr).map(n => n || 256);
   return [nums[0] ?? 256, nums[1] ?? nums[0] ?? 256];
 }

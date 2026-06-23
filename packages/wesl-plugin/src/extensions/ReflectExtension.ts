@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import type { StructElem } from "wesl";
+import { declsOfKind, type StructElem } from "wesl";
 import { originalTypeName, weslStructs, wgslTypeToTs } from "wesl-reflect";
 import type {
   PluginExtension,
@@ -21,9 +21,7 @@ export function simpleReflect(
     emitFn: async (_baseId: string, api: PluginExtensionApi) => {
       const registry = await api.weslRegistry();
       const astStructs = [...registry.allModules()].flatMap(([, module]) =>
-        module.moduleElem.contents.filter(
-          (e): e is StructElem => e.kind === "struct",
-        ),
+        declsOfKind(module.moduleElem, "struct"),
       );
 
       const jsStructs = weslStructs(astStructs);

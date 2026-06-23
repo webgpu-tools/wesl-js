@@ -1,4 +1,4 @@
-import type { FnElem, WeslAST } from "wesl";
+import { declsOfKind, type FnElem, type WeslAST } from "wesl";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 
 export type EntryPointStage = "compute" | "fragment" | "vertex";
@@ -15,9 +15,7 @@ const stageNames: EntryPointStage[] = ["compute", "fragment", "vertex"];
 
 /** Classify all functions in a parsed WESL module by entry-point stage. */
 export function classifyEntryPoints(ast: WeslAST): EntryPoint[] {
-  return ast.moduleElem.contents
-    .filter((e): e is FnElem => e.kind === "fn")
-    .flatMap(fn => entryPointFor(fn));
+  return declsOfKind(ast.moduleElem, "fn").flatMap(fn => entryPointFor(fn));
 }
 
 function entryPointFor(fn: FnElem): EntryPoint[] {

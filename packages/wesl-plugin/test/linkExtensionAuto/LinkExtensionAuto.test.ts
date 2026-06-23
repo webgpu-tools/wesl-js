@@ -28,10 +28,12 @@ test("verify ?link", { timeout: 30000 }, async () => {
     "
 
     fn main() {
-       toDep();
+      toDep();
     }
 
-    fn toDep() { dep(); }
+    fn toDep() {
+      dep();
+    }
 
     fn dep() { }
     "

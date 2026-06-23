@@ -1,10 +1,10 @@
-import type {
-  ExpressionElem,
-  GlobalVarElem,
-  StandardAttribute,
-  StructElem,
-  TypeRefElem,
-  WeslAST,
+import {
+  declsOfKind,
+  type ExpressionElem,
+  type GlobalVarElem,
+  type StructElem,
+  type TypeRefElem,
+  type WeslAST,
 } from "wesl";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 import {
@@ -215,9 +215,8 @@ function findGlobalVar(
   ast: WeslAST,
   varName: string,
 ): GlobalVarElem | undefined {
-  return ast.moduleElem.contents.find(
-    (e): e is GlobalVarElem =>
-      e.kind === "gvar" && e.name.decl.ident.originalName === varName,
+  return declsOfKind(ast.moduleElem, "gvar").find(
+    g => g.name.decl.ident.originalName === varName,
   );
 }
 
@@ -237,7 +236,7 @@ function parseAccessMode(declText: string): AccessMode | undefined {
 }
 
 function numericAttr(gvar: GlobalVarElem, name: string): number | undefined {
-  const attr: StandardAttribute | undefined = findAnnotation(gvar, name);
+  const attr = findAnnotation(gvar, name);
   if (!attr) return undefined;
   const [n] = numericParams(attr);
   return Number.isFinite(n) ? n : undefined;

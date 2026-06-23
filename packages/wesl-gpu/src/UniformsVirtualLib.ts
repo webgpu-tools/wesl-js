@@ -1,19 +1,10 @@
 import type { StructElem, VirtualLibraryFn } from "wesl";
-import { parseSrcModule } from "wesl";
+import { declsOfKind, parseSrcModule } from "wesl";
 import {
   type AnnotatedLayout,
   annotatedLayout,
   isUniformsStruct,
 } from "wesl-reflect";
-
-/** Default env:: module when no @uniforms struct is declared. */
-const defaultEnvSource = `
-  struct Uniforms {
-    resolution: vec2f,
-    time: f32,
-  }
-  @group(0) @binding(0) var<uniform> u: Uniforms;
-`;
 
 /** Result of scanning a shader source for @uniforms. */
 export interface UniformsScan {
@@ -23,6 +14,15 @@ export interface UniformsScan {
   /** Virtual library record to pass to the linker. */
   virtualLibs: Record<string, VirtualLibraryFn>;
 }
+
+/** Default env:: module when no @uniforms struct is declared. */
+const defaultEnvSource = `
+  struct Uniforms {
+    resolution: vec2f,
+    time: f32,
+  }
+  @group(0) @binding(0) var<uniform> u: Uniforms;
+`;
 
 /**
  * Scan entry module source for an @uniforms struct and produce:
@@ -55,7 +55,5 @@ function findUniformsStruct(
   modulePath: string,
 ): StructElem | undefined {
   const ast = parseSrcModule({ modulePath, debugFilePath: "entry", src });
-  return ast.moduleElem.contents
-    .filter((e): e is StructElem => e.kind === "struct")
-    .find(isUniformsStruct);
+  return declsOfKind(ast.moduleElem, "struct").find(isUniformsStruct);
 }

@@ -7,7 +7,7 @@ import type {
   TypeRefElem,
   WeslAST,
 } from "wesl";
-import { filterValidElements } from "wesl";
+import { declsOfKind, filterValidElements } from "wesl";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 import { originalTypeName } from "./WeslStructs.ts";
 
@@ -98,8 +98,8 @@ export function structLayout(
 /** Build a StructRegistry from all top-level struct declarations in `ast`. */
 export function buildStructRegistry(ast: WeslAST): StructRegistry {
   const reg = new Map<string, StructElem>();
-  for (const e of ast.moduleElem.contents) {
-    if (e.kind === "struct") reg.set(e.name.ident.originalName, e);
+  for (const e of declsOfKind(ast.moduleElem, "struct")) {
+    reg.set(e.name.ident.originalName, e);
   }
   return reg;
 }
@@ -112,11 +112,9 @@ export function typeRefLayout(
 ): TypeInfo {
   const name = originalTypeName(typeRef);
 
-  // primitive type
   const primitive = typeTable[name];
   if (primitive) return primitive;
 
-  // array<T, N> or array<T>
   if (name === "array") {
     const params = typeRef.templateParams;
     if (!params?.length)

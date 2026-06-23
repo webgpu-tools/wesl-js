@@ -22,6 +22,18 @@ test("compute-only", () => {
   ]);
 });
 
+test("workgroup_size with WGSL-suffixed literals", () => {
+  const eps = classifyEntryPoints(
+    parse(`
+      @compute @workgroup_size(8u, 2u, 4u)
+      fn main() {}
+    `),
+  );
+  expect(eps).toEqual([
+    { fnName: "main", stage: "compute", workgroupSize: [8, 2, 4] },
+  ]);
+});
+
 test("fragment-only", () => {
   const eps = classifyEntryPoints(
     parse(`

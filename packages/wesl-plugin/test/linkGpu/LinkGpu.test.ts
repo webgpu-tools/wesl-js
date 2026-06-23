@@ -27,7 +27,7 @@ test("gpu execution w/?link", async () => {
   device.createShaderModule({ code }); // verify works for webgpu
 
   expect(trimSrc(code)).toMatchInlineSnapshot(`
-    "@group(0) @binding(0) var <uniform> u: Uniforms;
+    "@group(0) @binding(0) var<uniform> u: Uniforms;
     @compute @workgroup_size(1) fn main() { }
     struct Uniforms { foo: u32 }"
   `);

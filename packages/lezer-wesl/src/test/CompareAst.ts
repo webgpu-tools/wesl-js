@@ -1,5 +1,5 @@
 import type { Tree } from "@lezer/common";
-import { type AbstractElem, groupBy, type WeslAST } from "wesl";
+import { type AbstractElem, childElems, groupBy, type WeslAST } from "wesl";
 
 export interface NodeInfo {
   type: string;
@@ -31,6 +31,18 @@ const weslToLezer: Record<string, string> = {
 
 // Local declarations use the same wesl kinds as globals but map to VarStatement in lezer.
 const localDeclKinds = new Set(["var", "let", "const"]);
+
+// Expression nodes whose operands are sub-expressions. childElems descends into
+// these, but lezer structures expressions differently and they hold no
+// comparable container nodes, so we stop at them (like `type` below).
+const exprOperatorKinds = new Set([
+  "binary-expression",
+  "unary-expression",
+  "call-expression",
+  "parenthesized-expression",
+  "component-expression",
+  "component-member-expression",
+]);
 
 const lezerTypes = new Set(Object.values(weslToLezer));
 
@@ -91,19 +103,13 @@ function collectNodes(
   nodes: NodeInfo[],
 ): void {
   const isLocalDecl = inFn && localDeclKinds.has(elem.kind);
-  const mapped = isLocalDecl ? null : mapWeslKind(elem.kind);
+  const mapped = isLocalDecl ? null : (weslToLezer[elem.kind] ?? null);
   if (mapped && "start" in elem)
     nodes.push({ type: mapped, start: elem.start });
 
-  if (!("contents" in elem)) return;
   // a type's contents are template-param expressions (incl. nested type refs);
   // don't descend - lezer does not emit comparable nested nodes there
-  if (elem.kind === "type") return;
+  if (elem.kind === "type" || exprOperatorKinds.has(elem.kind)) return;
   const childInFn = inFn || elem.kind === "fn";
-  for (const child of elem.contents) collectNodes(child, childInFn, nodes);
-}
-
-/** @return lezer node type name for a wesl AST kind, or null if not mapped. */
-function mapWeslKind(kind: string): string | null {
-  return weslToLezer[kind] ?? null;
+  for (const child of childElems(elem)) collectNodes(child, childInFn, nodes);
 }
