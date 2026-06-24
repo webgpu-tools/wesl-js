@@ -109,6 +109,32 @@ do test_recurse() { a(); }
   ).rejects.toThrow(/recursion depth/);
 });
 
+test("a terminating recursive do block runs once per level", async () => {
+  // reduce-style halving: each level bumps data[0] once, then recurses on
+  // count/2 until count <= 1, so 8 -> 4 -> 2 -> 1 records 4 passes.
+  const src = `
+@buffer var<storage, read_write> data: array<u32, 1>;
+
+@compute @workgroup_size(1) fn step() { data[0] = data[0] + 1u; }
+
+do reduce(count: u32) {
+  step(1, 1, 1);
+  if count > 1u { reduce(count / 2u); }
+}
+
+@test
+do test_reduce() { reduce(8u); }
+`;
+  const ast = parseTest(src);
+  const result = await runDoBlock({
+    device,
+    ast,
+    shaderSrc: src,
+    blockName: "test_reduce",
+  });
+  expect(result.data).toEqual([4]);
+});
+
 test("a do block binds its call arguments to its params", async () => {
   const src = `
 @buffer var<storage, read_write> data: array<u32, 4>;
