@@ -32,6 +32,7 @@
     "prepush:nocache": "run-s fix:all turbo:validate:nocache",
     "prepush:sequential": "run-s fix:all turbo:validate:sequential",
     "publish:all": "pnpm --filter \"./packages/**\" publish",
+    "regular_deps": "git checkout HEAD -- pnpm-lock.yaml && rimraf node_modules/.pnpm-workspace-state-v1.json && cross-env CI=true pnpm install --frozen-lockfile",
     "test": "cross-env FORCE_COLOR=1 NODE_OPTIONS=--expose-gc vitest",
     "test:all": "run-p test:unit test:examples test:e2e test:vscode",
     "test:built": "run-s build:all test:built:fast",
