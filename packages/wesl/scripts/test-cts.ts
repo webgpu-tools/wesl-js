@@ -92,7 +92,10 @@ for (const query of testQueries) {
   if (summaryStart !== -1) {
     console.log(comparison.slice(summaryStart));
   } else {
-    console.log(comparison);
+    // No summary means the runs or the comparison itself failed
+    console.error(comparison);
+    console.error(`Comparison produced no summary for ${query}`);
+    totalErrors += 1;
   }
 
   // Count errors from the comparison output
