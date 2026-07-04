@@ -33,7 +33,7 @@ function log(msg: string): void {
 function hasDeps(): boolean {
   return (
     existsSync(path.join(ctsDir, "node_modules")) &&
-    existsSync(path.join(transpilerDir, "node_modules"))
+    existsSync(path.join(transpilerDir, "node_modules/wesl/package.json"))
   );
 }
 
