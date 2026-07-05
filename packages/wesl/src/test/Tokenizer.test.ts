@@ -107,6 +107,24 @@ test("parse >> as template", () => {
   expect(tokenizer.nextToken()).toBe(null);
 });
 
+test("template discovery ignores > inside comments", () => {
+  const src = "a < b /* > */ ;";
+  const tokenizer = new WeslStream(src);
+  expect(tokenizer.nextToken()?.text).toBe("a");
+  expect(tokenizer.nextTemplateStartToken()).toBe(null);
+});
+
+test("template discovery sees comments inside template lists", () => {
+  const src = "array< /* len */ f32, 4 >";
+  const tokenizer = new WeslStream(src);
+  expect(tokenizer.nextToken()?.text).toBe("array");
+  expect(tokenizer.nextTemplateStartToken()).toEqual({
+    kind: "symbol",
+    text: "<",
+    span: [5, 6],
+  } as WeslToken);
+});
+
 test("parse skip block comment", () => {
   const src = "/* /* // */ */vec3<f32>";
   const tokenizer = new WeslStream(src);

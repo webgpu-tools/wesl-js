@@ -82,24 +82,8 @@ export class WeslStream implements Stream<WeslToken> {
       if (kind === "blankspaces") {
         continue; // newline/blank flags are derived later, at attach time
       } else if (kind === "commentStart") {
-        // SAFETY: The underlying streams can be seeked to any position
-        const style = token.text === "//" ? "line" : "block";
-        const end =
-          style === "line"
-            ? this.lineCommentEnd(token.span[1])
-            : this.skipBlockComment(token.span[1]);
         pending ??= [];
-        const start = token.span[0];
-        // WGSL forbids the null code point anywhere, including inside comments
-        // (a comment body is skipped here, so the `invalid` matcher never sees
-        // it). Scan only the comment body, keeping this O(comment length).
-        const bodyNull = this.src.slice(start, end).indexOf("\0");
-        if (bodyNull >= 0) {
-          const at = start + bodyNull;
-          throw new ParseError("Invalid token \\0", [at, at + 1]);
-        }
-        pending.push({ style, start, end });
-        this.stream.reset(end);
+        pending.push(this.consumeComment(token));
       } else if (kind === "invalid") {
         throw new ParseError("Invalid token " + token.text, token.span);
       } else {
@@ -121,6 +105,24 @@ export class WeslStream implements Stream<WeslToken> {
       return peeked;
     }
     return null;
+  }
+
+  /** Skip a comment (rejecting embedded \0), advance the stream past it,
+   *  and return it as trivia. */
+  private consumeComment(token: TypedToken<InternalTokenKind>): CommentTrivia {
+    const style = token.text === "//" ? "line" : "block";
+    const start = token.span[0];
+    const end = this.commentEnd(token);
+    // WGSL forbids the null code point anywhere, including inside comments
+    // (a comment body is skipped here, so the `invalid` matcher never sees
+    // it). Scan only the comment body, keeping this O(comment length).
+    const bodyNull = this.src.slice(start, end).indexOf("\0");
+    if (bodyNull >= 0) {
+      const at = start + bodyNull;
+      throw new ParseError("Invalid token \\0", [at, at + 1]);
+    }
+    this.stream.reset(end);
+    return { style, start, end };
   }
 
   /** Peek at the next token without consuming it */
@@ -183,6 +185,13 @@ export class WeslStream implements Stream<WeslToken> {
     return tokens;
   }
 
+  /** End position of a comment opened by a commentStart token. */
+  private commentEnd(token: TypedToken<InternalTokenKind>): number {
+    return token.text === "//"
+      ? this.lineCommentEnd(token.span[1])
+      : this.skipBlockComment(token.span[1]);
+  }
+
   /** End of a line comment: the start of the next line break (or end of file). */
   private lineCommentEnd(position: number): number {
     this.eolPattern.lastIndex = position;
@@ -215,7 +224,7 @@ export class WeslStream implements Stream<WeslToken> {
    */
   nextTemplateStartToken(): (WeslToken & { kind: "symbol" }) | null {
     const startPosition = this.stream.checkpoint();
-    const token: WeslToken | null = this.nextToken();
+    const token = this.nextToken();
     this.stream.reset(startPosition);
 
     //<<= << <= cannot be templates, so we match the entire token text
@@ -230,13 +239,18 @@ export class WeslStream implements Stream<WeslToken> {
     return token as WeslToken & { kind: "symbol" };
   }
 
+  /** Match a template-closing `>`, splitting it off a `>>`/`>=`/`>>=` token when needed. */
   nextTemplateEndToken(): (WeslToken & { kind: "symbol" }) | null {
     const startPosition = this.stream.checkpoint();
-    const token: WeslToken | null = this.nextToken();
+    const token = this.nextToken();
     this.stream.reset(startPosition);
     if (token === null) return null;
 
-    // template closing can also match a >= or >>, so we split the token
+    // Template closing can also match a >= or >> here, so split one `>` off
+    // and re-lex the rest. Safe for the closed set of `>`-leading symbols in
+    // WeslLexer.ts (`>` `>=` `>>` `>>=`): each remainder (``, `=`, `>`, `>=`)
+    // re-lexes to the intended tokens. A new `>`-leading symbol would break
+    // this split; isTemplateStart's exhaustive check throws if the set grows.
     if (token.kind !== "symbol" || token.text[0] !== ">") return null;
 
     // SAFETY: The underlying streams implementations can be reset to any position.
@@ -249,15 +263,27 @@ export class WeslStream implements Stream<WeslToken> {
     };
   }
 
+  /** Next symbol from the raw stream, skipping comment bodies (so symbols
+   *  inside comments don't count) and non-symbol tokens; null at EOF. */
+  private nextRawSymbol(): TypedToken<InternalTokenKind> | null {
+    while (true) {
+      const token = this.stream.nextToken();
+      if (token === null) return null;
+      if (token.kind === "commentStart") {
+        this.stream.reset(this.commentEnd(token));
+      } else if (token.kind === "symbol") return token;
+    }
+  }
+
+  /** Template-list discovery: scan forward from `<` for a balanced closing `>`. */
   private isTemplateStart(afterToken: number): boolean {
     // Skip over <
     this.stream.reset(afterToken);
     // We start with a < token
     let pendingCounter = 1;
     while (true) {
-      const nextToken = this.stream.nextToken();
+      const nextToken = this.nextRawSymbol();
       if (nextToken === null) return false;
-      if (nextToken.kind !== "symbol") continue;
       if (nextToken.text === "<") {
         // Start a nested template
         pendingCounter += 1;
@@ -298,12 +324,11 @@ export class WeslStream implements Stream<WeslToken> {
    */
   private skipBracketsTo(closingBracket: string): void {
     while (true) {
-      const nextToken = this.stream.nextToken();
+      const nextToken = this.nextRawSymbol();
       if (nextToken === null) {
         const after = this.stream.checkpoint();
         throw new ParseError("Unclosed bracket!", [after, after]);
       }
-      if (nextToken.kind !== "symbol") continue;
       if (nextToken.text === "(") {
         this.skipBracketsTo(")");
       } else if (nextToken.text === "[") {
