@@ -151,3 +151,81 @@ test("parse skip line without newline", () => {
   expect(tokenizer.nextToken()).toBe(null);
   expect(tokenizer.checkpoint()).toBe(src.length);
 });
+
+test("unicode mid-word falls back with correct span", () => {
+  const src = "réflexion x";
+  const tokenizer = new WeslStream(src);
+  expect(tokenizer.nextToken()).toEqual({
+    kind: "word",
+    text: "réflexion",
+    span: [0, 9],
+  } as WeslToken);
+  expect(tokenizer.nextToken()?.span).toEqual([10, 11]);
+});
+
+test("surrogate-pair ident spans count UTF-16 units", () => {
+  const src = "𐰓𐰏𐰇 x";
+  const tokenizer = new WeslStream(src);
+  expect(tokenizer.nextToken()).toEqual({
+    kind: "word",
+    text: "𐰓𐰏𐰇",
+    span: [0, 6],
+  } as WeslToken);
+  expect(tokenizer.nextToken()?.span).toEqual([7, 8]);
+});
+
+test("underscore boundary: _é word, _x word, bare _ symbol", () => {
+  const under = new WeslStream("_é _x _ x");
+  expect(under.nextToken()).toEqual({
+    kind: "word",
+    text: "_é",
+    span: [0, 2],
+  } as WeslToken);
+  expect(under.nextToken()).toEqual({
+    kind: "word",
+    text: "_x",
+    span: [3, 5],
+  } as WeslToken);
+  expect(under.nextToken()).toEqual({
+    kind: "symbol",
+    text: "_",
+    span: [6, 7],
+  } as WeslToken);
+});
+
+test("unicode blankspace separates tokens", () => {
+  const src = "a\u{2028}b\u{0085}c";
+  const tokenizer = new WeslStream(src);
+  expect(tokenizer.nextToken()?.span).toEqual([0, 1]);
+  expect(tokenizer.nextToken()?.span).toEqual([2, 3]);
+  expect(tokenizer.nextToken()?.span).toEqual([4, 5]);
+  expect(tokenizer.nextToken()).toBe(null);
+});
+
+test("leading-dot float and 3-char symbols", () => {
+  const src = "x >>= .5 <<= 0x1p4";
+  const tokenizer = new WeslStream(src);
+  tokenizer.nextToken(); // x
+  expect(tokenizer.nextToken()).toEqual({
+    kind: "symbol",
+    text: ">>=",
+    span: [2, 5],
+  } as WeslToken);
+  expect(tokenizer.nextToken()).toEqual({
+    kind: "number",
+    text: ".5",
+    span: [6, 8],
+  } as WeslToken);
+  expect(tokenizer.nextToken()?.text).toBe("<<=");
+  expect(tokenizer.nextToken()).toEqual({
+    kind: "number",
+    text: "0x1p4",
+    span: [13, 18],
+  } as WeslToken);
+});
+
+test("invalid character throws", () => {
+  const tokenizer = new WeslStream("a # b");
+  tokenizer.nextToken();
+  expect(() => tokenizer.nextToken()).toThrow(/Invalid token #/);
+});
