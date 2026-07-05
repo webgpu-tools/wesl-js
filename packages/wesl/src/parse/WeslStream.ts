@@ -70,16 +70,6 @@ const weslMatcher = new RegexMatchers<InternalTokenKind>({
   invalid: /[^]/,
 });
 
-/** Checks if a word is a valid WGSL ident, and not a keyword */
-export function isIdent(text: string): boolean {
-  return text.match(ident)?.[0] === text && !keywordOrReserved.has(text);
-}
-
-/** To mark parts of the grammar implementation that are WESL specific extensions */
-export function weslExtension<T>(combinator: T): T {
-  return combinator;
-}
-
 /** A stream that produces WESL tokens, skipping over comments and white space */
 export class WeslStream implements Stream<WeslToken> {
   private stream: Stream<TypedToken<InternalTokenKind>>;
