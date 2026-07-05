@@ -3,6 +3,7 @@ import type {
   AbstractElemBase,
   CommentElem,
   ModuleElem,
+  SyntheticElem,
 } from "../AbstractElems.ts";
 import { childElems } from "../LinkerUtil.ts";
 import type { SrcModule } from "../Scope.ts";
@@ -11,7 +12,11 @@ import type { CommentTrivia } from "./WeslStream.ts";
 
 /** An AST node with a source position (i.e. not a synthetic elem). Every such
  *  node can carry comments via the {@link AbstractElemBase} fields. */
-type Positioned = AbstractElem & { start: number; end: number };
+type Positioned = Exclude<AbstractElem, SyntheticElem>;
+
+/** Positioned children per node, computed once per attach pass. Attached
+ *  comments are not structural fields, so entries never go stale. */
+type ChildCache = Map<Positioned, Positioned[]>;
 
 const tab = 0x09;
 const lineFeed = 0x0a;
@@ -46,9 +51,15 @@ export function attachComments(
   moduleElem: ModuleElem,
 ): void {
   const { srcModule } = ctx.state.stable;
+  const cache: ChildCache = new Map();
   for (const run of ctx.stream.commentRuns()) {
-    const anchor = deepestContaining(moduleElem, run[0].start, runEnd(run));
-    distribute(anchor, run, srcModule);
+    const anchor = deepestContaining(
+      moduleElem,
+      run[0].start,
+      runEnd(run),
+      cache,
+    );
+    distribute(anchor, run, srcModule, cache);
   }
 }
 
@@ -60,10 +71,11 @@ function deepestContaining(
   root: Positioned,
   start: number,
   end: number,
+  cache: ChildCache,
 ): Positioned {
   let node = root;
   while (true) {
-    const child = positioned(childElems(node)).find(
+    const child = positionedChildren(node, cache).find(
       c => c.start <= start && end <= c.end,
     );
     if (!child) return node;
@@ -82,8 +94,9 @@ function distribute(
   anchor: Positioned,
   run: CommentTrivia[],
   srcModule: SrcModule,
+  cache: ChildCache,
 ): void {
-  const children = positioned(childElems(anchor));
+  const children = positionedChildren(anchor, cache);
   const start = run[0].start;
   const end = runEnd(run);
 
@@ -118,12 +131,13 @@ function distribute(
     addComments(next, "commentsBefore", run.slice(split), srcModule);
 }
 
-/** Source-positioned children, sorted in source order. Synthetic elems (no
- *  source position) cannot anchor comments and are dropped. */
-function positioned(elems: readonly AbstractElem[]): Positioned[] {
-  return elems
-    .filter((e): e is Positioned => "start" in e)
-    .sort((a, b) => a.start - b.start);
+function positionedChildren(node: Positioned, cache: ChildCache): Positioned[] {
+  let children = cache.get(node);
+  if (children === undefined) {
+    children = positioned(childElems(node));
+    cache.set(node, children);
+  }
+  return children;
 }
 
 /** Append converted comments to an element's leading or trailing list. */
@@ -177,8 +191,26 @@ function splitPoint(
   return ownLine >= 0 ? ownLine : hugsNextStart(run, next.start, src);
 }
 
-// --- WGSL blankspace scanning -------------------------------------------------
-// Character classification per https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
+/** Source-positioned children, sorted in source order. Synthetic elems (no
+ *  source position) cannot anchor comments and are dropped. Children usually
+ *  arrive already in source order, so the sort is skipped when possible.
+ *  Filtering and order-checking share one pass: this runs per node, so it's
+ *  kept deliberately lean. */
+function positioned(elems: readonly AbstractElem[]): Positioned[] {
+  const result: Positioned[] = [];
+  let sorted = true; // starts in source order until proven otherwise
+  let lastStart = -1;
+  for (const e of elems) {
+    if (e.kind === "synthetic") continue;
+    if (e.start < lastStart) sorted = false;
+    lastStart = e.start;
+    result.push(e);
+  }
+  if (!sorted) result.sort((a, b) => a.start - b.start);
+  return result;
+}
+
+// Blankspace classification per https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
 // (the tokenizer matches the same set via the blankspaces/lineBreak regexes).
 
 /** Count line breaks in the whitespace run immediately before `pos`, capped at 2:
