@@ -1,8 +1,7 @@
 import { ParseError } from "../ParseError.ts";
 import type { Stream, TypedToken } from "../Stream.ts";
 import { keywords, reservedWords } from "./Keywords.ts";
-import { MatchersStream, RegexMatchers } from "./stream/MatchersStream.ts";
-import { matchOneOf } from "./stream/RegexHelpers.ts";
+import { type InternalTokenKind, WeslLexer } from "./stream/WeslLexer.ts";
 export type WeslTokenKind = "word" | "keyword" | "number" | "symbol";
 
 export type WeslToken<Kind extends WeslTokenKind = WeslTokenKind> =
@@ -19,56 +18,11 @@ export interface CommentTrivia {
   end: number;
 }
 
-type InternalTokenKind =
-  | "word"
-  | "number"
-  | "blankspaces"
-  | "commentStart"
-  | "symbol"
-  | "invalid";
-
-// https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
-/** Whitespaces including new lines */
-const blankspaces = /[ \t\n\v\f\r\u{0085}\u{200E}\u{200F}\u{2028}\u{2029}]+/u;
-/** One line break, treating \r\n as a single break. */
+/** One line break, treating \r\n as a single break.
+ *  Same code points as `isLineBreak` in AttachComments.ts (charCode form). */
 const lineBreak = String.raw`\r\n?|[\n\v\f\u{0085}\u{2028}\u{2029}]`;
-const symbolSet =
-  "& && -> @ / ! [ ] { } :: : , == = != >>= >> >= > <<= << <= < % - --" +
-  " . + ++ | || ( ) ; * ~ ^ // /* */ += -= *= /= %= &= |= ^=" +
-  // For the _ = expr; syntax
-  " _";
-
-const ident =
-  /(?:(?:[_\p{XID_Start}][\p{XID_Continue}]+)|(?:[\p{XID_Start}]))/u;
 
 const keywordOrReserved = new Set(keywords.concat(reservedWords));
-
-const digits = new RegExp(
-  // decimal_float_literal
-  /(?:0[fh])|(?:[1-9][0-9]*[fh])/.source +
-    /|(?:[0-9]*\.[0-9]+(?:[eE][+-]?[0-9]+)?[fh]?)/.source +
-    /|(?:[0-9]+\.[0-9]*(?:[eE][+-]?[0-9]+)?[fh]?)/.source +
-    /|(?:[0-9]+[eE][+-]?[0-9]+[fh]?)/.source +
-    // hex_float_literal
-    /|(?:0[xX][0-9a-fA-F]*\.[0-9a-fA-F]+(?:[pP][+-]?[0-9]+[fh]?)?)/.source +
-    /|(?:0[xX][0-9a-fA-F]+\.[0-9a-fA-F]*(?:[pP][+-]?[0-9]+[fh]?)?)/.source +
-    /|(?:0[xX][0-9a-fA-F]+[pP][+-]?[0-9]+[fh]?)/.source +
-    // hex_int_literal
-    /|(?:0[xX][0-9a-fA-F]+[iu]?)/.source +
-    // decimal_int_literal
-    /|(?:0[iu]?)|(?:[1-9][0-9]*[iu]?)/.source,
-);
-
-const commentStart = /\/\/|\/\*/;
-const weslMatcher = new RegexMatchers<InternalTokenKind>({
-  word: ident,
-  number: digits,
-  blankspaces,
-  commentStart,
-  symbol: matchOneOf(symbolSet),
-  // biome-ignore lint/correctness/noEmptyCharacterClassInRegex: TODO
-  invalid: /[^]/,
-});
 
 /** A peeked token cached at the position it was read from. */
 interface PeekedToken {
@@ -91,7 +45,7 @@ export class WeslStream implements Stream<WeslToken> {
   public src: string;
   constructor(src: string) {
     this.src = src;
-    this.stream = new MatchersStream(src, weslMatcher);
+    this.stream = new WeslLexer(src);
   }
   checkpoint(): number {
     return this.stream.checkpoint();
