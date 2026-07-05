@@ -1,7 +1,6 @@
 import { ParseError } from "../ParseError.ts";
 import type { Stream, TypedToken } from "../Stream.ts";
 import { keywords, reservedWords } from "./Keywords.ts";
-import { CachingStream } from "./stream/CachingStream.ts";
 import { MatchersStream, RegexMatchers } from "./stream/MatchersStream.ts";
 import { matchOneOf } from "./stream/RegexHelpers.ts";
 export type WeslTokenKind = "word" | "keyword" | "number" | "symbol";
@@ -92,7 +91,7 @@ export class WeslStream implements Stream<WeslToken> {
   public src: string;
   constructor(src: string) {
     this.src = src;
-    this.stream = new CachingStream(new MatchersStream(src, weslMatcher));
+    this.stream = new MatchersStream(src, weslMatcher);
   }
   checkpoint(): number {
     return this.stream.checkpoint();
