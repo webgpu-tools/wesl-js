@@ -70,6 +70,13 @@ const weslMatcher = new RegexMatchers<InternalTokenKind>({
   invalid: /[^]/,
 });
 
+/** A peeked token cached at the position it was read from. */
+interface PeekedToken {
+  pos: number;
+  token: WeslToken | null;
+  end: number;
+}
+
 /** A stream that produces WESL tokens, skipping over comments and white space */
 export class WeslStream implements Stream<WeslToken> {
   private stream: Stream<TypedToken<InternalTokenKind>>;
@@ -78,6 +85,9 @@ export class WeslStream implements Stream<WeslToken> {
   private blockCommentPattern = /\/\*|\*\//g;
   /** Comments skipped before a real token, keyed by that token's start position. */
   private triviaByPos = new Map<number, CommentTrivia[]>();
+  /** Last peeked token, so the following nextToken() skips the rescan.
+   *  Never invalidated: tokenization is deterministic per position. */
+  private peeked: PeekedToken | null = null;
   public src: string;
   constructor(src: string) {
     this.src = src;
@@ -100,7 +110,11 @@ export class WeslStream implements Stream<WeslToken> {
     if (pending) this.triviaByPos.set(pos, pending);
   }
 
+  /** Next real token (comments/blankspace skipped and recorded as trivia); null at EOF. */
   nextToken(): WeslToken | null {
+    const peeked = this.usePeeked();
+    if (peeked !== null) return peeked.token;
+
     let pending: CommentTrivia[] | undefined;
     while (true) {
       const token = this.stream.nextToken();
@@ -145,11 +159,25 @@ export class WeslStream implements Stream<WeslToken> {
     }
   }
 
+  /** If the last peek() was at the current position, consume and return it. */
+  private usePeeked(): PeekedToken | null {
+    const peeked = this.peeked;
+    if (peeked !== null && peeked.pos === this.checkpoint()) {
+      this.reset(peeked.end);
+      return peeked;
+    }
+    return null;
+  }
+
   /** Peek at the next token without consuming it */
   peek(): WeslToken | null {
     const pos = this.checkpoint();
+    const peeked = this.peeked;
+    if (peeked !== null && peeked.pos === pos) return peeked.token;
     const token = this.nextToken();
+    const end = this.checkpoint();
     this.reset(pos);
+    this.peeked = { pos, token, end };
     return token;
   }
 
