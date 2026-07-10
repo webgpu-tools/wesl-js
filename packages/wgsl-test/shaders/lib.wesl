@@ -75,11 +75,20 @@ fn expectNearVec4(actual: vec4f, expected: vec4f) {
   expectWithinVec4(actual, expected, relTol, absTol);
 }
 
+// Map float bits to a monotonically ordered u32 space (negatives below
+// 0x80000000, positives above, +0 and -0 both at 0x80000000) so subtraction
+// counts representable floats even when the values straddle zero.
+fn ulpOrder(x: f32) -> u32 {
+  let bits = bitcast<u32>(x);
+  let negative = 0x80000000u - (bits & 0x7fffffffu);
+  return select(bits + 0x80000000u, negative, (bits & 0x80000000u) != 0u);
+}
+
 // ULP (Units in Last Place) comparison - measures how many representable floats apart
 fn ulpDiff(actual: f32, expected: f32) -> u32 {
-  let aBits = bitcast<i32>(actual);
-  let bBits = bitcast<i32>(expected);
-  return u32(abs(aBits - bBits));
+  let a = ulpOrder(actual);
+  let b = ulpOrder(expected);
+  return max(a, b) - min(a, b);
 }
 
 fn expectUlp(actual: f32, expected: f32, maxUlp: u32) {

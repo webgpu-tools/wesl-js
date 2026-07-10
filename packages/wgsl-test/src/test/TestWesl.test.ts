@@ -127,3 +127,12 @@ test("failing test with expectUlp()", async () => {
   expect(results).toHaveLength(1);
   expect(results[0].passed).toBe(false);
 });
+
+test("expectUlp counts representable floats across zero", async () => {
+  const src = loadFixture("ulp_across_zero.wesl");
+  const results = await runWesl({ device, src });
+  const within = results.find(r => r.name === "ulpAcrossZeroWithin");
+  const tooFar = results.find(r => r.name === "ulpAcrossZeroTooFar");
+  expect(within?.passed).toBe(true);
+  expect(tooFar?.passed).toBe(false);
+});
