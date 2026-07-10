@@ -1,7 +1,7 @@
 {
   "name": "wgsl-studio",
   "description": "WGSL/WESL previews and tests",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "repository": "github:webgpu-tools/wesl-js",
