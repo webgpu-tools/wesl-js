@@ -1,5 +1,7 @@
 .turbo/
 .vscode/
+.vscode-test/
+examples/
 scripts/
 src/
 dist/test/
@@ -7,6 +9,14 @@ dist/test/
 tsconfig*.json
 tsdown.config.ts
 *.md
-!readme.md
+!README.md
 .gitignore
 .vscode-test.mjs
+
+# agent tooling
+.claude/
+.cursor/
+.aider*
+.codex/
+.gemini/
+.windsurf/
