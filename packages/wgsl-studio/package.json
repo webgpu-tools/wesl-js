@@ -96,5 +96,8 @@
     "vscode": "^1.108.0"
   },
   "icon": "images/logo-small.png",
+  "monobump": {
+    "versioned": true
+  },
   "publisher": "webgpu-tools"
 }
