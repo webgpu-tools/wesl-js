@@ -60,6 +60,22 @@ Tests live in `src/test/` and cover extension activation, command registration,
 bb launch
 ```
 
+## Publishing
+
+Publishing to the VS Code Marketplace:
+
+```bash
+rpr publish:vsix
+```
+
+Notes:
+- Needs a one-time `vsce login webgpu-tools` with an Azure DevOps PAT. 
+- One VSIX covers all OSes (darwin/win32/linux). 
+- (`monobump` bumps the version across all packages including this one.)
+
+(auto-publishing from CI someday, but OIDC isn't supported yet: 
+([vsmarketplace#1422](https://github.com/microsoft/vsmarketplace/issues/1422)).)
+
 ## Build Configuration
 
 The extension uses tsdown with two entry points:
