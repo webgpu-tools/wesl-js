@@ -1,7 +1,7 @@
 {
   "name": "wesl-reflect",
   "description": "Browser-compatible reflection library for WESL/WGSL shader ASTs",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "files": [
     "dist",

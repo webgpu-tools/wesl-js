@@ -1,6 +1,6 @@
 {
   "name": "wesl-packager",
-  "version": "0.7.25",
+  "version": "0.7.26",
   "type": "module",
   "bin": "bin/wesl-packager",
   "files": [
