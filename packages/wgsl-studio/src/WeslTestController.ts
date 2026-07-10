@@ -235,9 +235,14 @@ export class WeslTestController implements vscode.Disposable {
           run.passed(item);
           this.resultEmitter.fire({ testId: item.id, passed: true });
         } else {
-          const msg = new vscode.TestMessage(
-            `actual: [${result.actual.join(", ")}]\nexpected: [${result.expected.join(", ")}]`,
-          );
+          const lines = [
+            `actual: [${result.actual.join(", ")}]`,
+            `expected: [${result.expected.join(", ")}]`,
+          ];
+          if ((result.failCount ?? 0) > 1) {
+            lines.push(`(first of ${result.failCount} failed assertions)`);
+          }
+          const msg = new vscode.TestMessage(lines.join("\n"));
           msg.location = new vscode.Location(item.uri!, item.range!);
           run.failed(item, msg);
           this.resultEmitter.fire({ testId: item.id, passed: false });
@@ -301,6 +306,7 @@ export class WeslTestController implements vscode.Disposable {
       passed: boolean;
       actual: number[];
       expected: number[];
+      failCount?: number;
       error?: string;
     }[]
   > {
