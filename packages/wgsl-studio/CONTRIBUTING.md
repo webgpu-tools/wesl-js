@@ -62,19 +62,33 @@ bb launch
 
 ## Publishing
 
-Publishing to the VS Code Marketplace:
+Publishing to the VS Code Marketplace, with the PAT from the macOS Keychain:
 
 ```bash
-rpr publish:vsix
+VSCE_PAT=$(security find-generic-password -a "$USER" -s vsce-webgpu-tools -w) rpr publish:vsix
 ```
 
 Notes:
-- Needs a one-time `vsce login webgpu-tools` with an Azure DevOps PAT. 
-- One VSIX covers all OSes (darwin/win32/linux). 
+- One VSIX covers all OSes (darwin/win32/linux).
 - (`monobump` bumps the version across all packages including this one.)
 
-(auto-publishing from CI someday, but OIDC isn't supported yet: 
-([vsmarketplace#1422](https://github.com/microsoft/vsmarketplace/issues/1422)).)
+### The Azure DevOps Personal Access Token 
+Don't use `vsce login` -- its keytar credential store is abandoned and falls back to
+storing the token clear-text in `~/.vsce`. Instead keep the PAT in the Keychain and pass
+it via `VSCE_PAT` as above.
+
+Create/regenerate the PAT:
+1. https://marketplace.visualstudio.com/manage -> confirm you own the `webgpu-tools`
+   publisher (personal Microsoft account lee@underneath.ca).
+2. https://dev.azure.com/mighdoll/_usersSettings/tokens -> New Token, with
+   **Organization: All accessible organizations** and scope **Marketplace > Manage**.
+3. Store it: `security add-generic-password -U -a "$USER" -s vsce-webgpu-tools -w`
+   (paste at the prompt), then verify with
+   `VSCE_PAT=$(security find-generic-password -a "$USER" -s vsce-webgpu-tools -w) pnpx @vscode/vsce verify-pat webgpu-tools`.
+
+(Auto-publishing from CI someday, but the Marketplace has no OIDC trusted publishing yet
+([vsmarketplace#1422](https://github.com/microsoft/vsmarketplace/issues/1422)), and global
+PATs retire 2026-12-01 in favor of Entra ID federation -- so it stays manual for now.)
 
 ## Build Configuration
 
