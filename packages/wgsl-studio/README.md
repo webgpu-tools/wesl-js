@@ -23,10 +23,10 @@ The native test runner can be disabled in settings
 
 ## Quick Start
 
-Create a fragment shader tagged with `@toy`:
+Create a fragment shader:
 
 ```wgsl
-@toy
+@fragment
 fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let uv = pos.xy / uniforms.size;
   return vec4f(uv, 0.5, 1.0);
@@ -54,7 +54,7 @@ and shaders from npm packages.
 import package::utils::palette;  // local file: ./utils/palette.wesl
 import lygia::sdf::circleSDF;    // npm package
 
-@toy
+@fragment
 fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let uv = pos.xy / uniforms.size;
   let d = circleSDF(uv - 0.5);
