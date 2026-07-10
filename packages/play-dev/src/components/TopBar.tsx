@@ -4,10 +4,16 @@ import { Title } from "./Title.tsx";
 interface Props {
   title: string;
   onTitleCommit(value: string): void;
+  saveButton: ComponentChildren;
   accountMenu: ComponentChildren;
 }
 
-export function TopBar({ title, onTitleCommit, accountMenu }: Props) {
+export function TopBar({
+  title,
+  onTitleCommit,
+  saveButton,
+  accountMenu,
+}: Props) {
   return (
     <header class="topbar">
       <a class="logo" href="/" aria-label="wgsl-play.dev">
@@ -21,14 +27,7 @@ export function TopBar({ title, onTitleCommit, accountMenu }: Props) {
         </button>
       </div>
       <appearance-picker />
-      <button
-        type="button"
-        class="save-btn"
-        disabled
-        title="Save coming next slice"
-      >
-        Save
-      </button>
+      {saveButton}
       {accountMenu}
     </header>
   );

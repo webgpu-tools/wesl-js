@@ -107,6 +107,10 @@ body {
   cursor: not-allowed;
 }
 
+.save-btn:not(:disabled):hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+
 .signin-btn {
   background: var(--accent);
   color: white;
@@ -246,6 +250,35 @@ wgsl-play {
 
 .copy-link:hover {
   text-decoration: underline;
+}
+
+.gist-chip {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--accent);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  animation: gist-chip-flash 0.6s ease-out;
+}
+
+.gist-chip:hover {
+  text-decoration: underline;
+}
+
+@keyframes gist-chip-flash {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @media (max-width: 720px) {
