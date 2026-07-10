@@ -3,7 +3,11 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { parseSrcModule } from "wesl";
-import { findTestFunctions, testDisplayName } from "wgsl-test";
+import {
+  findTestFunctions,
+  testDisplayName,
+  type TestResult as WeslTestResult,
+} from "wgsl-test";
 
 const execFileAsync = promisify(execFile);
 
@@ -300,16 +304,7 @@ export class WeslTestController implements vscode.Disposable {
   private async runFileTests(
     filePath: string,
     items: vscode.TestItem[],
-  ): Promise<
-    {
-      name: string;
-      passed: boolean;
-      actual: number[];
-      expected: number[];
-      failCount?: number;
-      error?: string;
-    }[]
-  > {
+  ): Promise<(WeslTestResult & { error?: string })[]> {
     try {
       const uri = vscode.Uri.file(filePath);
       const doc = await vscode.workspace.openTextDocument(uri);
