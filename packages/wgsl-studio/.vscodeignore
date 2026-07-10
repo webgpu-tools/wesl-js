@@ -8,6 +8,7 @@ dist/test/
 *.ts
 tsconfig*.json
 tsdown.config.ts
+turbo.json
 *.md
 !README.md
 .gitignore
