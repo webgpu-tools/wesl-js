@@ -53,6 +53,8 @@ export interface TestResult {
   passed: boolean;
   actual: number[];
   expected: number[];
+  /** Number of failed assertions (compute tests only). */
+  failCount?: number;
   snapshot?: SnapshotResult;
   /** Failure message for non-compute-test failures (e.g. do-block dispatch). */
   message?: string;
@@ -161,11 +163,15 @@ export async function expectWesl(params: RunWeslParams): Promise<void> {
   const messages = failures.map(f => {
     if (f.snapshot) return `  ${f.name}: FAILED\n    ${f.snapshot.message}`;
     if (f.message) return `  ${f.name}: FAILED\n    ${f.message}`;
-    return [
+    const lines = [
       `  ${f.name}: FAILED`,
       `    actual:   [${f.actual.join(", ")}]`,
       `    expected: [${f.expected.join(", ")}]`,
-    ].join("\n");
+    ];
+    if ((f.failCount ?? 0) > 1) {
+      lines.push(`    (first of ${f.failCount} failed assertions)`);
+    }
+    return lines.join("\n");
   });
   throw new Error(`WESL tests failed:\n${messages.join("\n")}`);
 }
@@ -445,7 +451,8 @@ function parseTestResult(name: string, data: ArrayBuffer): TestResult {
   const u32 = new Uint32Array(data);
   const f32 = new Float32Array(data);
   const passed = u32[0] === 1;
+  const failCount = u32[1];
   const actual = Array.from(f32.slice(4, 8));
   const expected = Array.from(f32.slice(8, 12));
-  return { name, passed, actual, expected };
+  return { name, passed, actual, expected, failCount };
 }

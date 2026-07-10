@@ -44,6 +44,32 @@ test("failing test with expectNear() reports actual and expected", async () => {
   expect(results[0].expected?.[0]).toBeCloseTo(2.0);
 });
 
+test("failing assertion values survive later passing assertions", async () => {
+  const src = loadFixture("first_failure.wesl");
+  const results = await runWesl({ device, src });
+  expect(results).toHaveLength(1);
+  expect(results[0].passed).toBe(false);
+  expect(results[0].actual?.[0]).toBeCloseTo(1.0);
+  expect(results[0].expected?.[0]).toBeCloseTo(5.0);
+});
+
+test("failCount counts every failed assertion", async () => {
+  const src = loadFixture("fail_count.wesl");
+  const results = await runWesl({ device, src });
+  expect(results).toHaveLength(1);
+  expect(results[0].passed).toBe(false);
+  expect(results[0].failCount).toBe(3);
+  expect(results[0].actual?.[0]).toBeCloseTo(1.0);
+  expect(results[0].expected?.[0]).toBeCloseTo(5.0);
+});
+
+test("expectWesl reports the failed assertion count", async () => {
+  const src = loadFixture("fail_count.wesl");
+  await expect(expectWesl({ device, src })).rejects.toThrow(
+    "first of 3 failed assertions",
+  );
+});
+
 test("multiple @test functions in one module", async () => {
   const src = loadFixture("multiple_tests.wesl");
   const results = await runWesl({ device, src });
