@@ -3,7 +3,7 @@
   "tasks": {
     "launch:code": { "dependsOn": ["^build", "build"] },
     "build:vsix:run": { "dependsOn": ["^build", "build"] },
-    "publish:vsix:run": { "dependsOn": ["^build", "build"] },
+    "publish:vsix:run": { "dependsOn": ["^build", "build"], "passThroughEnv": ["VSCE_PAT"] },
     "test:vscode:run": { "dependsOn": ["^build", "build"] }
   }
 }
