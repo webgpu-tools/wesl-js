@@ -1,7 +1,6 @@
 {
   "name": "play-dev",
   "version": "0.0.1",
-  "editorVersion": "2026.04",
   "private": true,
   "type": "module",
   "scripts": {
@@ -32,5 +31,6 @@
     "vite": "^8.0.1",
     "wesl-plugin": "workspace:x",
     "wrangler": "^4.77.0"
-  }
+  },
+  "editorVersion": "2026.04"
 }
