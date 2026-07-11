@@ -41,3 +41,10 @@ bench-report/
 # test built packages
 /temp-built-test/
 /temp-packages/
+
+
+# pnpm-11
+.pnpm-store/
+
+# vscode codetour extension
+.tours
