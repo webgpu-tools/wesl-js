@@ -5,7 +5,7 @@
  */
 
 import type { GitHubAuth } from "../auth/GitHubAuth.ts";
-import { buildGistFiles } from "./Gist.ts";
+import { buildGistFiles, type GistChanges, type GistFiles } from "./Gist.ts";
 import { createGist, updateGist } from "./GitHub.ts";
 import type { ShaderDocument } from "./Share.ts";
 import { captureThumbnail } from "./Thumbnail.ts";
@@ -15,25 +15,32 @@ export interface SaveOutcome {
   id: string;
   owner: string;
   url: string;
+  fileNames: string[];
 }
 
 interface SaveArgs {
   auth: GitHubAuth;
   payload: ShaderDocument;
-  gistId: string | null;
+  gist: SaveOutcome | null;
 }
 
 /** Capture a thumbnail and create or update the gist for the current buffer. */
 export async function saveGist(args: SaveArgs): Promise<SaveOutcome> {
-  const { auth, payload, gistId } = args;
+  const { auth, payload, gist } = args;
   const thumbnail = await captureThumbnail();
-  const files = buildGistFiles(payload, thumbnail ?? undefined);
-  const body = { description: payload.title, files };
-  const saved = gistId
-    ? await updateGist(auth, gistId, body)
-    : await createGist(auth, body);
+  const files = buildGistFiles(payload, {
+    wgslPlayVersion: __WGSL_PLAY_VERSION__,
+    thumbnailBase64: thumbnail ?? undefined,
+  });
+  const description = payload.title;
+  const saved = gist
+    ? await updateGist(auth, gist.id, {
+        description,
+        files: fileChanges(files, gist.fileNames),
+      })
+    : await createGist(auth, { description, files });
   const url = `${location.origin}/gist/${saved.owner}/${saved.id}`;
-  return { ...saved, url };
+  return { ...saved, url, fileNames: Object.keys(files) };
 }
 
 export const pendingSaveKey = "wgsl-play.pending-save";
@@ -48,4 +55,12 @@ export function takePendingSave(): boolean {
   const pending = sessionStorage.getItem(pendingSaveKey) === "1";
   sessionStorage.removeItem(pendingSaveKey);
   return pending;
+}
+
+/** Add explicit null entries for files removed since the previous save. */
+function fileChanges(files: GistFiles, previous: string[]): GistChanges {
+  const deleted = previous
+    .filter(name => !(name in files))
+    .map(name => [name, null] as const);
+  return { ...files, ...Object.fromEntries(deleted) };
 }

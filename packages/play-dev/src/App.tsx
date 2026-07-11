@@ -16,7 +16,12 @@ import { Footer } from "./components/Footer.tsx";
 import { SaveButton, type SaveStatus } from "./components/SaveButton.tsx";
 import { TopBar } from "./components/TopBar.tsx";
 import { type AutosaveSnapshot, writeSlot } from "./lib/Autosave.ts";
-import { markPendingSave, saveGist, takePendingSave } from "./lib/Save.ts";
+import {
+  markPendingSave,
+  type SaveOutcome,
+  saveGist,
+  takePendingSave,
+} from "./lib/Save.ts";
 import { encodeFragment, persistProject } from "./lib/Share.ts";
 import { resolveInitialState } from "./lib/State.ts";
 
@@ -31,7 +36,7 @@ export function App() {
   const [saveNonce, setSaveNonce] = useState(0);
   const sessionId = useRef(initialState.sessionId);
   const snapshot = useRef<AutosaveSnapshot>(initialState.snapshot);
-  const gistId = useRef<string | null>(null);
+  const savedGist = useRef<SaveOutcome | null>(null);
   const saveInFlight = useRef(false);
   const statusReset = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,9 +76,9 @@ export function App() {
       const outcome = await saveGist({
         auth: currentAuth,
         payload: document,
-        gistId: gistId.current,
+        gist: savedGist.current,
       });
-      gistId.current = outcome.id;
+      savedGist.current = outcome;
       history.replaceState(null, "", `/gist/${outcome.owner}/${outcome.id}`);
       setGistUrl(outcome.url);
       setSaveNonce(n => n + 1);

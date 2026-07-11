@@ -5,7 +5,7 @@
  */
 
 import type { GitHubAuth } from "../auth/GitHubAuth.ts";
-import type { GistFiles } from "./Gist.ts";
+import type { GistChanges, GistFiles } from "./Gist.ts";
 
 /** Identity of a saved gist, enough to build its share URL. */
 export interface SavedGist {
@@ -13,9 +13,9 @@ export interface SavedGist {
   owner: string;
 }
 
-interface CreateBody {
+interface GistBody<TFiles> {
   description: string;
-  files: GistFiles;
+  files: TFiles;
 }
 
 const apiBase = "https://api.github.com";
@@ -23,16 +23,16 @@ const apiBase = "https://api.github.com";
 /** Create a new public gist; returns its id and owner login. */
 export async function createGist(
   auth: GitHubAuth,
-  body: CreateBody,
+  body: GistBody<GistFiles>,
 ): Promise<SavedGist> {
   return request(auth, "POST", "/gists", { ...body, public: true });
 }
 
-/** Replace the files/description of an existing gist. */
+/** Apply file and description changes to an existing gist. */
 export async function updateGist(
   auth: GitHubAuth,
   id: string,
-  body: CreateBody,
+  body: GistBody<GistChanges>,
 ): Promise<SavedGist> {
   return request(auth, "PATCH", `/gists/${id}`, body);
 }

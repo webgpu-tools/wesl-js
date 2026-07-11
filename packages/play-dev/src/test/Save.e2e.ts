@@ -80,7 +80,7 @@ test("signed-in Save creates a gist, updates URL, shows chip", async ({
       "util.wesl",
       "package.json",
       "README.md",
-      "thumbnail.png",
+      "thumbnail.png.base64",
     ]),
   );
   const pkg = JSON.parse(sent.files["package.json"].content);
@@ -123,6 +123,32 @@ test("second Save patches the same gist", async ({ page }) => {
   await expect.poll(() => calls.length).toBe(2);
   expect(calls[1].method()).toBe("PATCH");
   expect(calls[1].url()).toBe(`${createUrl}/${gistId}`);
+});
+
+test("second Save deletes files removed from the editor", async ({ page }) => {
+  await seedToken(page);
+  const { calls } = await stubGists(page);
+  await page.goto("/");
+  await waitForCompileSuccess(page);
+
+  await page.locator(".save-btn").click();
+  await expect.poll(() => calls.length).toBe(1);
+  await page.evaluate(() => {
+    const editor = document.querySelector("#editor") as HTMLElement & {
+      project: { weslSrc: Record<string, string> };
+    };
+    editor.project = {
+      weslSrc: {
+        "package::main":
+          "@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }",
+      },
+    };
+  });
+  await page.locator(".save-btn").click();
+
+  await expect.poll(() => calls.length).toBe(2);
+  const patch = calls[1].postDataJSON();
+  expect(patch.files["util.wesl"]).toBeNull();
 });
 
 test("second Save stays busy past the first save status timeout", async ({
