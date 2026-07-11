@@ -1,4 +1,4 @@
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+import type { SaveStatus } from "../lib/Save.ts";
 
 interface Props {
   status: SaveStatus;

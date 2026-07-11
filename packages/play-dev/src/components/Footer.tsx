@@ -1,17 +1,16 @@
 import { useState } from "preact/hooks";
+import type { SaveOutcome, SaveStatus } from "../lib/Save.ts";
 
 type Status = "idle" | "copied" | "too-large";
 
 interface Props {
   buildShareUrl(): string | null;
-  gistUrl: string | null;
-  /** Bumped on each save so the chip replays its flash animation. */
-  saveNonce: number;
+  gist: SaveOutcome | null;
+  saveStatus: SaveStatus;
 }
 
-const editorVersion = "2026.04";
-
-export function Footer({ buildShareUrl, gistUrl, saveNonce }: Props) {
+/** Render editor versions and controls for copying or opening share links. */
+export function Footer({ buildShareUrl, gist, saveStatus }: Props) {
   const [status, setStatus] = useState<Status>("idle");
 
   async function copyLink() {
@@ -32,16 +31,19 @@ export function Footer({ buildShareUrl, gistUrl, saveNonce }: Props) {
 
   return (
     <footer class="footer">
-      <span>Editor: {editorVersion}</span>
+      <span>Editor: {__EDITOR_VERSION__}</span>
       <span>·</span>
       <span>v{__WGSL_PLAY_VERSION__}</span>
       <span>·</span>
       <button type="button" class="copy-link" onClick={copyLink}>
         {label(status)}
       </button>
-      {gistUrl && (
-        <a key={saveNonce} class="gist-chip" href={gistUrl}>
-          {shortPath(gistUrl)}
+      {gist && (
+        <a
+          class={`gist-chip${saveStatus === "saved" ? " gist-chip-flash" : ""}`}
+          href={gist.url}
+        >
+          {shortPath(gist.url)}
         </a>
       )}
     </footer>

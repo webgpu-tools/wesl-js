@@ -3,6 +3,9 @@ import preact from "@preact/preset-vite";
 import { defineConfig, type Plugin } from "vite";
 import viteWesl from "wesl-plugin/vite";
 
+const playDevPkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+);
 const wgslPlayPkg = JSON.parse(
   readFileSync(new URL("../wgsl-play/package.json", import.meta.url), "utf-8"),
 );
@@ -10,6 +13,7 @@ const wgslPlayPkg = JSON.parse(
 export default defineConfig({
   plugins: [preact(), viteWesl() as Plugin],
   define: {
+    __EDITOR_VERSION__: JSON.stringify(playDevPkg.editorVersion),
     __WGSL_PLAY_VERSION__: JSON.stringify(wgslPlayPkg.version),
   },
   build: {

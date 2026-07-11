@@ -261,6 +261,9 @@ wgsl-play {
   color: var(--accent);
   text-decoration: none;
   font-variant-numeric: tabular-nums;
+}
+
+.gist-chip-flash {
   animation: gist-chip-flash 0.6s ease-out;
 }
 

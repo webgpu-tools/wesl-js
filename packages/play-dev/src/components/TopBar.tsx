@@ -8,6 +8,7 @@ interface Props {
   accountMenu: ComponentChildren;
 }
 
+/** Render the editor header with title, navigation, save, and account controls. */
 export function TopBar({
   title,
   onTitleCommit,

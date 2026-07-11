@@ -18,6 +18,8 @@ export interface SaveOutcome {
   fileNames: string[];
 }
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 interface SaveArgs {
   auth: GitHubAuth;
   payload: ShaderDocument;

@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { lastKey, slotPrefix } from "../lib/Autosave.ts";
 import { encodeFragment } from "../lib/Share.ts";
+
+const { editorVersion } = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { editorVersion: string };
 
 async function waitForCompileSuccess(page: Page, selector: string) {
   await page.waitForFunction(sel => {
@@ -29,7 +34,7 @@ test("starter loads and compiles", async ({ page }) => {
   expect(sources["package::util"]).toBeTruthy();
 
   const footer = await page.textContent(".footer");
-  expect(footer).toContain("Editor: 2026.04");
+  expect(footer).toContain(`Editor: ${editorVersion}`);
   expect(footer).toMatch(/v\d/);
 
   const titleText = (await page.textContent(".title"))?.trim();
