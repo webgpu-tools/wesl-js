@@ -162,6 +162,7 @@ test("second Save stays busy past the first save status timeout", async ({
   const { calls } = await stubGists(page, { onPatch: () => patchGate });
   await page.goto("/");
   await waitForCompileSuccess(page);
+  await page.clock.install();
 
   const save = page.locator(".save-btn");
   await save.click();
@@ -170,7 +171,7 @@ test("second Save stays busy past the first save status timeout", async ({
   await save.click();
   await expect.poll(() => calls.length).toBe(2);
   await expect(save).toHaveText("Saving...");
-  await page.waitForTimeout(1900);
+  await page.clock.fastForward(1900);
   await expect(save).toHaveText("Saving...");
   await expect(save).toBeDisabled();
 
