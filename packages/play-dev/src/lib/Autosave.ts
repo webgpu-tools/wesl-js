@@ -11,10 +11,10 @@
  * anything older than 30 days.
  */
 
-import { isSharePayload, type SharePayload } from "./Share.ts";
+import { isShaderDocument, type ShaderDocument } from "./Share.ts";
 
 /** A snapshot of editor state persisted to a localStorage slot. */
-export interface BufferPayload extends SharePayload {
+export interface AutosaveSnapshot extends ShaderDocument {
   savedAt: number;
 }
 
@@ -24,11 +24,11 @@ const sessionIdKey = "wgsl-play.session-id";
 const maxSlots = 20;
 const maxAgeMs = 30 * 24 * 60 * 60 * 1000;
 
-/** Validate that `value` matches the persisted-buffer shape. */
-export function isBufferPayload(value: unknown): value is BufferPayload {
+/** Validate that `value` matches the autosave snapshot shape. */
+export function isAutosaveSnapshot(value: unknown): value is AutosaveSnapshot {
   return (
-    isSharePayload(value) &&
-    typeof (value as BufferPayload).savedAt === "number"
+    isShaderDocument(value) &&
+    typeof (value as AutosaveSnapshot).savedAt === "number"
   );
 }
 
@@ -52,27 +52,27 @@ export function setSessionId(id: string): void {
   sessionStorage.setItem(sessionIdKey, id);
 }
 
-/** Read the payload stored in slot `id`, or null if missing/corrupt. */
-export function readSlot(id: string): BufferPayload | null {
+/** Read the snapshot stored in slot `id`, or null if missing/corrupt. */
+export function readSlot(id: string): AutosaveSnapshot | null {
   return readKey(slotKey(id));
 }
 
-/** Persist `payload` to slot `id` and mirror it to the shared "last" slot. */
-export function writeSlot(id: string, payload: BufferPayload): void {
-  const json = JSON.stringify(payload);
+/** Persist `snapshot` to slot `id` and mirror it to the shared "last" slot. */
+export function writeSlot(id: string, snapshot: AutosaveSnapshot): void {
+  const json = JSON.stringify(snapshot);
   localStorage.setItem(slotKey(id), json);
   localStorage.setItem(lastKey, json);
 }
 
-/** Read the most recently written payload across all tabs. */
-export function readLast(): BufferPayload | null {
+/** Read the most recently written snapshot across all tabs. */
+export function readLast(): AutosaveSnapshot | null {
   return readKey(lastKey);
 }
 
-/** Allocate a fresh slot id and seed both slot + last with the payload. */
-export function allocateSlot(payload: BufferPayload): string {
+/** Allocate a fresh slot id and seed both slot + last with the snapshot. */
+export function allocateSlot(snapshot: AutosaveSnapshot): string {
   const id = newId();
-  writeSlot(id, payload);
+  writeSlot(id, snapshot);
   return id;
 }
 
@@ -88,12 +88,12 @@ export function sweepOldSlots(): void {
   }
   const slots: Array<{ key: string; savedAt: number }> = [];
   for (const key of keys) {
-    const payload = readKey(key);
-    if (!payload || now - payload.savedAt > maxAgeMs) {
+    const snapshot = readKey(key);
+    if (!snapshot || now - snapshot.savedAt > maxAgeMs) {
       localStorage.removeItem(key);
       continue;
     }
-    slots.push({ key, savedAt: payload.savedAt });
+    slots.push({ key, savedAt: snapshot.savedAt });
   }
   if (slots.length <= maxSlots) return;
   slots.sort((a, b) => b.savedAt - a.savedAt);
@@ -104,12 +104,12 @@ function newId(): string {
   return crypto.randomUUID();
 }
 
-function readKey(key: string): BufferPayload | null {
+function readKey(key: string): AutosaveSnapshot | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return isBufferPayload(parsed) ? parsed : null;
+    return isAutosaveSnapshot(parsed) ? parsed : null;
   } catch {
     return null;
   }

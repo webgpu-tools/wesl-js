@@ -9,28 +9,28 @@ import type { AppearanceChangeDetail } from "appearance-picker";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { WeslProject } from "wesl";
 import { startSignIn } from "./auth/Authorize.ts";
-import { type AuthToken, readToken } from "./auth/Token.ts";
+import { type GitHubAuth, readGitHubAuth } from "./auth/GitHubAuth.ts";
 import { AccountMenu } from "./components/AccountMenu.tsx";
 import { EditPlay } from "./components/EditPlay.tsx";
 import { Footer } from "./components/Footer.tsx";
 import { SaveButton, type SaveStatus } from "./components/SaveButton.tsx";
 import { TopBar } from "./components/TopBar.tsx";
-import { type BufferPayload, readSlot, writeSlot } from "./lib/Autosave.ts";
+import { type AutosaveSnapshot, writeSlot } from "./lib/Autosave.ts";
 import { markPendingSave, saveGist, takePendingSave } from "./lib/Save.ts";
-import { encodeFragment } from "./lib/Share.ts";
+import { encodeFragment, persistProject } from "./lib/Share.ts";
 import { resolveInitialState } from "./lib/State.ts";
 
 const initialState = resolveInitialState();
 
 export function App() {
   const [theme, setTheme] = useState<"light" | "dark">(() => initialTheme());
-  const [title, setTitle] = useState(initialState.payload.title);
-  const [token, setToken] = useState<AuthToken | null>(() => readToken());
+  const [title, setTitle] = useState(initialState.snapshot.title);
+  const [auth, setAuth] = useState<GitHubAuth | null>(() => readGitHubAuth());
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [gistUrl, setGistUrl] = useState<string | null>(null);
   const [saveNonce, setSaveNonce] = useState(0);
   const sessionId = useRef(initialState.sessionId);
-  const buffer = useRef<BufferPayload>(initialState.payload);
+  const snapshot = useRef<AutosaveSnapshot>(initialState.snapshot);
   const gistId = useRef<string | null>(null);
   const saveInFlight = useRef(false);
   const statusReset = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +47,7 @@ export function App() {
   // the pending flag on mount so an abandoned sign-out save can't later fire a
   // phantom save on an unrelated sign-in.
   useEffect(() => {
-    if (takePendingSave() && readToken()) void runSave();
+    if (takePendingSave() && readGitHubAuth()) void runSave();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -56,8 +56,9 @@ export function App() {
   /** Save the current buffer to a gist, signing in first if needed. */
   async function runSave() {
     if (saveInFlight.current) return;
-    const current = readToken();
-    if (!current) {
+    const currentAuth = readGitHubAuth();
+    if (!currentAuth) {
+      persist();
       markPendingSave();
       startSignIn();
       return;
@@ -66,10 +67,10 @@ export function App() {
     clearStatusReset();
     setSaveStatus("saving");
     try {
-      const payload = readSlot(sessionId.current) ?? buffer.current;
+      const document = persist();
       const outcome = await saveGist({
-        token: current,
-        payload,
+        auth: currentAuth,
+        payload: document,
         gistId: gistId.current,
       });
       gistId.current = outcome.id;
@@ -100,15 +101,22 @@ export function App() {
   }
 
   /** Merge fields into the current buffer and persist to the session slot. */
-  function persist(patch: Partial<BufferPayload>) {
-    const current = readSlot(sessionId.current) ?? buffer.current;
-    const next = { ...current, ...patch, savedAt: Date.now() };
-    buffer.current = next;
+  function persist(patch: Partial<AutosaveSnapshot> = {}) {
+    const next = { ...snapshot.current, ...patch, savedAt: Date.now() };
+    snapshot.current = next;
     writeSlot(sessionId.current, next);
+    return next;
+  }
+
+  function onProjectChange(project: WeslProject) {
+    snapshot.current = {
+      ...snapshot.current,
+      project: persistProject(project),
+    };
   }
 
   function onAutosave(project: WeslProject) {
-    persist({ project });
+    persist({ project: persistProject(project) });
   }
 
   function onTitleCommit(value: string) {
@@ -117,7 +125,7 @@ export function App() {
   }
 
   function buildShareUrl(): string | null {
-    const { project, title } = readSlot(sessionId.current) ?? buffer.current;
+    const { project, title } = snapshot.current;
     const fragment = encodeFragment({ project, title });
     if (!fragment) return null;
     return `${location.origin}${location.pathname}${fragment}`;
@@ -130,12 +138,13 @@ export function App() {
         onTitleCommit={onTitleCommit}
         saveButton={<SaveButton status={saveStatus} onSave={runSave} />}
         accountMenu={
-          <AccountMenu token={token} onSignOut={() => setToken(null)} />
+          <AccountMenu auth={auth} onSignOut={() => setAuth(null)} />
         }
       />
       <EditPlay
-        initial={initialState.payload.project}
+        initial={initialState.snapshot.project}
         theme={theme}
+        onChange={onProjectChange}
         onAutosave={onAutosave}
       />
       <Footer

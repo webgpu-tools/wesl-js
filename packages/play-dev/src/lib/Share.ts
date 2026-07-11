@@ -4,8 +4,11 @@ import type { WeslProject } from "wesl";
 const { compressToEncodedURIComponent, decompressFromEncodedURIComponent } =
   LZString;
 
-export interface SharePayload {
-  project: WeslProject;
+export type PersistedProject = Omit<WeslProject, "libs">;
+
+/** Editable shader state that is safe to persist or share. */
+export interface ShaderDocument {
+  project: PersistedProject;
   title: string;
 }
 
@@ -16,9 +19,9 @@ export const maxTitleLength = 64;
  *  ~3-5x compression so this covers ~100-150KB of shader source. */
 export const maxFragmentLength = 32_000;
 
-/** Validate a decoded payload's shape and bounds. */
-export function isSharePayload(value: unknown): value is SharePayload {
-  const v = value as Partial<SharePayload> | null;
+/** Validate a decoded shader document's shape and bounds. */
+export function isShaderDocument(value: unknown): value is ShaderDocument {
+  const v = value as Partial<ShaderDocument> | null;
   if (!v) return false;
   if (typeof v.title !== "string" || v.title.length > maxTitleLength) {
     return false;
@@ -26,17 +29,17 @@ export function isSharePayload(value: unknown): value is SharePayload {
   return isProject(v.project);
 }
 
-/** Encode a payload into a `#v1=<lz-string>` fragment. Returns `null` if the
+/** Encode a document into a `#v1=<lz-string>` fragment. Returns `null` if the
  *  encoded URL would exceed `maxFragmentLength`. */
-export function encodeFragment(payload: SharePayload): string | null {
-  const json = JSON.stringify(payload);
+export function encodeFragment(document: ShaderDocument): string | null {
+  const json = JSON.stringify(document);
   const fragment = `#${fragmentPrefix}${compressToEncodedURIComponent(json)}`;
   if (fragment.length > maxFragmentLength) return null;
   return fragment;
 }
 
 /** Decode a `#v1=...` fragment string. Returns `null` if missing/invalid. */
-export function decodeFragment(hash: string): SharePayload | null {
+export function decodeFragment(hash: string): ShaderDocument | null {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   if (!raw.startsWith(fragmentPrefix)) return null;
   const compressed = raw.slice(fragmentPrefix.length);
@@ -44,10 +47,17 @@ export function decodeFragment(hash: string): SharePayload | null {
   if (!json) return null;
   try {
     const parsed = JSON.parse(json);
-    return isSharePayload(parsed) ? parsed : null;
+    if (!isShaderDocument(parsed)) return null;
+    return { ...parsed, project: persistProject(parsed.project) };
   } catch {
     return null;
   }
+}
+
+/** Remove hydrated runtime libraries from a project before persistence. */
+export function persistProject(project: WeslProject): PersistedProject {
+  const { libs: _libs, ...persisted } = project;
+  return persisted;
 }
 
 function isProject(p: unknown): p is WeslProject {

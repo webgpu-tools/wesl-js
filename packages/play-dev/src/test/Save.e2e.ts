@@ -1,13 +1,15 @@
 import { expect, type Page, type Request, test } from "@playwright/test";
 import { csrfKey } from "../auth/Authorize.ts";
-import { tokenKey } from "../auth/Token.ts";
+import { githubAuthKey } from "../auth/GitHubAuth.ts";
 import { pendingSaveKey } from "../lib/Save.ts";
 
-const fakeToken = {
+const fakeAuth = {
   accessToken: "fake-token",
   scope: "gist",
-  login: "octocat",
-  avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+  account: {
+    login: "octocat",
+    avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+  },
 };
 
 const createUrl = "https://api.github.com/gists";
@@ -16,7 +18,7 @@ const gistId = "abc123";
 async function seedToken(page: Page) {
   await page.addInitScript(
     ({ key, token }) => localStorage.setItem(key, JSON.stringify(token)),
-    { key: tokenKey, token: fakeToken },
+    { key: githubAuthKey, token: fakeAuth },
   );
 }
 
@@ -28,7 +30,7 @@ async function stubGists(
   const calls: Request[] = [];
   const body = JSON.stringify({
     id: gistId,
-    owner: { login: fakeToken.login },
+    owner: { login: fakeAuth.account.login },
   });
   await page.route(createUrl, route => {
     calls.push(route.request());
@@ -84,6 +86,28 @@ test("signed-in Save creates a gist, updates URL, shows chip", async ({
   const pkg = JSON.parse(sent.files["package.json"].content);
   expect(pkg.name).toMatch(/^[a-z0-9-]+$/);
   expect(pkg.private).toBe(true);
+});
+
+test("Save snapshots an edit before the autosave debounce", async ({
+  page,
+}) => {
+  await seedToken(page);
+  const { calls } = await stubGists(page);
+  await page.goto("/");
+  await waitForCompileSuccess(page);
+
+  const marker = "// LIVE-SAVE-MARKER";
+  await page.evaluate(source => {
+    const editor = document.querySelector("#editor") as HTMLElement & {
+      source: string;
+    };
+    editor.source = source;
+  }, `${marker}\n@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }`);
+  await page.locator(".save-btn").click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  const sent = calls[0].postDataJSON();
+  expect(sent.files["main.wesl"].content).toContain(marker);
 });
 
 test("second Save patches the same gist", async ({ page }) => {
@@ -169,7 +193,7 @@ test("pending save resumes after sign-in", async ({ page }) => {
       localStorage.setItem(tk, JSON.stringify(token));
       sessionStorage.setItem(pk, "1");
     },
-    { tk: tokenKey, token: fakeToken, pk: pendingSaveKey },
+    { tk: githubAuthKey, token: fakeAuth, pk: pendingSaveKey },
   );
 
   await page.goto("/");

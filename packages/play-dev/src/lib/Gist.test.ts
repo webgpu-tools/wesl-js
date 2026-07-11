@@ -1,17 +1,17 @@
 import { expect, test } from "vitest";
-import type { BufferPayload } from "./Autosave.ts";
 import {
   buildGistFiles,
   externalLibs,
   moduleToFilename,
   slug,
 } from "./Gist.ts";
+import type { ShaderDocument } from "./Share.ts";
 
 function payload(
   weslSrc: Record<string, string>,
   title = "marble-prism",
-): BufferPayload {
-  return { project: { weslSrc }, title, savedAt: 0 };
+): ShaderDocument {
+  return { project: { weslSrc }, title };
 }
 
 test("buildGistFiles maps module paths to .wesl filenames", () => {

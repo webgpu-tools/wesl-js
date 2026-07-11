@@ -4,10 +4,10 @@
  * so a Save clicked while signed out resumes automatically after sign-in.
  */
 
-import type { AuthToken } from "../auth/Token.ts";
-import type { BufferPayload } from "./Autosave.ts";
+import type { GitHubAuth } from "../auth/GitHubAuth.ts";
 import { buildGistFiles } from "./Gist.ts";
 import { createGist, updateGist } from "./GitHub.ts";
+import type { ShaderDocument } from "./Share.ts";
 import { captureThumbnail } from "./Thumbnail.ts";
 
 /** A completed save: gist identity plus the in-app share URL. */
@@ -18,20 +18,20 @@ export interface SaveOutcome {
 }
 
 interface SaveArgs {
-  token: AuthToken;
-  payload: BufferPayload;
+  auth: GitHubAuth;
+  payload: ShaderDocument;
   gistId: string | null;
 }
 
 /** Capture a thumbnail and create or update the gist for the current buffer. */
 export async function saveGist(args: SaveArgs): Promise<SaveOutcome> {
-  const { token, payload, gistId } = args;
+  const { auth, payload, gistId } = args;
   const thumbnail = await captureThumbnail();
   const files = buildGistFiles(payload, thumbnail ?? undefined);
   const body = { description: payload.title, files };
   const saved = gistId
-    ? await updateGist(token, gistId, body)
-    : await createGist(token, body);
+    ? await updateGist(auth, gistId, body)
+    : await createGist(auth, body);
   const url = `${location.origin}/gist/${saved.owner}/${saved.id}`;
   return { ...saved, url };
 }

@@ -1,13 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 import { csrfKey } from "../auth/Authorize.ts";
 import { workerUrl } from "../auth/Callback.ts";
-import { tokenKey } from "../auth/Token.ts";
+import { githubAuthKey } from "../auth/GitHubAuth.ts";
 
-const fakeToken = {
+const fakeAuth = {
   accessToken: "fake-token",
   scope: "gist",
-  login: "octocat",
-  avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+  account: {
+    login: "octocat",
+    avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+  },
 };
 
 const workerGlob = `${workerUrl}/**`;
@@ -19,7 +21,7 @@ async function stubWorkerAndProfile(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        access_token: fakeToken.accessToken,
+        access_token: fakeAuth.accessToken,
         scope: "gist",
         token_type: "bearer",
       }),
@@ -30,8 +32,8 @@ async function stubWorkerAndProfile(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        login: fakeToken.login,
-        avatar_url: fakeToken.avatarUrl,
+        login: fakeAuth.account.login,
+        avatar_url: fakeAuth.account.avatarUrl,
       }),
     }),
   );
@@ -56,7 +58,7 @@ test("signed-out shows Sign in button", async ({ page }) => {
 test("signed-in shows avatar and dropdown with Sign out", async ({ page }) => {
   await page.addInitScript(
     ({ key, token }) => localStorage.setItem(key, JSON.stringify(token)),
-    { key: tokenKey, token: fakeToken },
+    { key: githubAuthKey, token: fakeAuth },
   );
   await page.goto("/");
 
@@ -71,7 +73,10 @@ test("signed-in shows avatar and dropdown with Sign out", async ({ page }) => {
   await page.locator(".account-dropdown button").click();
   await expect(page.locator(".signin-btn")).toBeVisible();
 
-  const stored = await page.evaluate(k => localStorage.getItem(k), tokenKey);
+  const stored = await page.evaluate(
+    k => localStorage.getItem(k),
+    githubAuthKey,
+  );
   expect(stored).toBeNull();
 });
 
@@ -121,12 +126,14 @@ test("callback exchange persists token and reloads to editor", async ({
   await page.waitForURL("**/");
   await expect(page.locator(".avatar-btn")).toBeVisible();
 
-  const stored = await page.evaluate(k => localStorage.getItem(k), tokenKey);
+  const stored = await page.evaluate(
+    k => localStorage.getItem(k),
+    githubAuthKey,
+  );
   expect(stored && JSON.parse(stored)).toMatchObject({
-    accessToken: fakeToken.accessToken,
+    accessToken: fakeAuth.accessToken,
     scope: "gist",
-    login: fakeToken.login,
-    avatarUrl: fakeToken.avatarUrl,
+    account: fakeAuth.account,
   });
 });
 

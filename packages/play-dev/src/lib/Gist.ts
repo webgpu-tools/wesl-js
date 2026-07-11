@@ -8,7 +8,7 @@
  */
 
 import { findUnboundIdents, RecordResolver } from "wesl";
-import type { BufferPayload } from "./Autosave.ts";
+import type { ShaderDocument } from "./Share.ts";
 
 /** A gist file's content, matching the GitHub gists API shape. */
 export interface GistFile {
@@ -24,7 +24,7 @@ const localRoots = new Set(["package", "super", "env", "constants"]);
 
 /** Build the full gist file map for a buffer, including the thumbnail if given. */
 export function buildGistFiles(
-  payload: BufferPayload,
+  payload: ShaderDocument,
   thumbnailBase64?: string,
 ): GistFiles {
   const files: GistFiles = {};
@@ -69,7 +69,7 @@ export function moduleToFilename(key: string): string {
   return /\.(wesl|wgsl)$/.test(name) ? name : `${name}.wesl`;
 }
 
-function packageJson(payload: BufferPayload): string {
+function packageJson(payload: ShaderDocument): string {
   const libs = externalLibs(payload.project.weslSrc ?? {});
   const pkg: Record<string, unknown> = {
     name: slug(payload.title),

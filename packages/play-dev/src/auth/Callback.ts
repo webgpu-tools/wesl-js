@@ -1,10 +1,10 @@
 import { takeStoredCsrf } from "./Authorize.ts";
-import { type AuthToken, writeToken } from "./Token.ts";
+import { type GitHubAuth, writeGitHubAuth } from "./GitHubAuth.ts";
 
 export const workerUrl = "https://play-auth.mighdoll.workers.dev";
 
 export type CallbackResult =
-  | { ok: true; token: AuthToken }
+  | { ok: true; auth: GitHubAuth }
   | { ok: false; error: string };
 
 /**
@@ -32,14 +32,13 @@ export async function completeSignIn(): Promise<CallbackResult> {
   const profile = await fetchProfile(exchanged.accessToken);
   if (!profile.ok) return profile;
 
-  const token: AuthToken = {
+  const auth: GitHubAuth = {
     accessToken: exchanged.accessToken,
     scope: exchanged.scope,
-    login: profile.login,
-    avatarUrl: profile.avatarUrl,
+    account: { login: profile.login, avatarUrl: profile.avatarUrl },
   };
-  writeToken(token);
-  return { ok: true, token };
+  writeGitHubAuth(auth);
+  return { ok: true, auth };
 }
 
 type ExchangeOk = { ok: true; accessToken: string; scope: string };

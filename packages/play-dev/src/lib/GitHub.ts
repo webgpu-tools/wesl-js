@@ -4,7 +4,7 @@
  * have a single failure path.
  */
 
-import type { AuthToken } from "../auth/Token.ts";
+import type { GitHubAuth } from "../auth/GitHubAuth.ts";
 import type { GistFiles } from "./Gist.ts";
 
 /** Identity of a saved gist, enough to build its share URL. */
@@ -22,23 +22,23 @@ const apiBase = "https://api.github.com";
 
 /** Create a new public gist; returns its id and owner login. */
 export async function createGist(
-  token: AuthToken,
+  auth: GitHubAuth,
   body: CreateBody,
 ): Promise<SavedGist> {
-  return request(token, "POST", "/gists", { ...body, public: true });
+  return request(auth, "POST", "/gists", { ...body, public: true });
 }
 
 /** Replace the files/description of an existing gist. */
 export async function updateGist(
-  token: AuthToken,
+  auth: GitHubAuth,
   id: string,
   body: CreateBody,
 ): Promise<SavedGist> {
-  return request(token, "PATCH", `/gists/${id}`, body);
+  return request(auth, "PATCH", `/gists/${id}`, body);
 }
 
 async function request(
-  token: AuthToken,
+  auth: GitHubAuth,
   method: "POST" | "PATCH",
   path: string,
   body: unknown,
@@ -46,7 +46,7 @@ async function request(
   const res = await fetch(`${apiBase}${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${token.accessToken}`,
+      Authorization: `Bearer ${auth.accessToken}`,
       Accept: "application/vnd.github+json",
       "Content-Type": "application/json",
     },
@@ -60,5 +60,5 @@ async function request(
     owner?: { login?: string };
   };
   if (!data.id) throw new Error("gist response missing id");
-  return { id: data.id, owner: data.owner?.login ?? token.login };
+  return { id: data.id, owner: data.owner?.login ?? auth.account.login };
 }

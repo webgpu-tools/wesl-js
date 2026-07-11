@@ -1,4 +1,4 @@
-import { clearToken } from "./Token.ts";
+import { clearGitHubAuth } from "./GitHubAuth.ts";
 
 /**
  * Sign out locally. Server-side grant revocation is deferred until the
@@ -6,5 +6,5 @@ import { clearToken } from "./Token.ts";
  * client_secret as Basic auth, which the browser cannot hold.
  */
 export function signOut(): void {
-  clearToken();
+  clearGitHubAuth();
 }

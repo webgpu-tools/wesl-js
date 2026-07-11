@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { decodeFragment, encodeFragment, maxTitleLength } from "./Share.ts";
+import type { WeslBundle } from "wesl";
+import {
+  decodeFragment,
+  encodeFragment,
+  maxTitleLength,
+  persistProject,
+} from "./Share.ts";
 
 test("encode/decode round-trips a payload", () => {
   const payload = {
@@ -61,4 +67,17 @@ test("encodeFragment returns null for oversized payload", () => {
     title: "big",
   });
   expect(fragment).toBeNull();
+});
+
+test("persistProject removes hydrated library bundles", () => {
+  const lib: WeslBundle = { name: "lib", edition: "test", modules: {} };
+  lib.dependencies = [lib];
+  const project = persistProject({
+    weslSrc: { "package::main": "fn main() {}" },
+    libs: [lib],
+  });
+  expect(project).toEqual({
+    weslSrc: { "package::main": "fn main() {}" },
+  });
+  expect(() => JSON.stringify(project)).not.toThrow();
 });

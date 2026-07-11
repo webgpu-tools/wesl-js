@@ -1,29 +1,29 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { startSignIn } from "../auth/Authorize.ts";
+import type { GitHubAuth } from "../auth/GitHubAuth.ts";
 import { signOut } from "../auth/Revoke.ts";
-import type { AuthToken } from "../auth/Token.ts";
 
 interface Props {
-  token: AuthToken | null;
+  auth: GitHubAuth | null;
   onSignOut(): void;
 }
 
-export function AccountMenu({ token, onSignOut }: Props) {
-  if (!token) {
+export function AccountMenu({ auth, onSignOut }: Props) {
+  if (!auth) {
     return (
       <button type="button" class="signin-btn" onClick={startSignIn}>
         Sign in
       </button>
     );
   }
-  return <SignedIn token={token} onSignOut={onSignOut} />;
+  return <SignedIn auth={auth} onSignOut={onSignOut} />;
 }
 
 function SignedIn({
-  token,
+  auth,
   onSignOut,
 }: {
-  token: AuthToken;
+  auth: GitHubAuth;
   onSignOut(): void;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,16 +49,16 @@ function SignedIn({
       <button
         type="button"
         class="avatar-btn"
-        aria-label={`Signed in as ${token.login}`}
+        aria-label={`Signed in as ${auth.account.login}`}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(o => !o)}
       >
-        <img src={token.avatarUrl} alt="" />
+        <img src={auth.account.avatarUrl} alt="" />
       </button>
       {open && (
         <div class="account-dropdown" role="menu">
-          <div class="account-login">{token.login}</div>
+          <div class="account-login">{auth.account.login}</div>
           <button type="button" role="menuitem" onClick={handleSignOut}>
             Sign out
           </button>
