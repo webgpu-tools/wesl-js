@@ -15,7 +15,13 @@ export interface GistSaveState {
   gist: SaveOutcome | null;
 }
 
-/** Coordinate gist saves and expose their complete UI state. */
+/**
+ * Coordinate gist saves and expose their complete UI state.
+ *
+ * `snapshotDocument` returns the current editor document and, as a side effect,
+ * persists it to the session slot, so a live edit survives the sign-in reload
+ * when a signed-out Save redirects to OAuth.
+ */
 export function useGistSave(snapshotDocument: () => ShaderDocument) {
   const initial: GistSaveState = { status: "idle", gist: null };
   const [state, setState] = useState(initial);
@@ -35,7 +41,7 @@ export function useGistSave(snapshotDocument: () => ShaderDocument) {
     if (saveInFlight.current) return;
     const auth = readGitHubAuth();
     if (!auth) {
-      snapshotRef.current();
+      snapshotRef.current(); // flush the live edit before the sign-in reload
       markPendingSave();
       startSignIn();
       return;
