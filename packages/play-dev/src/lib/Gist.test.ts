@@ -79,6 +79,21 @@ test("dependencyNames is empty for unparsable source", () => {
   ).toEqual([]);
 });
 
+test("dependencyNames includes unused imports", () => {
+  const weslSrc = {
+    "package::main": "import random_wgsl::pcg;\nfn main() {}",
+  };
+  expect(dependencyNames({ weslSrc })).toEqual(["random_wgsl"]);
+});
+
+test("dependencyNames recognizes a custom local package name", () => {
+  const weslSrc = {
+    "my_pkg::main": "import my_pkg::util::f;\nfn main() { f(); }",
+    "my_pkg::util": "fn f() {}",
+  };
+  expect(dependencyNames({ weslSrc, packageName: "my_pkg" })).toEqual([]);
+});
+
 test("slug produces npm-safe names with a fallback", () => {
   expect(slug("Marble Prism!")).toBe("marble-prism");
   expect(slug("   ")).toBe("wgsl-shader");
