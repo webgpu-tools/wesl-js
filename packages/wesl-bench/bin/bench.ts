@@ -26,8 +26,10 @@ await runBenchCli({
   // that preset's batches/duration/warmup. Explicit CLI flags override these.
   // quick: cold-start-inclusive mean (each batch resets the heap). warm: skips
   // the per-batch warmup ramp for steady-state hot-loop throughput and a
-  // steadier noise floor. Both calibrate to 0.5%.
+  // steadier noise floor. Both calibrate to 0.5%. validate: one iteration per
+  // benchmark, timings meaningless -- just checks that every case+variant runs.
   presets: {
+    validate: { batches: 1, iterations: 1, "equiv-margin": 0 },
     quick: {
       batches: 100,
       duration: 0.1,

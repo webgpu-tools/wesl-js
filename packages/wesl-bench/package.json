@@ -8,7 +8,7 @@
     "bench:bun": "bun --expose-gc --allow-natives-syntax bin/bench.ts",
     "bench:details": "sudo bin/bench.ts --cpu",
     "bench:profile": "node --expose-gc --inspect-brk bin/bench.ts --profile --no-html",
-    "bench:validate": "node --expose-gc --allow-natives-syntax bin/bench.ts --profile --no-html",
+    "bench:validate": "node --expose-gc --allow-natives-syntax bin/bench.ts --preset validate --all --profile --no-html",
     "browser:build": "vite build browser",
     "browser:dev": "vite browser",
     "browser:preview": "vite preview browser",
