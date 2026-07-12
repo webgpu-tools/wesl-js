@@ -28,9 +28,25 @@ await runBenchCli({
   // the per-batch warmup ramp for steady-state hot-loop throughput and a
   // steadier noise floor. Both calibrate to 0.5%.
   presets: {
-    quick: { batches: 100, duration: 0.1, "equiv-margin": 0.5, "calibrate-runs": 10 },
-    warm: { batches: 100, duration: 0.1, warmup: 20, "equiv-margin": 0.5, "calibrate-runs": 10 },
-    thorough: { batches: 200, duration: 0.5, "equiv-margin": 0.3, "calibrate-runs": 20 },
+    quick: {
+      batches: 100,
+      duration: 0.1,
+      "equiv-margin": 0.5,
+      "calibrate-runs": 10,
+    },
+    warm: {
+      batches: 100,
+      duration: 0.1,
+      warmup: 20,
+      "equiv-margin": 0.5,
+      "calibrate-runs": 10,
+    },
+    thorough: {
+      batches: 200,
+      duration: 0.5,
+      "equiv-margin": 0.3,
+      "calibrate-runs": 20,
+    },
   },
   defaultPreset: "quick",
   configure: y =>
