@@ -20,6 +20,7 @@
     "lz-string": "^1.5.0",
     "preact": "^10.27.2",
     "wesl": "workspace:*",
+    "wesl-tooling": "workspace:*",
     "wgsl-edit": "workspace:*",
     "wgsl-play": "workspace:*"
   },

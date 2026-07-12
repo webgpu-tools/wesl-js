@@ -79,13 +79,6 @@ test("dependencyNames is empty for unparsable source", () => {
   ).toEqual([]);
 });
 
-test("dependencyNames includes unused imports", () => {
-  const weslSrc = {
-    "package::main": "import random_wgsl::pcg;\nfn main() {}",
-  };
-  expect(dependencyNames({ weslSrc })).toEqual(["random_wgsl"]);
-});
-
 test("dependencyNames recognizes a custom local package name", () => {
   const weslSrc = {
     "my_pkg::main": "import my_pkg::util::f;\nfn main() { f(); }",

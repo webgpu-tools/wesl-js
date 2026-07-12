@@ -1,19 +1,15 @@
 import { pathToFileURL } from "node:url";
 import { resolve } from "import-meta-resolve";
 import type { WeslBundle, WeslExtensions } from "wesl";
-import {
-  filterMap,
-  findUnboundIdents,
-  RecordResolver,
-  WeslParseError,
-} from "wesl";
+import { filterMap, WeslParseError } from "wesl";
 import { npmResolveWESL } from "./NpmResolver.ts";
+import { scanDependencies } from "./ScanDependencies.ts";
 
 /**
  * Find package dependencies in WESL source files.
  *
- * Parses sources and partially binds identifiers to reveal unresolved package
- * references. Returns the longest resolvable npm subpath for each dependency.
+ * Partially binds identifiers and returns the longest resolvable npm subpath
+ * for each referenced dependency.
  *
  * For example, 'foo::bar::baz' could resolve to:
  *   - 'foo/bar' (package foo, export './bar' bundle)
@@ -31,31 +27,29 @@ export function parseDependencies(
   virtualLibNames: string[] = [],
   weslExtensions?: WeslExtensions,
 ): string[] {
-  let resolver: RecordResolver;
   try {
-    resolver = new RecordResolver(weslSrc, { weslExtensions });
-  } catch (e: any) {
-    if (e.cause instanceof WeslParseError) {
+    const refs = scanDependencies(weslSrc, { weslExtensions });
+    return resolvePkgDeps(refs, projectDir, virtualLibNames);
+  } catch (e: unknown) {
+    const isParseError =
+      e instanceof WeslParseError ||
+      (e instanceof Error && e.cause instanceof WeslParseError);
+    if (isParseError && e instanceof Error) {
       console.error(e.message, "\n");
       return [];
     }
     throw e;
   }
-
-  const unbound = findUnboundIdents(resolver);
-  if (!unbound) return [];
-
-  return resolvePkgDeps(unbound, projectDir, virtualLibNames);
 }
 
 /** Resolve pre-computed unbound refs to npm dependency paths. */
 export function resolvePkgDeps(
-  unbound: string[][],
+  refs: string[][],
   projectDir: string,
   virtualLibNames: string[] = [],
 ): string[] {
   const excludeRoots = new Set(["constants", ...virtualLibNames]);
-  const pkgRefs = unbound.filter(
+  const pkgRefs = refs.filter(
     modulePath => modulePath.length > 1 && !excludeRoots.has(modulePath[0]),
   );
   if (pkgRefs.length === 0) return [];

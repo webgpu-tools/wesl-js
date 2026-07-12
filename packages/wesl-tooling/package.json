@@ -19,6 +19,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./dependencies": {
+        "types": "./dist/ScanDependencies.d.ts",
+        "import": "./dist/ScanDependencies.js"
       }
     },
     "main": "dist/index.js"
@@ -26,6 +30,9 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./dependencies": {
+      "import": "./src/ScanDependencies.ts"
     }
   },
   "dependencies": {

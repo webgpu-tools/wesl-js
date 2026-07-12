@@ -1,4 +1,4 @@
-import { findUnboundIdents, RecordResolver } from "wesl";
+import { scanDependencies } from "wesl-tooling/dependencies";
 import type { PersistedProject } from "./Share.ts";
 
 const virtualPackages = new Set(["env", "constants"]);
@@ -9,22 +9,13 @@ export function dependencyNames(project: PersistedProject): string[] {
   if (!weslSrc) return [];
   const packageName = project.packageName ?? "package";
   try {
-    const resolver = new RecordResolver(weslSrc, {
+    const paths = scanDependencies(weslSrc, {
       packageName,
       weslExtensions: project.weslExtensions,
     });
-    const referenced = findUnboundIdents(resolver)
-      .filter(path => path.length > 1)
-      .map(path => path[0]);
-    const imported = [...resolver.allModules()].flatMap(([, ast]) => {
-      return ast.imports.flatMap(imp => {
-        const root = imp.segments[0]?.name;
-        return root ? [root] : [];
-      });
-    });
-    const packages = [...referenced, ...imported].filter(
-      name => !isLocalPackage(name, packageName),
-    );
+    const packages = paths
+      .map(path => path[0])
+      .filter(name => !isLocalPackage(name, packageName));
     return [...new Set(packages)].sort();
   } catch {
     return [];

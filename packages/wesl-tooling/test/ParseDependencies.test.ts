@@ -37,3 +37,10 @@ test("parseDepenencies finds non-root dependency", () => {
   const deps = parseDependencies(srcs, thisDir);
   expect(deps).deep.equals(["dependent_package"]);
 });
+
+test("parseDependencies ignores an unused import", () => {
+  const srcs = {
+    main: "import dependent_package::dep;\nfn main() {}",
+  };
+  expect(parseDependencies(srcs, thisDir)).deep.equals([]);
+});

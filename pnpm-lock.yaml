@@ -418,6 +418,9 @@ importers:
       wesl:
         specifier: workspace:*
         version: link:../wesl
+      wesl-tooling:
+        specifier: workspace:*
+        version: link:../wesl-tooling
       wgsl-edit:
         specifier: workspace:*
         version: link:../wgsl-edit
