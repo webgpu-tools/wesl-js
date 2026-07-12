@@ -22,12 +22,25 @@ const fixturesDir = join(
 );
 
 await runBenchCli({
+  // Run-settings bundles; --equiv-margin per preset comes from --calibrate at
+  // that preset's batches/duration/warmup. Explicit CLI flags override these.
+  // quick: cold-start-inclusive mean (each batch resets the heap). warm: skips
+  // the per-batch warmup ramp for steady-state hot-loop throughput and a
+  // steadier noise floor. Both calibrate to 0.5%.
+  presets: {
+    quick: { batches: 100, duration: 0.1, "equiv-margin": 0.5, "calibrate-runs": 10 },
+    warm: { batches: 100, duration: 0.1, warmup: 20, "equiv-margin": 0.5, "calibrate-runs": 10 },
+    thorough: { batches: 200, duration: 0.5, "equiv-margin": 0.3, "calibrate-runs": 20 },
+  },
+  defaultPreset: "quick",
   configure: y =>
-    y.option("baseline", {
-      type: "boolean",
-      default: false,
-      describe: "Compare against baseline version in _baseline/ directory",
-    }),
+    y
+      .option("baseline", {
+        type: "boolean",
+        default: false,
+        describe: "Compare against baseline version in _baseline/ directory",
+      })
+      .default("gc-stats", true),
   build: async args => {
     await ensureBevyFixture(fixturesDir);
     const hasBaseline = args.baseline && hasBaselineModule();
