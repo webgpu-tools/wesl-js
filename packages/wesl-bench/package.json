@@ -12,9 +12,6 @@
     "browser:build": "vite build browser",
     "browser:dev": "vite browser",
     "browser:preview": "vite preview browser",
-    "test": "vitest --hideSkippedTests",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:once": "vitest run",
     "typecheck": "tsgo"
   },
   "dependencies": {
