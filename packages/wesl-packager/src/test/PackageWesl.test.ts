@@ -85,6 +85,27 @@ test("package multi ", async () => {
   }
 });
 
+test("error if the package name isn't usable in shader code", async () => {
+  const workDir = await fs.mkdtemp(path.join(tmpdir(), "wesl-packager-name-"));
+  try {
+    await mkdir(path.join(workDir, "shaders"));
+    const pkgJson = `{ "name": "3d-utils", "private": true }\n`;
+    await fs.writeFile(path.join(workDir, "package.json"), pkgJson);
+    await fs.writeFile(path.join(workDir, "shaders", "lib.wesl"), "fn f() {}");
+
+    const run = packageCli(
+      `--projectDir ${workDir}
+       --baseDir ${workDir}/shaders
+       --src ${workDir}/shaders/*.wesl
+       --updatePackageJson false
+       --outDir ${workDir}/dist`,
+    );
+    await expect(run).rejects.toThrow(/unusable in shader code/);
+  } finally {
+    await rimraf(workDir);
+  }
+});
+
 function packageCli(argsLine: string): Promise<void> {
   return packagerCli(argsLine.split(/\s+/));
 }

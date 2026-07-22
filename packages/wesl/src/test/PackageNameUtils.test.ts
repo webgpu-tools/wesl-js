@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { sanitizePackageName } from "../discovery/PackageNameUtils.ts";
+import {
+  sanitizePackageName,
+  validWgslIdent,
+} from "../discovery/PackageNameUtils.ts";
 
 test("my_package", () => {
   expect(sanitizePackageName("my_package")).toBe("my_package");
@@ -29,4 +32,19 @@ test("@my-org/my-cool-package", () => {
   expect(sanitizePackageName("@my-org/my-cool-package")).toBe(
     "my_org__my_cool_package",
   );
+});
+
+test("sanitized names that are valid wgsl idents", () => {
+  const names = ["my_package", "scope__my_package", "wgsl_utils", "a"];
+  for (const name of names) {
+    expect(validWgslIdent(name), name).toBe(true);
+  }
+});
+
+test("sanitized names that aren't valid wgsl idents", () => {
+  // e.g. npm names 3d-utils, my.utils, ~utils, package
+  const names = ["3d_utils", "my.utils", "~utils", "package", "fn", ""];
+  for (const name of names) {
+    expect(validWgslIdent(name), name).toBe(false);
+  }
 });

@@ -24,3 +24,6 @@ export const reservedWords =
   union unless unorm unsafe unsized use using varying virtual volatile wgsl where with writeonly yield`.split(
     /\s+/,
   );
+
+/** words that can't be used as identifiers */
+export const keywordOrReserved = new Set(keywords.concat(reservedWords));

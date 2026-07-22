@@ -1,7 +1,12 @@
 import fs, { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { Biome, Distribution } from "@biomejs/js-api";
-import { noSuffix, sanitizePackageName, type WeslBundle } from "wesl";
+import {
+  noSuffix,
+  sanitizePackageName,
+  validWgslIdent,
+  type WeslBundle,
+} from "wesl";
 import { weslBundleDeclUrl } from "wesl/bundle-decl";
 import { loadModules, parseDependencies, zip } from "wesl-tooling";
 import type { CliArgs } from "./PackagerCli.ts";
@@ -16,21 +21,37 @@ export async function packageWgsl(args: CliArgs): Promise<void> {
   const modules = await loadModules(projectDir, baseDir, src);
   const pkgJsonPath = path.join(projectDir, "package.json");
   const { name } = await loadPackageFields(pkgJsonPath);
+  const shaderName = shaderPackageName(name);
   const edition = "unstable_2025_1";
 
   if (args.multiBundle) {
-    await writeMultiBundle(modules, name, edition, projectDir, outDir);
+    await writeMultiBundle(modules, shaderName, edition, projectDir, outDir);
   } else {
     const allDeps = parseDependencies(modules, projectDir);
-    const sanitized = sanitizePackageName(name);
-    const deps = filterSelfDeps(allDeps, sanitized);
-    const bundle: WeslBundle = { name: sanitized, edition, modules };
+    const deps = filterSelfDeps(allDeps, shaderName);
+    const bundle: WeslBundle = { name: shaderName, edition, modules };
     await writeJsBundle(bundle, deps, outDir);
   }
   await writeTypeScriptDts(outDir);
   if (args.updatePackageJson) {
     await updatePackageJson(projectDir, outDir, multiBundle);
   }
+}
+
+/** Convert the npm package name to the name shader code will use to import it.
+ * Reports the shader name, and errors if it isn't a usable WGSL identifier. */
+function shaderPackageName(npmName: string): string {
+  const shaderName = sanitizePackageName(npmName);
+  if (!validWgslIdent(shaderName)) {
+    console.error(
+      `package name "${npmName}" becomes "${shaderName}" in shader code,\n` +
+        `  which is not a valid WGSL identifier, so shaders can't import it.\n` +
+        `  Rename the package to start with a letter and use only letters, digits, '-' and '_'.`,
+    );
+    throw new Error("package name unusable in shader code");
+  }
+  console.log(`shader code will import this package as: ${shaderName}`);
+  return shaderName;
 }
 
 /** add an 'exports' entry to package.json for the wesl bundles */
@@ -88,16 +109,15 @@ function insertExports(pkgJson: any, exports: Record<string, any>): any {
 /** create one bundle per source module */
 async function writeMultiBundle(
   modules: Record<string, string>,
-  name: string,
+  shaderName: string,
   edition: string,
   projectDir: string,
   outDir: string,
 ): Promise<void> {
-  const sanitized = sanitizePackageName(name);
   for (const [moduleName, moduleSrc] of Object.entries(modules)) {
     const oneModule = { [moduleName]: moduleSrc };
     const moduleBundle: WeslBundle = {
-      name: sanitized,
+      name: shaderName,
       edition,
       modules: oneModule,
     };

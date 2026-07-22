@@ -1,6 +1,6 @@
 import { ParseError } from "../ParseError.ts";
 import type { Stream, TypedToken } from "../Stream.ts";
-import { keywords, reservedWords } from "./Keywords.ts";
+import { keywordOrReserved } from "./Keywords.ts";
 import { type InternalTokenKind, WeslLexer } from "./stream/WeslLexer.ts";
 export type WeslTokenKind = "word" | "keyword" | "number" | "symbol";
 
@@ -21,8 +21,6 @@ export interface CommentTrivia {
 /** One line break, treating \r\n as a single break.
  *  Same code points as `isLineBreak` in AttachComments.ts (charCode form). */
 const lineBreak = String.raw`\r\n?|[\n\v\f\u{0085}\u{2028}\u{2029}]`;
-
-const keywordOrReserved = new Set(keywords.concat(reservedWords));
 
 /** A peeked token cached at the position it was read from. */
 interface PeekedToken {

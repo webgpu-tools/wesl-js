@@ -27,12 +27,24 @@
  * ```
  */
 
+import { keywordOrReserved } from "../parse/Keywords.ts";
+import { identPattern } from "../parse/stream/WeslLexer.ts";
+
 /** Convert npm package name to WGSL-safe identifier using double-underscore encoding. */
 export function sanitizePackageName(npmName: string): string {
   return npmName
     .replace(/^@/, "") // Remove @ prefix
     .replaceAll("/", "__") // Replace / with __ (double underscore)
     .replaceAll("-", "_"); // Replace - with _ (single underscore)
+}
+
+const wholeIdent = new RegExp(`^(?:${identPattern.source})$`, "u");
+
+/** @return true if the name is usable as a WGSL identifier.
+ * Sanitized package names that aren't valid identifiers are unreachable
+ * from shader code (e.g. `3d-utils` sanitizes to `3d_utils`). */
+export function validWgslIdent(name: string): boolean {
+  return wholeIdent.test(name) && !keywordOrReserved.has(name);
 }
 
 /** Generate npm package name variations from sanitized WESL identifier.

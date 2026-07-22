@@ -12,7 +12,8 @@ export type InternalTokenKind =
 
 type RawToken = TypedToken<InternalTokenKind>;
 
-const ident =
+/** https://www.w3.org/TR/WGSL/#identifiers ident_pattern_token (unanchored) */
+export const identPattern =
   /(?:(?:[_\p{XID_Start}][\p{XID_Continue}]+)|(?:[\p{XID_Start}]))/u;
 
 // https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
@@ -46,7 +47,7 @@ const commentStart = /\/\/|\/\*/;
 /** Unicode-aware fallback for characters the ASCII fast path can't handle.
  *  lastIndex is set on every use, so sharing one instance is safe. */
 const unicodeMatcher = new RegexMatchers<InternalTokenKind>({
-  word: ident,
+  word: identPattern,
   number: digits,
   blankspaces,
   commentStart,
