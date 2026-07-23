@@ -4,7 +4,7 @@ import toml from "toml";
 
 /** Configuration from wesl.toml */
 export interface WeslToml {
-  /** WESL edition (e.g. "unstable_2025") */
+  /** WESL edition (e.g. "2026_pre") */
   edition: string;
 
   /** glob patterns to find .wesl/.wgsl files. Relative to the toml directory. */
@@ -39,7 +39,7 @@ export interface WeslTomlInfo {
 
 /** Default configuration when no wesl.toml is found */
 export const defaultWeslToml: WeslToml = {
-  edition: "unstable_2025",
+  edition: "2026_pre",
   include: ["shaders/**/*.w[eg]sl"],
   root: "shaders",
 };

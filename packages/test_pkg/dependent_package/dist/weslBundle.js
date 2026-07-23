@@ -1,7 +1,7 @@
 
 export const weslBundle = {
   "name": "dependent_package",
-  "edition": "unstable_2025_1",
+  "edition": "2026_pre",
   "modules": {
     "lib.wesl": "fn dep() { } "
   }

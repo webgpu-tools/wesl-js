@@ -26,7 +26,7 @@ test("load single bundle from tgz", async () => {
   expect(bundles.length).toBe(1);
   const bundle = bundles[0];
   expect(bundle.name).toBe("dependent_package");
-  expect(bundle.edition).toBe("unstable_2025_1");
+  expect(bundle.edition).toBe("2026_pre");
   expect(Object.keys(bundle.modules)).toEqual(["lib.wesl"]);
   expect(bundle.modules["lib.wesl"]).toContain("fn dep()");
 });
@@ -66,7 +66,7 @@ test("circular dependencies", async () => {
       import bundleB from "circular_test/b";
       export const weslBundle = {
         name: "circular_test",
-        edition: "unstable_2025_1",
+        edition: "2026_pre",
         modules: { "a.wesl": "fn a() {}" },
         dependencies: [bundleB]
       };
@@ -80,7 +80,7 @@ test("circular dependencies", async () => {
       import bundleA from "circular_test";
       export const weslBundle = {
         name: "circular_test",
-        edition: "unstable_2025_1",
+        edition: "2026_pre",
         modules: { "b.wesl": "fn b() {}" },
         dependencies: [bundleA]
       };

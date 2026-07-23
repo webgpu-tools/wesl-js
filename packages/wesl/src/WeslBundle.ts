@@ -3,7 +3,7 @@ export interface WeslBundle {
    * (@ removed, / ==> __, - ==> _) */
   name: string;
 
-  /** WESL edition of the code e.g. unstable_2025_1 */
+  /** WESL edition of the code e.g. 2026_pre */
   edition: string;
 
   /** map of WESL/WGSL modules:

@@ -22,7 +22,7 @@ export async function packageWgsl(args: CliArgs): Promise<void> {
   const pkgJsonPath = path.join(projectDir, "package.json");
   const { name } = await loadPackageFields(pkgJsonPath);
   const shaderName = shaderPackageName(name);
-  const edition = "unstable_2025_1";
+  const edition = "2026_pre";
 
   if (args.multiBundle) {
     await writeMultiBundle(modules, shaderName, edition, projectDir, outDir);

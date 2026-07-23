@@ -211,7 +211,7 @@ test("link with library bundle (tests CompositeResolver)", async () => {
   const libs = [
     {
       name: "mylib",
-      edition: "unstable_2025_1" as const,
+      edition: "2026_pre" as const,
       modules: {
         "util.wesl": `fn helper() { }`,
       },

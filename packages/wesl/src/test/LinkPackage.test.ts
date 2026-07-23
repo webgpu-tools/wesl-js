@@ -8,7 +8,7 @@ import { expectNoLogAsync } from "./LogCatcher.ts";
 // Static fixture bundle - no external package dependency needed
 const hashPkg: WeslBundle = {
   name: "hash_pkg",
-  edition: "unstable_2025_1",
+  edition: "2026_pre",
   modules: {
     "hash.wesl":
       "fn hashFn(v: u32) -> u32 { return v ^ (v >> 16u); }\nfn unusedFn() { }",

@@ -1,4 +1,4 @@
-edition = "unstable_2025"
+edition = "2026_pre"
 include = [ "./shaders/**/*.wesl" ]
 root = "./shaders"
 dependencies = "auto"

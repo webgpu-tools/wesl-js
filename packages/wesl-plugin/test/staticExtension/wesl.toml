@@ -3,4 +3,4 @@
 # We want a file so that we can explicitly set a path in vitest.config.ts
 # so that tests work even when run from the root /tools directory
 
-edition = "unstable_2025"
+edition = "2026_pre"

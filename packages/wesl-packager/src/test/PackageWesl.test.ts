@@ -27,7 +27,7 @@ test("package two wgsl files into one bundle", async () => {
   expect(normalized).toMatchInlineSnapshot(`
     "export const weslBundle = {
       name: "test_wesl_package",
-      edition: "unstable_2025_1",
+      edition: "2026_pre",
       modules: {
         "util.wgsl": "fn foo() {}",
         "lib.wesl": "import package::util;\\n",

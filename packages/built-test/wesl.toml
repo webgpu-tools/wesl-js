@@ -1,4 +1,4 @@
 # placeholder so we can point at this directory in vitest.config.ts
 # when running tests in the monorepo
 
-edition = "unstable_2025"
+edition = "2026_pre"

@@ -1,6 +1,6 @@
 export const weslBundle = {
   name: "test_shader_pkg",
-  edition: "unstable_2025",
+  edition: "2026_pre",
   modules: {
     utils: `fn helper() -> u32 {
   return 43u;

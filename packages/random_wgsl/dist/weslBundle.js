@@ -1,6 +1,6 @@
 export const weslBundle = {
   name: "random_wgsl",
-  edition: "unstable_2025_1",
+  edition: "2026_pre",
   modules: {
     "randomTest.wgsl":
       "import env::u;\n\n@fragment\nfn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {\n  let timeOffset = u32(u.time * 60.0);\n  let seed = vec2u(pos.xy) + timeOffset;\n  let rand = random_wgsl::lib::pcg_2u_3f(seed);\n  return vec4(rand, 1.0);\n}",
