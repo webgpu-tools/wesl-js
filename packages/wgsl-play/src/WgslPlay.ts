@@ -289,7 +289,10 @@ export class WgslPlay extends HTMLElement {
     }
     if (libs) this._libs = libs;
 
-    if (weslSrc) {
+    // An empty source map means no content yet, not a shader with no files: a
+    // connected editor's project getter reports weslSrc {} until its files
+    // land, and building it would just warn that the root module is missing.
+    if (weslSrc && Object.keys(weslSrc).length > 0) {
       const pkg = this._linkOptions.packageName || "package";
       const root = rootModuleName ?? "main";
       this._weslSrc = toModulePaths(weslSrc, pkg);
