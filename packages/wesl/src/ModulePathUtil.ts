@@ -1,5 +1,13 @@
 /** WESL module path utilities for converting between :: and / separators. */
 
+/** Matches the file extensions that carry WESL/WGSL source. */
+export const weslFileRegex = /\.(wesl|wgsl)$/;
+
+/** True for file paths that carry WESL/WGSL source (`.wesl` / `.wgsl`). */
+export function isWeslFile(path: string): boolean {
+  return weslFileRegex.test(path);
+}
+
 /**
  * Convert module path segments to relative file path.
  * Resolves package:: and super:: via srcModuleParts context.

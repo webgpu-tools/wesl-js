@@ -8,6 +8,7 @@ import { LinkedWesl } from "./LinkedWesl.ts";
 import { debug } from "./Logging.ts";
 import { lowerAndEmit } from "./LowerAndEmit.ts";
 import type { ManglerFn } from "./Mangler.ts";
+import { isWeslFile, weslFileRegex } from "./ModulePathUtil.ts";
 import {
   BundleResolver,
   CompositeResolver,
@@ -19,6 +20,9 @@ import type { Conditions, DeclIdent, SrcModule } from "./Scope.ts";
 import { type SrcMap, SrcMapBuilder } from "./SrcMap.ts";
 import { filterMap, mapValues } from "./Util.ts";
 import type { WeslBundle } from "./WeslBundle.ts";
+
+/** Root module used for linking when none is specified. */
+export const defaultRootModule = "main";
 
 export type LinkerTransform = (boundAST: TransformedAST) => TransformedAST;
 
@@ -220,7 +224,7 @@ export function bindAndTransform(
   params: LinkRegistryParams,
 ): BoundAndTransformed {
   const { resolver, mangler, constants, config } = params;
-  const { rootModuleName = "main", conditions = {} } = params;
+  const { rootModuleName = defaultRootModule, conditions = {} } = params;
 
   const modulePath = normalizeModuleName(rootModuleName);
   const rootAst = getRootModule(resolver, modulePath, rootModuleName);
@@ -243,8 +247,8 @@ export function bindAndTransform(
  * Accepts: module path (package::foo), file path (./foo.wesl), or name (foo) */
 export function normalizeModuleName(name: string): string {
   if (name.includes("::")) return name;
-  if (name.includes("/") || name.endsWith(".wesl") || name.endsWith(".wgsl")) {
-    const stripped = name.replace(/\.(wesl|wgsl)$/, "").replace(/^\.\//, "");
+  if (name.includes("/") || isWeslFile(name)) {
+    const stripped = name.replace(weslFileRegex, "").replace(/^\.\//, "");
     return "package::" + stripped.replaceAll("/", "::");
   }
   return "package::" + name;
