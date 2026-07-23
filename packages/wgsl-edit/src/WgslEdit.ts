@@ -76,6 +76,8 @@ export interface WgslEditAttrs {
   theme?: "light" | "dark" | "auto";
   /** ID of an element (e.g. `<wgsl-play>`) to source compile diagnostics from. */
   "lint-from"?: string;
+  /** Reject file names containing '/' (for hosts with no directories). */
+  "flat-files"?: boolean | string;
 }
 
 type GpuMessage = {
@@ -146,6 +148,7 @@ export class WgslEdit extends HTMLElement {
     "fetch-libs",
     "gpu-lint",
     "autosave",
+    "flat-files",
   ];
 
   private editorView: EditorView | null = null;
@@ -166,6 +169,7 @@ export class WgslEdit extends HTMLElement {
   private _activeFile = "";
   private _rootModuleName: string | undefined;
   private _tabs = true;
+  private _flatFiles = false;
   private _lint: LintMode = "on";
   private _gpuLint = true;
   private _fetchLibs = true;
@@ -274,6 +278,9 @@ export class WgslEdit extends HTMLElement {
       case "autosave":
         if (value !== null && value !== "false") this.enableDevSave();
         else this.disableDevSave();
+        break;
+      case "flat-files":
+        this._flatFiles = value !== null && value !== "false";
         break;
     }
   }
@@ -539,9 +546,20 @@ export class WgslEdit extends HTMLElement {
     else this.removeAttribute("shader-root");
   }
 
-  /** Add a new file and switch to it. No-op if `name` already exists. */
+  /** When true, reject file names containing '/': for hosts whose storage has
+   *  no directories (e.g. GitHub gists). Nested names are allowed by default. */
+  get flatFiles(): boolean {
+    return this._flatFiles;
+  }
+
+  set flatFiles(value: boolean) {
+    this._flatFiles = value;
+  }
+
+  /** Add a new file and switch to it. No-op if `name` already exists or is
+   *  rejected by `flat-files`. */
   addFile(name: string, content = ""): void {
-    if (this._files.has(name)) return;
+    if (this._files.has(name) || !this.allowsFileName(name)) return;
     this._files.set(name, { doc: toDoc(content) });
     this.switchToFile(name);
     this.renderTabs();
@@ -560,15 +578,22 @@ export class WgslEdit extends HTMLElement {
     this.dispatchFileChange("remove", name);
   }
 
-  /** Rename a file, preserving its document and editor state. No-op on collision. */
+  /** Rename a file, preserving its document and editor state. No-op on
+   *  collision or a name rejected by `flat-files`. */
   renameFile(oldName: string, newName: string): void {
     const state = this._files.get(oldName);
     if (!state || this._files.has(newName)) return;
+    if (!this.allowsFileName(newName)) return;
     this._files.delete(oldName);
     this._files.set(newName, state);
     if (this._activeFile === oldName) this._activeFile = newName;
     this.renderTabs();
     this.dispatchFileChange("rename", newName);
+  }
+
+  /** False for names `flat-files` mode rejects (a '/' implies directories). */
+  private allowsFileName(name: string): boolean {
+    return !this._flatFiles || !name.includes("/");
   }
 
   /** Switch to a file, saving current state and restoring target state. */
@@ -1012,7 +1037,11 @@ export class WgslEdit extends HTMLElement {
     };
     const finishRename = () => {
       const newName = input.value.trim() || oldName;
-      if (newName !== oldName && !this._files.has(newName)) {
+      const accepted =
+        newName !== oldName &&
+        !this._files.has(newName) &&
+        this.allowsFileName(newName);
+      if (accepted) {
         this.renameFile(oldName, newName);
       } else {
         cancelRename();
