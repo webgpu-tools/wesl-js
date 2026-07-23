@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "preact/hooks";
-
-const maxLen = 64;
+import { maxTitleLength } from "../lib/Share.ts";
 
 interface Props {
   value: string;
@@ -19,7 +18,9 @@ export function Title({ value, onCommit }: Props) {
   }, [value]);
 
   function commit() {
-    const text = (ref.current?.textContent ?? "").trim().slice(0, maxLen);
+    const text = (ref.current?.textContent ?? "")
+      .trim()
+      .slice(0, maxTitleLength);
     if (!text) {
       ref.current!.textContent = committed.current;
       return;

@@ -1,52 +1,19 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { csrfKey } from "../auth/Authorize.ts";
-import { workerUrl } from "../auth/Callback.ts";
 import { githubAuthKey } from "../auth/GitHubAuth.ts";
+import {
+  authorizeRequest,
+  blockGitHubNav,
+  captureSessionWrites,
+  editAndAutosave,
+  fakeAuth,
+  readEditorSources,
+  seedToken,
+  stubOAuth,
+  waitForCompileSuccess,
+} from "./E2eUtil.ts";
 
-const fakeAuth = {
-  accessToken: "fake-token",
-  scope: "gist",
-  account: {
-    login: "octocat",
-    avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
-  },
-};
-
-const workerGlob = `${workerUrl}/**`;
-const profileUrl = "https://api.github.com/user";
-
-async function stubWorkerAndProfile(page: Page) {
-  await page.route(workerGlob, route =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        access_token: fakeAuth.accessToken,
-        scope: "gist",
-        token_type: "bearer",
-      }),
-    }),
-  );
-  await page.route(profileUrl, route =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        login: fakeAuth.account.login,
-        avatar_url: fakeAuth.account.avatarUrl,
-      }),
-    }),
-  );
-}
-
-async function waitForCompileSuccess(page: Page, selector: string) {
-  await page.waitForFunction(sel => {
-    const el = document.querySelector(sel) as
-      | (HTMLElement & { frameCount?: number })
-      | null;
-    return (el?.frameCount ?? 0) > 0;
-  }, selector);
-}
+const octocat = fakeAuth();
 
 test("signed-out shows Sign in button", async ({ page }) => {
   await page.goto("/");
@@ -56,10 +23,7 @@ test("signed-out shows Sign in button", async ({ page }) => {
 });
 
 test("signed-in shows avatar and dropdown with Sign out", async ({ page }) => {
-  await page.addInitScript(
-    ({ key, token }) => localStorage.setItem(key, JSON.stringify(token)),
-    { key: githubAuthKey, token: fakeAuth },
-  );
+  await seedToken(page);
   await page.goto("/");
 
   const avatar = page.locator(".avatar-btn");
@@ -81,29 +45,11 @@ test("signed-in shows avatar and dropdown with Sign out", async ({ page }) => {
 });
 
 test("Sign in button starts OAuth redirect", async ({ page }) => {
-  // Capture the CSRF value via console at the moment it's written, since
-  // the navigation to github.com would otherwise race the read.
-  const sessionWrites: Record<string, string> = {};
-  page.on("console", msg => {
-    const t = msg.text();
-    const prefix = "@@SESS@@";
-    if (!t.startsWith(prefix)) return;
-    const eq = t.indexOf("=", prefix.length);
-    if (eq > 0) sessionWrites[t.slice(prefix.length, eq)] = t.slice(eq + 1);
-  });
-  await page.addInitScript(() => {
-    const origSet = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (k, v) {
-      if (this === sessionStorage) console.log(`@@SESS@@${k}=${v}`);
-      return origSet.call(this, k, v);
-    };
-  });
+  const sessionWrites = await captureSessionWrites(page);
 
   await page.goto("/");
-  await page.route("https://github.com/**", route => route.abort());
-  const navPromise = page.waitForRequest(req =>
-    req.url().startsWith("https://github.com/login/oauth/authorize"),
-  );
+  await blockGitHubNav(page);
+  const navPromise = authorizeRequest(page);
   await page.locator(".signin-btn").click();
   const req = await navPromise;
   const url = new URL(req.url());
@@ -116,7 +62,7 @@ test("Sign in button starts OAuth redirect", async ({ page }) => {
 test("callback exchange persists token and reloads to editor", async ({
   page,
 }) => {
-  await stubWorkerAndProfile(page);
+  await stubOAuth(page);
   await page.addInitScript(
     ({ key, csrf }) => sessionStorage.setItem(key, csrf),
     { key: csrfKey, csrf: "the-state" },
@@ -131,9 +77,9 @@ test("callback exchange persists token and reloads to editor", async ({
     githubAuthKey,
   );
   expect(stored && JSON.parse(stored)).toMatchObject({
-    accessToken: fakeAuth.accessToken,
+    accessToken: octocat.accessToken,
     scope: "gist",
-    account: fakeAuth.account,
+    account: octocat.account,
   });
 });
 
@@ -147,31 +93,20 @@ test("callback rejects mismatched state", async ({ page }) => {
 });
 
 test("editor buffer survives sign-in redirect simulation", async ({ page }) => {
-  await stubWorkerAndProfile(page);
+  await stubOAuth(page);
 
   await page.goto("/");
-  await waitForCompileSuccess(page, "#player");
-  await page.evaluate(() => {
-    const el = document.querySelector("#editor") as HTMLElement & {
-      source: string;
-    };
-    return new Promise<void>(resolve => {
-      el.addEventListener("autosave", () => resolve(), { once: true });
-      el.source =
-        "// AUTH-MARKER\n@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }\n";
-    });
-  });
+  await waitForCompileSuccess(page);
+  await editAndAutosave(
+    page,
+    "// AUTH-MARKER\n@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }\n",
+  );
 
   await page.evaluate(k => sessionStorage.setItem(k, "s"), csrfKey);
   await page.goto("/auth/callback?code=c&state=s");
   await page.waitForURL("**/");
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
-  const sources = await page.evaluate(() => {
-    const el = document.querySelector("#editor") as HTMLElement & {
-      sources?: Record<string, string>;
-    };
-    return el?.sources ?? {};
-  });
+  const sources = await readEditorSources(page);
   expect(Object.values(sources).join("\n")).toContain("// AUTH-MARKER");
 });

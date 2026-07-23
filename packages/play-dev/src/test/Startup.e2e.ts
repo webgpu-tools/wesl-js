@@ -1,33 +1,27 @@
 import { readFileSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { lastKey, slotPrefix } from "../lib/Autosave.ts";
 import { encodeFragment } from "../lib/Share.ts";
+import {
+  editAndAutosave,
+  readEditorSources,
+  waitForCompileSuccess,
+} from "./E2eUtil.ts";
 
 const { editorVersion } = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { editorVersion: string };
 
-async function waitForCompileSuccess(page: Page, selector: string) {
-  await page.waitForFunction(sel => {
-    const el = document.querySelector(sel) as
-      | (HTMLElement & { frameCount?: number })
-      | null;
-    return (el?.frameCount ?? 0) > 0;
-  }, selector);
-}
-
-async function readEditorSources(page: Page): Promise<Record<string, string>> {
-  return page.evaluate(() => {
-    const el = document.querySelector("#editor") as
-      | (HTMLElement & { sources?: Record<string, string> })
-      | null;
-    return el?.sources ?? {};
-  });
-}
-
 test("starter loads and compiles", async ({ page }) => {
+  // The player connects to the editor before the editor holds any files; a
+  // premature build used to warn "root module ... not found in sources: []".
+  const warnings: string[] = [];
+  page.on("console", msg => {
+    if (msg.type() === "warning") warnings.push(msg.text());
+  });
+
   await page.goto("/");
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
   const sources = await readEditorSources(page);
   expect(sources["package::main"]).toContain("import package::util::gradient");
@@ -39,6 +33,8 @@ test("starter loads and compiles", async ({ page }) => {
 
   const titleText = (await page.textContent(".title"))?.trim();
   expect(titleText?.length ?? 0).toBeGreaterThan(0);
+
+  expect(warnings.filter(w => w.includes("not found in sources"))).toEqual([]);
 });
 
 test("fragment URL loads, compiles, and rotates the slot", async ({ page }) => {
@@ -78,7 +74,7 @@ import env::u;
   );
 
   await page.goto(`/${fragment}`);
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
   const sources = await readEditorSources(page);
   expect(sources["package::main"]).toContain("// STARTUP-FIXTURE");
@@ -132,7 +128,7 @@ test("startup sweeps stale slots and caps slot count", async ({ page }) => {
   }, slotPrefix);
 
   await page.goto("/");
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
   const seeded = await page.evaluate(prefix => {
     const keys: string[] = [];
@@ -152,23 +148,15 @@ test("startup sweeps stale slots and caps slot count", async ({ page }) => {
 
 test("localStorage round-trips an edit", async ({ page }) => {
   await page.goto("/");
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
-  // Mutate the editor's source via its setter, then wait for the autosave
-  // event before reloading.
-  await page.evaluate(() => {
-    const el = document.querySelector("#editor") as HTMLElement & {
-      source: string;
-    };
-    return new Promise<void>(resolve => {
-      el.addEventListener("autosave", () => resolve(), { once: true });
-      el.source =
-        "// EDIT-MARKER\n@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }\n";
-    });
-  });
+  await editAndAutosave(
+    page,
+    "// EDIT-MARKER\n@fragment fn fs_main() -> @location(0) vec4f { return vec4f(1.0); }\n",
+  );
 
   await page.reload();
-  await waitForCompileSuccess(page, "#player");
+  await waitForCompileSuccess(page);
 
   const sources = await readEditorSources(page);
   const concat = Object.values(sources).join("\n");

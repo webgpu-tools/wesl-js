@@ -12,11 +12,17 @@ export interface GitHubAccount {
 
 export const githubAuthKey = "wgsl-play.token";
 
-/** Read the persisted GitHub authorization, migrating the legacy flat shape. */
+/**
+ * Read the persisted GitHub authorization, migrating the legacy flat shape.
+ *
+ * Reads storage inside the try: a browser with site data blocked throws on
+ * `localStorage` access itself, and this runs during the first render, where a
+ * throw renders nothing at all. Signed-out is the right answer there.
+ */
 export function readGitHubAuth(): GitHubAuth | null {
-  const raw = localStorage.getItem(githubAuthKey);
-  if (!raw) return null;
   try {
+    const raw = localStorage.getItem(githubAuthKey);
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (isGitHubAuth(parsed)) return parsed;
     const migrated = migrateLegacyAuth(parsed);
@@ -45,14 +51,6 @@ function isGitHubAuth(v: unknown): v is GitHubAuth {
   );
 }
 
-function isGitHubAccount(v: unknown): v is GitHubAccount {
-  if (!v || typeof v !== "object") return false;
-  const account = v as Partial<GitHubAccount>;
-  return (
-    typeof account.login === "string" && typeof account.avatarUrl === "string"
-  );
-}
-
 /** Convert auth persisted before the account fields were grouped. */
 function migrateLegacyAuth(v: unknown): GitHubAuth | null {
   if (!v || typeof v !== "object") return null;
@@ -67,4 +65,12 @@ function migrateLegacyAuth(v: unknown): GitHubAuth | null {
   }
   const account = { login: legacy.login, avatarUrl: legacy.avatarUrl };
   return { accessToken: legacy.accessToken, scope: legacy.scope, account };
+}
+
+function isGitHubAccount(v: unknown): v is GitHubAccount {
+  if (!v || typeof v !== "object") return false;
+  const account = v as Partial<GitHubAccount>;
+  return (
+    typeof account.login === "string" && typeof account.avatarUrl === "string"
+  );
 }

@@ -36,7 +36,13 @@ export function EditPlay({ initial, theme, onChange, onAutosave }: Props) {
 
   return (
     <div class="editplay-pane">
-      <wgsl-edit ref={editorRef} id="editor" theme={theme} lint-from="player" />
+      <wgsl-edit
+        ref={editorRef}
+        id="editor"
+        theme={theme}
+        lint-from="player"
+        flat-files // gist filenames can't hold directories
+      />
       <wgsl-play id="player" from="editor" theme={theme} resizable />
     </div>
   );

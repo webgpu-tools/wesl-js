@@ -198,6 +198,30 @@ body {
   color: var(--fg);
 }
 
+/* A gist URL that would not load; the editor falls back to the local buffer. */
+.load-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 24px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(200, 90, 60, 0.14);
+  color: var(--fg);
+}
+
+.load-error button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
 appearance-picker {
   --appearance-picker-color: var(--muted);
   --appearance-picker-active-color: var(--accent);
