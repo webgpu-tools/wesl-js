@@ -5,7 +5,7 @@ import type {
 } from "./AbstractElems.ts";
 import { assertThatDebug } from "./Assertions.ts";
 import { failIdent } from "./ClickableError.ts";
-import { validScopeItems } from "./Conditions.ts";
+import { filterValidElements, validScopeItems } from "./Conditions.ts";
 import { identToString } from "./debug/ScopeToString.ts";
 import type { FlatImport } from "./FlattenTreeImport.ts";
 import { findQualifiedImport } from "./ImportResolution.ts";
@@ -116,7 +116,8 @@ export interface BindResults {
   /** Global declarations referenced (to emit in link). */
   decls: DeclIdent[];
 
-  /** Additional global statements to emit (e.g., const_assert). */
+  /** Module level statements contributed by imported modules: const_asserts,
+   * and the enable/requires directives the linker hoists. */
   newStatements: EmittableElem[];
 
   /** Unbound identifiers with position info (only if accumulateUnbound is true). */
@@ -179,6 +180,9 @@ export interface BindContext {
 
   /** Additional global statements to emit (indexed by elem for uniqueness). */
   globalStatements: Map<AbstractElem, EmittableElem>;
+
+  /** Modules that already contributed their global statements. */
+  statementModules: Set<WeslAST>;
 
   /** Construct unique identifier names for global declarations. */
   mangler: ManglerFn;
@@ -288,6 +292,7 @@ export function bindIdents(params: BindIdentsParams): BindResults {
     foundScopes: new Set(),
     globalNames,
     globalStatements: new Map(),
+    statementModules: new Set(),
     unbound: accumulateUnbound ? [] : undefined,
     lenient,
     discoveryMode,
@@ -454,15 +459,18 @@ function handleNewDecl(
   ctx: BindContext,
 ): DeclIdent | undefined {
   const { decl, moduleAst } = foundDecl;
-  const { knownDecls, globalStatements } = ctx;
+  const { knownDecls, globalStatements, statementModules } = ctx;
   if (knownDecls.has(decl)) return;
 
   knownDecls.add(decl);
   setMangledName(refIdent.originalName, decl, ctx);
   if (!decl.isGlobal) return;
 
-  for (const elem of moduleAst.moduleAsserts ?? []) {
-    globalStatements.set(elem, { srcModule: decl.srcModule, elem });
+  if (!statementModules.has(moduleAst)) {
+    statementModules.add(moduleAst);
+    for (const elem of importedStatements(moduleAst, ctx.conditions)) {
+      globalStatements.set(elem, { srcModule: decl.srcModule, elem });
+    }
   }
   return decl;
 }
@@ -486,4 +494,32 @@ function setMangledName(
   const mangledName = mangler(decl, decl.srcModule, name, globalNames);
   bindings.mangled.set(decl, mangledName);
   globalNames.add(mangledName);
+}
+
+/**
+ * Module level statements an imported module contributes to the link: its
+ * const_asserts, and its enable/requires directives (without them the decl we
+ * just pulled in won't compile, e.g. an f16 fn from an f16 library).
+ *
+ * Conditions are applied here, where the module's whole declaration sequence is
+ * in hand, rather than per statement at emit: an @if/@elif/@else chain only
+ * reads correctly in sequence, and the head of a chain may be an element that
+ * never hoists (a diagnostic directive) or that emits separately (a
+ * const_assert). Emit takes these statements as already valid.
+ *
+ * Relies on the parser recording every moduleAssert/moduleDirective element in
+ * moduleElem.decls as well (ASTs are immutable after parse, so the shared
+ * element identity holds).
+ */
+function importedStatements(
+  moduleAst: WeslAST,
+  conditions: Conditions,
+): AbstractElem[] {
+  const { moduleAsserts, moduleDirectives, moduleElem } = moduleAst;
+  if (!moduleAsserts?.length && !moduleDirectives?.length) return [];
+
+  const contributed = new Set<AbstractElem>(moduleAsserts);
+  for (const elem of moduleDirectives ?? []) contributed.add(elem);
+  const valid = filterValidElements(moduleElem.decls, conditions);
+  return valid.filter(e => contributed.has(e));
 }

@@ -1,5 +1,6 @@
 import type {
   ConstAssertElem,
+  DirectiveElem,
   ImportStatement,
   ModuleElem,
 } from "./AbstractElems.ts";
@@ -34,6 +35,8 @@ export interface WeslAST {
   imports: ImportStatement[];
   /** Module level const_assert statements. */
   moduleAsserts?: ConstAssertElem[];
+  /** enable/requires directives, hoisted into the link if this module is used. */
+  moduleDirectives?: DirectiveElem[];
   /** Parse options used to produce this AST (so re-parsing preserves them). */
   parseOptions?: ParseOptions;
   /** Syntax errors recovered during parsing (empty for a valid module). */

@@ -242,3 +242,162 @@ test("inline ref in array size from another module", async () => {
   `;
   expectTrimmedMatch(result, expected);
 });
+
+test("enable directive hoists from an imported module", async () => {
+  const main = `import package::file1::half;
+    fn main() { let x = half(); }`;
+  const lib = `enable f16;
+    fn half() -> f16 { return 1.0h; }`;
+  const expected = `
+    enable f16;
+    fn main() {
+      let x = half();
+    }
+    fn half() -> f16 {
+      return 1.0h;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("enable directives from two modules dedupe", async () => {
+  const main = `import package::file1::half;
+    import package::file2::quarter;
+    fn main() { let x = half() + quarter(); }`;
+  const lib1 = `enable f16;
+    fn half() -> f16 { return 1.0h; }`;
+  const lib2 = `enable f16;
+    fn quarter() -> f16 { return 0.5h; }`;
+  const expected = `
+    enable f16;
+    fn main() {
+      let x = half() + quarter();
+    }
+    fn half() -> f16 {
+      return 1.0h;
+    }
+    fn quarter() -> f16 {
+      return 0.5h;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib1, lib2), expected);
+});
+
+test("hoisted enable skips extensions the root module declares", async () => {
+  const main = `import package::file1::half;
+    enable f16;
+    fn main() { let x = half(); }`;
+  const lib = `enable f16;
+    fn half() -> f16 { return 1.0h; }`;
+  const expected = `
+    enable f16;
+    fn main() {
+      let x = half();
+    }
+    fn half() -> f16 {
+      return 1.0h;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("@if(false) enable does not hoist", async () => {
+  const main = `import package::file1::half;
+    fn main() { let x = half(); }`;
+  const lib = `@if(false) enable f16;
+    fn half() -> f32 { return 1.0; }`;
+  const expected = `
+    fn main() {
+      let x = half();
+    }
+    fn half() -> f32 {
+      return 1.0;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("requires directive hoists from an imported module", async () => {
+  const main = `import package::file1::foo;
+    fn main() { foo(); }`;
+  const lib = `requires readonly_and_readwrite_storage_textures;
+    fn foo() { }`;
+  const expected = `
+    requires readonly_and_readwrite_storage_textures;
+    fn main() {
+      foo();
+    }
+    fn foo() { }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("enable in a tree shaken module does not hoist", async () => {
+  const main = `fn main() { }`;
+  const lib = `enable f16;
+    fn half() -> f16 { return 1.0h; }`;
+  expectTrimmedMatch(await linkTest(main, lib), `fn main() { }`);
+});
+
+test("one module's @if(false) doesn't satisfy another module's @else", async () => {
+  // @if/@else chains are per module, so lib1's trailing @if(false) can't
+  // enable lib2's @else. Within lib2 the @else follows an @if(true)
+  // diagnostic -- a directive that never hoists, but still heads the chain --
+  // so the @else isn't taken and `enable f16` stays out
+  const main = `import package::file1::half;
+    import package::file2::quarter;
+    fn main() { let x = half() + quarter(); }`;
+  const lib1 = `@if(false) enable subgroups;
+    fn half() -> f32 { return 0.5; }`;
+  const lib2 = `@if(true) diagnostic(off, derivative_uniformity);
+    @else enable f16;
+    fn quarter() -> f32 { return 0.25; }`;
+  const expected = `
+    fn main() {
+      let x = half() + quarter();
+    }
+    fn half() -> f32 {
+      return 0.5;
+    }
+    fn quarter() -> f32 {
+      return 0.25;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib1, lib2), expected);
+});
+
+test("@else enable hoists when a diagnostic heads the chain", async () => {
+  const main = `import package::file1::half;
+    fn main() { let x = half(); }`;
+  const lib = `@if(false) diagnostic(off, derivative_uniformity);
+    @else enable f16;
+    fn half() -> f16 { return 1.0h; }`;
+  const expected = `
+    enable f16;
+    fn main() {
+      let x = half();
+    }
+    fn half() -> f16 {
+      return 1.0h;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("@else const_assert in an imported module is included", async () => {
+  const main = `import package::file1::half;
+    fn main() { let x = half(); }`;
+  const lib = `@if(false) const_assert 1 == 2;
+    @else const_assert 1 == 1;
+    fn half() -> f32 { return 1.0; }`;
+  const expected = `
+    const_assert 1 == 1;
+    fn main() {
+      let x = half();
+    }
+    fn half() -> f32 {
+      return 1.0;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});

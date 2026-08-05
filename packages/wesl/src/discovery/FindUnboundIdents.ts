@@ -41,6 +41,7 @@ export function findUnboundRefs(resolver: BatchModuleResolver): UnboundRef[] {
     foundScopes: new Set(),
     globalNames: new Set(),
     globalStatements: new Map(),
+    statementModules: new Set(),
     mangler: minimalMangle,
     unbound,
     lenient: true,

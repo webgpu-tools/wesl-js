@@ -5,6 +5,7 @@ import {
   type LinkBindings,
 } from "./BindIdents.ts";
 import { createConstantsResolver } from "./ConstantsResolver.ts";
+import { hoistedDirectives } from "./HoistDirectives.ts";
 import { LinkedWesl } from "./LinkedWesl.ts";
 import { debug } from "./Logging.ts";
 import { lowerAndEmit } from "./LowerAndEmit.ts";
@@ -19,15 +20,12 @@ import {
 import type { WeslAST, WeslExtensions } from "./ParseWESL.ts";
 import type { Conditions, DeclIdent, SrcModule } from "./Scope.ts";
 import { type SrcMap, SrcMapBuilder } from "./SrcMap.ts";
-import { filterMap } from "./Util.ts";
+import { filterMap, partition } from "./Util.ts";
 import {
   createVirtualLibraryResolver,
   type VirtualLibraryFn,
 } from "./VirtualLibraryResolver.ts";
 import type { WeslBundle } from "./WeslBundle.ts";
-
-/** Root module used for linking when none is specified. */
-export const defaultRootModule = "main";
 
 export type LinkerTransform = (boundAST: TransformedAST) => TransformedAST;
 
@@ -128,6 +126,9 @@ export interface BoundAndTransformed {
   newDecls: DeclIdent[];
   newStatements: EmittableElem[];
 }
+
+/** Root module used for linking when none is specified. */
+export const defaultRootModule = "main";
 
 /**
  * Link a set of WESL source modules (typically the text from .wesl files) into a single WGSL string.
@@ -247,7 +248,8 @@ export function normalizeModuleName(name: string): string {
   return "package::" + name;
 }
 
-/** Assemble WGSL output from prologue statements, root module, and imported declarations. */
+/** Assemble WGSL output in emit order: hoisted directives, statements from
+ * imported modules, the root module, then imported declarations. */
 function emitWgsl(
   rootModuleElem: ModuleElem,
   srcModule: SrcModule,
@@ -256,9 +258,21 @@ function emitWgsl(
   bindings: LinkBindings,
   conditions: Conditions = {},
 ): SrcMapBuilder[] {
-  const prologueBuilders = newStatements.map(s =>
-    emitElem(s.srcModule, s.elem, conditions, bindings, { addNl: true }),
+  const [directives, statements] = partition(
+    newStatements,
+    s => s.elem.kind === "directive",
   );
+  const hoisted = hoistedDirectives(rootModuleElem, directives, conditions);
+
+  // binding filtered these against the conditions already (as a sequence, so
+  // @if/@elif/@else chains read correctly), so don't filter them again here
+  const emitStatement = (s: EmittableElem) =>
+    emitElem(s.srcModule, s.elem, conditions, bindings, {
+      addNl: true,
+      skipConditionalFiltering: true,
+    });
+  const directiveBuilders = hoisted.map(emitStatement);
+  const statementBuilders = statements.map(emitStatement);
 
   const rootBuilder = builderFromModule(srcModule);
   lowerAndEmit({
@@ -275,7 +289,12 @@ function emitWgsl(
     }),
   );
 
-  return [...prologueBuilders, rootBuilder, ...declBuilders];
+  return [
+    ...directiveBuilders,
+    ...statementBuilders,
+    rootBuilder,
+    ...declBuilders,
+  ];
 }
 
 /** Resolve root module AST or throw if not found. */
@@ -311,7 +330,7 @@ function applyTransformPlugins(
   return transforms.reduce((ast, transform) => transform(ast), startAst);
 }
 
-/** Emit a single element (prologue statement or imported declaration) into a SrcMapBuilder. */
+/** Emit a single imported element (statement or declaration) into a SrcMapBuilder. */
 function emitElem(
   srcModule: SrcModule,
   elem: AbstractElem,

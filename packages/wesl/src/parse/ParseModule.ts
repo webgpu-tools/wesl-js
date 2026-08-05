@@ -183,7 +183,16 @@ function parseImports(ctx: ParsingContext): void {
 /** Grammar: global_directive : diagnostic_directive | enable_directive | requires_directive */
 function parseDirectives(ctx: ParsingContext): void {
   const directives = parseMany(ctx, parseDirective);
-  for (const elem of directives) ctx.addModuleDecl(elem);
+  const { stable } = ctx.state;
+  for (const elem of directives) {
+    ctx.addModuleDecl(elem);
+    // enable/requires apply to the whole linked shader, so the linker hoists
+    // them out of imported modules; diagnostic directives stay put.
+    if (elem.directive.kind !== "diagnostic") {
+      stable.moduleDirectives ??= [];
+      stable.moduleDirectives.push(elem);
+    }
+  }
 }
 
 /** Record a syntax error and resync: drop scopes built by the failed
