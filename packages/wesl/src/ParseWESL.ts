@@ -3,19 +3,16 @@ import type {
   ImportStatement,
   ModuleElem,
 } from "./AbstractElems.ts";
-import { filterValidElements } from "./Conditions.ts";
 import {
   type Diagnostic,
   diagnosticToString,
   errorDiagnostic,
   firstError,
 } from "./Diagnostics.ts";
-import { type FlatImport, flattenTreeImport } from "./FlattenTreeImport.ts";
-import { declsOfKind } from "./LinkerUtil.ts";
 import { ParseError } from "./ParseError.ts";
 import { parseWesl } from "./parse/ParseWesl.ts";
 import type { ParseOptions, WeslExtensions } from "./parse/ParsingContext.ts";
-import type { Conditions, Scope, SrcModule } from "./Scope.ts";
+import type { Scope, SrcModule } from "./Scope.ts";
 import type { Span } from "./Span.ts";
 
 /**
@@ -41,12 +38,6 @@ export interface WeslAST {
   parseOptions?: ParseOptions;
   /** Syntax errors recovered during parsing (empty for a valid module). */
   diagnostics: Diagnostic[];
-}
-
-/** Extended AST with cached flattened imports. */
-export interface BindingAST extends WeslAST {
-  /** Flattened import statements (cached on demand). */
-  _flatImports?: FlatImport[];
 }
 
 /** Stable and unstable state used during parsing. */
@@ -107,24 +98,4 @@ export function throwOnParseError(ast: WeslAST): void {
   const cause = new ParseError(error.message, [error.start, error.end]);
   const { srcModule, diagnostics } = ast;
   throw new WeslParseError({ cause, src: srcModule, diagnostics });
-}
-
-/** @return flattened form of import tree for binding idents. */
-export function flatImports(
-  ast: BindingAST,
-  conditions?: Conditions,
-): FlatImport[] {
-  // TODO cache per condition set?
-  if (ast._flatImports && !conditions) return ast._flatImports;
-
-  const importElems = declsOfKind(ast.moduleElem, "import");
-  const validImportElems = conditions
-    ? filterValidElements(importElems, conditions)
-    : importElems;
-
-  const flat = validImportElems.flatMap(elem =>
-    flattenTreeImport(elem.imports),
-  );
-  if (!conditions) ast._flatImports = flat;
-  return flat;
 }

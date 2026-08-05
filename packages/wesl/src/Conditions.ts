@@ -8,7 +8,13 @@ import type {
   IfAttribute,
 } from "./AbstractElems.ts";
 import { assertThatDebug, assertUnreachable } from "./Assertions.ts";
-import type { Conditions, Scope } from "./Scope.ts";
+import type { Conditions, Scope, ScopeItem } from "./Scope.ts";
+
+/** @public */
+export interface ConditionalResult {
+  valid: boolean;
+  nextElseState: boolean;
+}
 
 /** @return true if the scope is valid under current conditions */
 export function scopeValid(scope: Scope, conditions: Conditions): boolean {
@@ -31,53 +37,16 @@ export function scopeValid(scope: Scope, conditions: Conditions): boolean {
   return false;
 }
 
-/** @return true if the @if attribute is valid with current Conditions */
-function evaluateIfAttribute(
-  ifAttribute: IfAttribute,
+/** Iterate scope contents, yielding only conditionally valid items. */
+export function* validScopeItems(
+  scope: Scope,
   conditions: Conditions,
-): boolean {
-  return evaluateIfExpression(ifAttribute.param.expression, conditions);
-}
-
-/** @return true if the @elif attribute is valid with current Conditions */
-function evaluateElifAttribute(
-  elifAttribute: ElifAttribute,
-  conditions: Conditions,
-): boolean {
-  return evaluateIfExpression(elifAttribute.param.expression, conditions);
-}
-
-/** Evaluate an @if expression based on current runtime Conditions
- * @return true if the expression is true */
-function evaluateIfExpression(
-  expression: ExpressionElem,
-  conditions: Conditions,
-): boolean {
-  const { kind } = expression;
-  if (kind === "unary-expression") {
-    assertThatDebug(expression.operator.value === "!");
-    return !evaluateIfExpression(expression.expression, conditions);
-  } else if (kind === "binary-expression") {
-    const op = expression.operator.value;
-    assertThatDebug(op === "||" || op === "&&");
-    const leftResult = evaluateIfExpression(expression.left, conditions);
-    if (op === "||") {
-      return leftResult || evaluateIfExpression(expression.right, conditions);
-    } else if (op === "&&") {
-      return leftResult && evaluateIfExpression(expression.right, conditions);
-    } else {
-      assertUnreachable(op);
-    }
-  } else if (kind === "literal") {
-    const { value } = expression;
-    assertThatDebug(value === "true" || value === "false");
-    return value === "true";
-  } else if (kind === "parenthesized-expression") {
-    return evaluateIfExpression(expression.expression, conditions);
-  } else if (kind === "ref") {
-    return conditions[expression.ident.originalName] ?? false;
-  } else {
-    throw new Error(`unexpected @if expression ${JSON.stringify(expression)}`);
+): Generator<ScopeItem> {
+  let elseValid = false;
+  for (const item of scope.contents) {
+    const cond = validateConditional(getCondAttr(item), elseValid, conditions);
+    elseValid = cond.nextElseState;
+    if (cond.valid) yield item;
   }
 }
 
@@ -105,12 +74,6 @@ export function filterValidElements<T extends AbstractElem>(
     elseValid = nextElseState;
     return valid ? [e] : [];
   });
-}
-
-/** @public */
-export interface ConditionalResult {
-  valid: boolean;
-  nextElseState: boolean;
 }
 
 /**
@@ -172,4 +135,66 @@ export function findConditional(
     }
   }
   return undefined;
+}
+
+/** @return true if the @if attribute is valid with current Conditions */
+function evaluateIfAttribute(
+  ifAttribute: IfAttribute,
+  conditions: Conditions,
+): boolean {
+  return evaluateIfExpression(ifAttribute.param.expression, conditions);
+}
+
+/** @return true if the @elif attribute is valid with current Conditions */
+function evaluateElifAttribute(
+  elifAttribute: ElifAttribute,
+  conditions: Conditions,
+): boolean {
+  return evaluateIfExpression(elifAttribute.param.expression, conditions);
+}
+
+/** Get conditional attribute from any scope item. */
+function getCondAttr(item: ScopeItem): Scope["condAttribute"] {
+  // Decls inside PartialScopes don't need their own conditional checked -
+  // the PartialScope.condAttribute handles filtering at the scope level.
+  if (item.kind === "decl" && item.containingScope.kind === "partial")
+    return undefined;
+  if (item.kind === "decl") return findConditional(item.declElem?.attributes);
+  if (item.kind === "partial" || item.kind === "scope")
+    return item.condAttribute;
+  return undefined;
+}
+
+/** Evaluate an @if expression based on current runtime Conditions
+ * @return true if the expression is true */
+function evaluateIfExpression(
+  expression: ExpressionElem,
+  conditions: Conditions,
+): boolean {
+  const { kind } = expression;
+  if (kind === "unary-expression") {
+    assertThatDebug(expression.operator.value === "!");
+    return !evaluateIfExpression(expression.expression, conditions);
+  } else if (kind === "binary-expression") {
+    const op = expression.operator.value;
+    assertThatDebug(op === "||" || op === "&&");
+    const leftResult = evaluateIfExpression(expression.left, conditions);
+    if (op === "||") {
+      return leftResult || evaluateIfExpression(expression.right, conditions);
+    } else if (op === "&&") {
+      return leftResult && evaluateIfExpression(expression.right, conditions);
+    } else {
+      assertUnreachable(op);
+    }
+  } else if (kind === "literal") {
+    const { value } = expression;
+    assertThatDebug(value === "true" || value === "false");
+    return value === "true";
+  } else if (kind === "parenthesized-expression") {
+    return evaluateIfExpression(expression.expression, conditions);
+  } else if (kind === "ref") {
+    return conditions[expression.ident.originalName] ?? false;
+  } else {
+    throw new Error(`unexpected @if expression ${JSON.stringify(expression)}`);
+  }
 }

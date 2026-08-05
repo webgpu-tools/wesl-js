@@ -1,5 +1,6 @@
 import {
   type AttributeElem,
+  addAttributes,
   declsOfKind,
   type GlobalVarElem,
   type StandardAttribute,
@@ -81,7 +82,7 @@ export function annotatedResourcesPlugin(
         const anchor = annotationAnchor(elem);
         const groupAttr = makeStandardAttr("group", 0, anchor);
         const bindingAttr = makeStandardAttr("binding", binding, anchor);
-        elem.attributes = [...(elem.attributes ?? []), groupAttr, bindingAttr];
+        addAttributes(ast.bindings, elem, [groupAttr, bindingAttr]);
       }
       return ast;
     },

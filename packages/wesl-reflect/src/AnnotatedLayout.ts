@@ -1,9 +1,10 @@
-import type { Conditions, StructElem, StructMemberElem } from "wesl";
-import { filterValidElements } from "wesl";
+import type { StructElem, StructMemberElem } from "wesl";
 import {
   type FieldLayout,
+  type LayoutOptions,
   type StructLayout,
   structLayout,
+  validMembers,
 } from "./StructLayout.ts";
 import {
   type AutoAnnotation,
@@ -57,12 +58,11 @@ type Classified =
 /** Compute layout + annotations for a @uniforms-annotated struct. */
 export function annotatedLayout(
   struct: StructElem,
-  conditions?: Conditions,
+  opts: LayoutOptions = {},
 ): AnnotatedLayout {
-  const layout = structLayout(struct, conditions);
-  const members = conditions
-    ? filterValidElements(struct.members, conditions)
-    : struct.members;
+  const layout = structLayout(struct, opts);
+  // same filtering as structLayout, so members index-align with layout.fields
+  const members = validMembers(struct, opts.conditions);
   const controls: UniformControl[] = [];
   const fields: UniformField[] = [];
 

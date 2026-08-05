@@ -67,3 +67,31 @@ test("reference to non-imported symbol from sibling module should fail", async (
   };
   await expectLinkFails(weslSrc, "main", /unresolved identifier.*EPSILON/i);
 });
+
+test("a missing export blames the export, not the module", async () => {
+  const weslSrc = {
+    "./main.wesl": `
+      import package::common::missing;
+      fn main() { missing(); }
+    `,
+    "./common.wesl": `
+      fn u() { }
+    `,
+  };
+  const pattern = /no exported 'missing' in module 'package::common'/;
+  await expectLinkFails(weslSrc, "main", pattern);
+});
+
+test("an export excluded by conditions reads as a missing export", async () => {
+  const weslSrc = {
+    "./main.wesl": `
+      import package::common::u;
+      fn main() { u(); }
+    `,
+    "./common.wesl": `
+      @if(DEBUG) fn u() { }
+    `,
+  };
+  const pattern = /no exported 'u' in module 'package::common'/;
+  await expectLinkFails(weslSrc, "main", pattern);
+});

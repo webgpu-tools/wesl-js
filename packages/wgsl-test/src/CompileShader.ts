@@ -6,7 +6,7 @@ import type {
   WeslBundle,
   WeslJsPlugin,
 } from "wesl";
-import { CompositeResolver, freshResolver, link, RecordResolver } from "wesl";
+import { CompositeResolver, link, RecordResolver } from "wesl";
 import {
   dependencyBundles,
   FileModuleResolver,
@@ -23,7 +23,7 @@ export interface ShaderContext {
   packageName?: string;
 
   /** File resolver for lazy loading (when useSourceShaders is true).
-   * Shared across compileShader calls; wrapped with freshResolver per call. */
+   * Shared across compileShader calls. */
   fileResolver?: ModuleResolver;
 }
 
@@ -179,7 +179,7 @@ export async function createProjectResolver(
   return new FileModuleResolver(baseDir, packageName);
 }
 
-/** Build a fresh resolver from a ShaderContext and main source.
+/** Build a resolver from a ShaderContext and main source.
  * Returns undefined if context has no fileResolver (bundle-only mode). */
 export function buildResolver(
   ctx: ShaderContext,
@@ -190,7 +190,7 @@ export function buildResolver(
     { main: src },
     { packageName: ctx.packageName, weslExtensions: { doBlocks: true } },
   );
-  return freshResolver(new CompositeResolver([mainResolver, ctx.fileResolver]));
+  return new CompositeResolver([mainResolver, ctx.fileResolver]);
 }
 
 /** Verify shader compilation succeeded, throw on errors. */

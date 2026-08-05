@@ -168,25 +168,30 @@ export class BundleResolver implements ModuleResolver {
   }
 }
 
-/** Wrap a resolver so each resolveModule call returns a freshly parsed AST.
- * Use this when reusing a resolver across multiple link() calls, since binding
- * mutates ASTs in place. Each wrapper instance caches within itself, so within
- * a single link pass the same module path returns the same AST object.
- * Re-parsing is faster than structuredClone due to cycle-tracking overhead
- * from Scope.parent backpointers. */
+/** Compose resolvers into one that tries each in order until one succeeds.
+ * Undefined entries are skipped, easing conditional composition. */
+export function composeResolvers(
+  ...resolvers: (ModuleResolver | undefined)[]
+): ModuleResolver {
+  const defined = resolvers.filter(r => r !== undefined);
+  if (defined.length === 0) throw new Error("no resolvers provided");
+  return defined.length === 1 ? defined[0] : new CompositeResolver(defined);
+}
+
+/** Create resolvers for library bundles and their transitive dependencies. */
+export function createLibraryResolvers(
+  libs: WeslBundle[],
+  debugWeslRoot?: string,
+): BundleResolver[] {
+  const flattened = flattenLibraryTree(libs);
+  return flattened.map(lib => new BundleResolver(lib, debugWeslRoot));
+}
+
+/** @deprecated No longer needed: binding no longer mutates ASTs (results go
+ * in a per-link LinkBindings table), so resolvers can be shared across link()
+ * calls directly. Now an identity wrapper; will be removed in a future release. */
 export function freshResolver(inner: ModuleResolver): ModuleResolver {
-  const cache = new Map<string, WeslAST>();
-  return {
-    resolveModule(modulePath: string): WeslAST | undefined {
-      const cached = cache.get(modulePath);
-      if (cached) return cached;
-      const ast = inner.resolveModule(modulePath);
-      if (!ast) return undefined;
-      const fresh = parseSrcModule(ast.srcModule, ast.parseOptions);
-      cache.set(modulePath, fresh);
-      return fresh;
-    },
-  };
+  return inner;
 }
 
 /** Convert file path to module path (e.g., "foo/bar.wesl" to "package::foo::bar"). */
@@ -226,4 +231,24 @@ function findInVariants(
   }
 
   return undefined;
+}
+
+/** Flatten library dependency tree, deduplicating by object identity rather than package name.
+ *
+ * Some packages (like Lygia) provide multiple bundles in the same npm package
+ * to enable tree shaking. All bundles share the same package name, so we deduplicate
+ * by object identity to keep them distinct. Also handles circular dependencies correctly. */
+function flattenLibraryTree(libs: WeslBundle[]): WeslBundle[] {
+  const result: WeslBundle[] = [];
+  const seen = new Set<WeslBundle>();
+
+  function visit(bundle: WeslBundle) {
+    if (seen.has(bundle)) return;
+    seen.add(bundle);
+    result.push(bundle);
+    bundle.dependencies?.forEach(visit);
+  }
+
+  libs.forEach(visit);
+  return result;
 }

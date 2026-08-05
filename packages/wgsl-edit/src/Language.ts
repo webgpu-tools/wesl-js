@@ -3,15 +3,16 @@ import { type Diagnostic, linter } from "@codemirror/lint";
 import { parser, weslHighlighting } from "lezer-wesl";
 import {
   type BindResults,
-  BundleResolver,
   bindIdents,
   CompositeResolver,
   type Conditions,
+  createLibraryResolvers,
   type ModuleResolver,
   RecordResolver,
   type UnboundRef,
   type WeslAST,
   type WeslBundle,
+  type Diagnostic as WeslDiagnostic,
   WeslParseError,
 } from "wesl";
 
@@ -113,16 +114,23 @@ function lintPass(
     const resolver = buildResolver(sources, libs, config.packageName?.());
     const rootAst = resolver.resolveModule(rootModule);
     if (rootAst) {
+      // parsing recovers at decl boundaries, so every syntax error is reported
+      const parseDiags = rootAst.diagnostics.map(weslToDiagnostic);
+      diagnostics.push(...parseDiags);
       const result = bindIdents({
         resolver,
         rootAst,
         conditions: config.conditions?.(),
         accumulateUnbound: true,
+        // syntax errors are already reported above; bind the valid decls anyway
+        lenient: true,
       });
       const unbound = unboundDiagnostics(result, rootModule, ignored);
       diagnostics.push(...unbound);
-      weslErrorCount = unbound.length;
-      // LATER integrate external fetching into the bind (when we go async), then this becomes unnecessary
+      const parseErrors = parseDiags.filter(d => d.severity === "error");
+      weslErrorCount = parseErrors.length + unbound.length;
+      // Binding is sync by design: collect all missing packages from the bind
+      // results so lintAndFetch can fetch them in one batch and re-lint.
       externals = findMissingPackages(rootAst, result, resolver, ignored, libs);
     }
   } catch (e: unknown) {
@@ -144,8 +152,15 @@ function buildResolver(
 ): ModuleResolver {
   const record = new RecordResolver(sources, { packageName });
   if (libs.length === 0) return record;
-  const resolvers = [record, ...libs.map(b => new BundleResolver(b))];
+  // flatten each bundle's transitive dependencies, matching link()'s resolver
+  const resolvers = [record, ...createLibraryResolvers(libs)];
   return new CompositeResolver(resolvers);
+}
+
+/** Convert a wesl compiler diagnostic to a CodeMirror lint diagnostic. */
+function weslToDiagnostic(d: WeslDiagnostic): Diagnostic {
+  const { start: from, end: to, severity, message } = d;
+  return { from, to, severity, message };
 }
 
 /** Convert unbound refs to diagnostics, skipping ignored packages. */
@@ -161,17 +176,6 @@ function unboundDiagnostics(
         !(ref.path.length > 1 && ignored.has(ref.path[0])),
     )
     .map(unboundToDiagnostic);
-}
-
-function errorToDiagnostic(e: unknown): Diagnostic | undefined {
-  if (!(e instanceof WeslParseError)) return undefined;
-  const [from, to] = e.span;
-  return {
-    from,
-    to,
-    severity: "error",
-    message: (e.cause as Error)?.message ?? e.message,
-  };
 }
 
 /** Find external package names not yet loaded, from unresolved imports and unbound refs. */
@@ -204,8 +208,15 @@ function findMissingPackages(
   return [...new Set([...fromImports, ...fromUnbound])];
 }
 
-function isExternalRoot(root: string): boolean {
-  return root !== "package" && root !== "super";
+function errorToDiagnostic(e: unknown): Diagnostic | undefined {
+  if (!(e instanceof WeslParseError)) return undefined;
+  const [from, to] = e.span;
+  return {
+    from,
+    to,
+    severity: "error",
+    message: (e.cause as Error)?.message ?? e.message,
+  };
 }
 
 function unboundToDiagnostic(ref: UnboundRef): Diagnostic {
@@ -215,4 +226,8 @@ function unboundToDiagnostic(ref: UnboundRef): Diagnostic {
     severity: "error",
     message: `unresolved identifier '${ref.path.join("::")}'`,
   };
+}
+
+function isExternalRoot(root: string): boolean {
+  return root !== "package" && root !== "super";
 }

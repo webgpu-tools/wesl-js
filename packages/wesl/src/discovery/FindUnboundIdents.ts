@@ -1,12 +1,11 @@
-import type { AbstractElem } from "../AbstractElems.ts";
 import {
+  type BindContext,
   bindIdents,
   bindIdentsRecursive,
-  type EmittableElem,
-  findAllRootDecls,
+  newLinkBindings,
   type UnboundRef,
 } from "../BindIdents.ts";
-import { type LiveDecls, makeLiveDecls } from "../LiveDeclarations.ts";
+import { makeLiveDecls, makeRootLiveDecls } from "../LiveDeclarations.ts";
 import { minimalMangle } from "../Mangler.ts";
 import {
   type BatchModuleResolver,
@@ -14,7 +13,7 @@ import {
   type ModuleResolver,
 } from "../ModuleResolver.ts";
 import type { WeslAST } from "../ParseWESL.ts";
-import type { DeclIdent, Scope } from "../Scope.ts";
+import { findAllRootDecls } from "../RootDeclarations.ts";
 import { filterMap } from "../Util.ts";
 
 /**
@@ -33,25 +32,25 @@ export function findUnboundIdents(resolver: BatchModuleResolver): string[][] {
 
 /** Find unbound references with full position info. */
 export function findUnboundRefs(resolver: BatchModuleResolver): UnboundRef[] {
-  const bindContext = {
+  const unbound: UnboundRef[] = [];
+  const bindContext: BindContext = {
     resolver,
     conditions: {},
-    knownDecls: new Set<DeclIdent>(),
-    foundScopes: new Set<Scope>(),
-    globalNames: new Set<string>(),
-    globalStatements: new Map<AbstractElem, EmittableElem>(),
+    bindings: newLinkBindings(),
+    knownDecls: new Set(),
+    foundScopes: new Set(),
+    globalNames: new Set(),
+    globalStatements: new Map(),
     mangler: minimalMangle,
-    packageName: "package",
-    rootModulePath: "package::main",
-    unbound: [] as UnboundRef[],
+    unbound,
+    lenient: true,
     dontFollowDecls: true,
     discoveryMode: true,
   };
 
   for (const [, ast] of resolver.allModules()) {
     const rootDecls = findAllRootDecls(ast.rootScope);
-    const decls = new Map(rootDecls.map(d => [d.originalName, d] as const));
-    const liveDecls: LiveDecls = { decls, parent: null };
+    const liveDecls = makeRootLiveDecls(rootDecls);
     // Process dependent scopes of root decls to find unbound refs in function bodies
     for (const s of filterMap(rootDecls, decl => decl.dependentScope)) {
       bindIdentsRecursive(s, bindContext, makeLiveDecls(liveDecls));
@@ -60,7 +59,7 @@ export function findUnboundRefs(resolver: BatchModuleResolver): UnboundRef[] {
     bindIdentsRecursive(ast.rootScope, bindContext, liveDecls);
   }
 
-  return bindContext.unbound;
+  return unbound;
 }
 
 /** Thin decorator that records which modules were resolved. */
@@ -100,6 +99,7 @@ export function discoverModules(
     rootAst,
     resolver: tracking,
     accumulateUnbound: true,
+    lenient: true,
     discoveryMode: true,
   });
 

@@ -6,8 +6,8 @@
  */
 
 import { expect, test } from "vitest";
-import { findValidRootDecls } from "../BindIdents.ts";
 import { scopeToString } from "../debug/ScopeToString.ts";
+import { findValidRootDecls } from "../RootDeclarations.ts";
 import { parseWESL } from "./TestUtil.ts";
 
 test("scope from simple fn", () => {

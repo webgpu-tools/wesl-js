@@ -25,10 +25,11 @@ import type {
   WhileElem,
 } from "./AbstractElems.ts";
 import { assertThatDebug, assertUnreachable } from "./Assertions.ts";
+import { type LinkBindings, outputName, refTarget } from "./BindIdents.ts";
 import { failIdentElem } from "./ClickableError.ts";
 import { filterValidElements } from "./Conditions.ts";
 import { identToString } from "./debug/ScopeToString.ts";
-import type { Conditions, DeclIdent, Ident } from "./Scope.ts";
+import type { Conditions, DeclIdent } from "./Scope.ts";
 import type { SrcMapBuilder } from "./SrcMap.ts";
 import { wgslStandardAttributes } from "./StandardTypes.ts";
 
@@ -36,6 +37,8 @@ export interface EmitParams {
   srcBuilder: SrcMapBuilder;
   rootElems: readonly AbstractElem[];
   conditions: Conditions;
+  /** binding results for the link (ref targets, mangled names) */
+  bindings: LinkBindings;
   /** are we extracting or copying the root module */
   extracting?: boolean;
   /** if true, rootElems are already validated (e.g., from findValidRootDecls) */
@@ -46,9 +49,12 @@ export interface EmitParams {
 interface EmitContext {
   srcBuilder: SrcMapBuilder;
   conditions: Conditions;
+  bindings: LinkBindings;
   extracting: boolean;
   /** Current block nesting depth, for statement indentation. */
   indent: number;
+  /** Plugin attributes to emit alongside elem attributes, if any plugin added some. */
+  addedAttributes?: Map<AbstractElem, AttributeElem[]>;
 }
 
 /** Declarations emitted structurally (var/let/const/override/gvar/alias/assert),
@@ -77,14 +83,17 @@ const noSemicolon = new Set<Statement["kind"]>([
 
 /** Traverse the AST, starting from root elements, emitting WGSL for each. */
 export function lowerAndEmit(params: EmitParams): void {
-  const { srcBuilder, rootElems, conditions } = params;
+  const { srcBuilder, rootElems, conditions, bindings } = params;
   const { extracting = true, skipConditionalFiltering = false } = params;
 
+  const { addedAttributes } = bindings;
   const emitContext: EmitContext = {
     conditions,
     srcBuilder,
+    bindings,
     extracting,
     indent: 0,
+    addedAttributes: addedAttributes.size ? addedAttributes : undefined,
   };
   const validElements = skipConditionalFiltering
     ? rootElems
@@ -137,18 +146,6 @@ export function expressionToString(elem: ExpressionElem): string {
   }
 }
 
-/** Trace through refersTo links until we find the declaration. */
-export function findDecl(ident: Ident): DeclIdent {
-  let i: Ident | undefined = ident;
-  do {
-    if (i.kind === "decl") return i;
-    i = i.refersTo;
-  } while (i);
-
-  // TODO show source position if this can happen in a non buggy linker.
-  throw new Error(`unresolved identifer: ${ident.originalName}`);
-}
-
 function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
   switch (e.kind) {
     case "import":
@@ -181,7 +178,7 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
       return;
 
     case "param":
-      emitAttributes(e.attributes, ctx);
+      emitElemAttributes(e, ctx);
       emitTypedDecl(e.name, ctx);
       return;
     case "typeDecl":
@@ -279,15 +276,20 @@ function emitSynthetic(e: SyntheticElem, ctx: EmitContext): void {
 }
 
 function emitRefIdent(e: RefIdentElem, ctx: EmitContext): void {
-  if (e.ident.std) {
+  const { bindings } = ctx;
+  const target = refTarget(e.ident, bindings);
+  if (target === "std") {
+    // standard WGSL ident (like sin, or u32), emitted as-is
     ctx.srcBuilder.add(e.ident.originalName, e.start, e.end);
+  } else if (target === "unbound") {
+    failIdentElem(e, `unresolved identifier: '${e.ident.originalName}'`);
   } else {
-    ctx.srcBuilder.add(displayName(findDecl(e.ident)), e.start, e.end);
+    ctx.srcBuilder.add(displayName(target, bindings), e.start, e.end);
   }
 }
 
 function emitDeclIdent(e: DeclIdentElem, ctx: EmitContext): void {
-  ctx.srcBuilder.add(displayName(e.ident), e.start, e.end);
+  ctx.srcBuilder.add(displayName(e.ident, ctx.bindings), e.start, e.end);
 }
 
 /** Emit an expression with any comments attached to it. Comments inside an
@@ -297,6 +299,15 @@ function emitExpression(e: ExpressionElem, ctx: EmitContext): void {
   emitInlineLeading(e, ctx);
   emitExpressionCore(e, ctx);
   emitInlineTrailing(e, ctx);
+}
+
+/** Emit an elem's attributes, followed by any a plugin added for this link. */
+function emitElemAttributes(
+  e: AbstractElem & { attributes?: AttributeElem[] },
+  ctx: EmitContext,
+): void {
+  emitAttributes(e.attributes, ctx);
+  emitAttributes(ctx.addedAttributes?.get(e), ctx);
 }
 
 function emitAttributes(
@@ -325,7 +336,7 @@ function emitTypedDecl(name: TypedDeclElem, ctx: EmitContext): void {
 
 /** Emit a struct member from its typed fields: `[attrs] name: type`. */
 function emitMember(member: StructMemberElem, ctx: EmitContext): void {
-  emitAttributes(member.attributes, ctx);
+  emitElemAttributes(member, ctx);
   emitName(member.name, ctx);
   ctx.srcBuilder.appendNext(": ");
   emitTypeRef(member.typeRef, ctx);
@@ -337,7 +348,7 @@ function emitSwitchClause(e: SwitchClauseElem, ctx: EmitContext): void {
   const builder = ctx.srcBuilder;
   emitLeadingComments(e, ctx);
   newLine(ctx);
-  emitAttributes(e.attributes, ctx);
+  emitElemAttributes(e, ctx);
   const defaultOnly = e.selectors.length === 1 && e.selectors[0] === "default";
   if (defaultOnly) {
     builder.appendNext("default");
@@ -406,10 +417,10 @@ function emitRootLeading(e: AbstractElemBase, ctx: EmitContext): void {
 
 /** Emit function explicitly to control commas between conditional parameters. */
 function emitFn(e: FnElem, ctx: EmitContext): void {
-  const { attributes, name, params, returnAttributes, returnType, body } = e;
+  const { name, params, returnAttributes, returnType, body } = e;
   const { conditions, srcBuilder: builder } = ctx;
 
-  emitAttributes(attributes, ctx);
+  emitElemAttributes(e, ctx);
 
   builder.add("fn ", name.start - 3, name.start);
   emitInlineLeading(name, ctx);
@@ -420,7 +431,7 @@ function emitFn(e: FnElem, ctx: EmitContext): void {
   const validParams = filterValidElements(params, conditions);
   validParams.forEach((p, i) => {
     emitInlineLeading(p, ctx);
-    emitAttributes(p.attributes, ctx);
+    emitElemAttributes(p, ctx);
     emitTypedDecl(p.name, ctx);
     emitInlineTrailing(p, ctx);
     if (i < validParams.length - 1) {
@@ -451,7 +462,7 @@ function emitTrailingComments(e: AbstractElemBase, ctx: EmitContext): void {
 
 /** Emit structs explicitly to control commas between conditional members. */
 function emitStruct(e: StructElem, ctx: EmitContext): void {
-  const { attributes, name, members, start } = e;
+  const { name, members, start } = e;
   const { srcBuilder, conditions } = ctx;
 
   const validMembers = filterValidElements(members, conditions);
@@ -462,7 +473,7 @@ function emitStruct(e: StructElem, ctx: EmitContext): void {
     return;
   }
 
-  emitAttributes(attributes, ctx);
+  emitElemAttributes(e, ctx);
   srcBuilder.add("struct ", start, name.start);
   emitInlineLeading(name, ctx);
   emitDeclIdent(name, ctx);
@@ -538,17 +549,15 @@ function emitDirective(e: DirectiveElem, ctx: EmitContext): void {
   }
 }
 
-function displayName(declIdent: DeclIdent): string {
-  if (declIdent.isGlobal) {
-    assertThatDebug(
-      declIdent.mangledName,
-      `ERR: mangled name not found for decl ident ${identToString(declIdent)}`,
-    );
-    // mangled name was set in binding step
-    return declIdent.mangledName as string;
-  }
+function displayName(declIdent: DeclIdent, bindings: LinkBindings): string {
+  const name = outputName(declIdent, bindings);
 
-  return declIdent.mangledName || declIdent.originalName;
+  // every global the emitter reaches was mangled in the binding step
+  assertThatDebug(
+    name,
+    `ERR: mangled name not found for decl ident ${identToString(declIdent)}`,
+  );
+  return name as string;
 }
 
 /** Leading comments on an inline node: block comments get a trailing space, line
@@ -645,7 +654,7 @@ function newLine(ctx: EmitContext): void {
 /** Emit a `{ ... }` block, one statement per indented line. A block with no
  *  statements collapses to `{ }` unless it holds dangling inner comments. */
 function emitBlock(e: BlockElem, ctx: EmitContext): void {
-  emitAttributes(e.attributes, ctx);
+  emitElemAttributes(e, ctx);
   const stmts = filterValidElements(e.body, ctx.conditions);
   if (stmts.length === 0 && !e.innerComments?.length) {
     ctx.srcBuilder.appendNext("{ }");
@@ -682,7 +691,7 @@ function emitCoreSemi(stmt: Statement, ctx: EmitContext): void {
  *  `[attrs] var<...> name: T = init;`, `const name = init;`, `override n;`,
  *  `alias name = T;`, `const_assert expr;`. */
 function emitValueDecl(e: ValueDeclElem, ctx: EmitContext): void {
-  emitAttributes(e.attributes, ctx);
+  emitElemAttributes(e, ctx);
   const builder = ctx.srcBuilder;
   switch (e.kind) {
     case "var":
@@ -788,7 +797,7 @@ function emitStatementCore(stmt: Statement, ctx: EmitContext): void {
   }
   // a block prints its own attributes (before its '{'); everything else prints
   // them before its keyword.
-  if (stmt.kind !== "block") emitAttributes(stmt.attributes, ctx);
+  if (stmt.kind !== "block") emitElemAttributes(stmt, ctx);
   const builder = ctx.srcBuilder;
   switch (stmt.kind) {
     case "block":

@@ -2,23 +2,28 @@ import type { AbstractElem, ModuleElem } from "./AbstractElems.ts";
 import {
   bindIdents,
   type EmittableElem,
-  type VirtualLibrarySet,
+  type LinkBindings,
 } from "./BindIdents.ts";
+import { createConstantsResolver } from "./ConstantsResolver.ts";
 import { LinkedWesl } from "./LinkedWesl.ts";
 import { debug } from "./Logging.ts";
 import { lowerAndEmit } from "./LowerAndEmit.ts";
 import type { ManglerFn } from "./Mangler.ts";
 import { isWeslFile, weslFileRegex } from "./ModulePathUtil.ts";
 import {
-  BundleResolver,
-  CompositeResolver,
+  composeResolvers,
+  createLibraryResolvers,
   type ModuleResolver,
   RecordResolver,
 } from "./ModuleResolver.ts";
 import type { WeslAST, WeslExtensions } from "./ParseWESL.ts";
 import type { Conditions, DeclIdent, SrcModule } from "./Scope.ts";
 import { type SrcMap, SrcMapBuilder } from "./SrcMap.ts";
-import { filterMap, mapValues } from "./Util.ts";
+import { filterMap } from "./Util.ts";
+import {
+  createVirtualLibraryResolver,
+  type VirtualLibraryFn,
+} from "./VirtualLibraryResolver.ts";
 import type { WeslBundle } from "./WeslBundle.ts";
 
 /** Root module used for linking when none is specified. */
@@ -30,10 +35,17 @@ export interface WeslJsPlugin {
   transform?: LinkerTransform;
 }
 
+/** The bound root module handed to plugin transforms.
+ *
+ * The parsed AST is read-only: it's shared by every link of these modules, so
+ * edits to it would leak into later links with other conditions or plugins.
+ * Record per-link changes in `bindings` instead: addAttributes() to decorate a
+ * declaration, bindings.mangled to rename one. */
 export interface TransformedAST
   extends Pick<WeslAST, "srcModule" | "moduleElem"> {
+  /** per-link binding facts: ref targets, mangled names, added attributes */
+  bindings: LinkBindings;
   globalNames: Set<string>;
-  notableElems: Record<string, AbstractElem[]>;
 }
 
 export interface LinkConfig {
@@ -103,15 +115,19 @@ export type WeslProject = Pick<
   shaderRoot?: string;
 };
 
-/** Context passed to virtual library generators. */
-export interface VirtualLibContext {
-  conditions: Conditions;
-  rootModulePath: string;
-  packageName: string;
+export interface LinkRegistryParams
+  extends Pick<
+    LinkParams,
+    "rootModuleName" | "conditions" | "config" | "mangler"
+  > {
+  resolver: ModuleResolver;
 }
 
-/** Generate a virtual WESL module. */
-export type VirtualLibraryFn = (ctx: VirtualLibContext) => string;
+export interface BoundAndTransformed {
+  transformedAst: TransformedAST;
+  newDecls: DeclIdent[];
+  newStatements: EmittableElem[];
+}
 
 /**
  * Link a set of WESL source modules (typically the text from .wesl files) into a single WGSL string.
@@ -126,10 +142,23 @@ export async function link(params: LinkParams): Promise<LinkedWesl> {
   return new LinkedWesl(_linkSync(params));
 }
 
+/** Link using a caller-provided resolver.
+ *
+ * Unlike link(), no resolver building: compose sources, libraries, constants
+ * and virtual libraries into a single resolver yourself (RecordResolver,
+ * createLibraryResolvers, createConstantsResolver,
+ * createVirtualLibraryResolver, composeResolvers). */
+export async function linkWithResolver(
+  params: LinkRegistryParams,
+): Promise<LinkedWesl> {
+  return new LinkedWesl(linkRegistry(params));
+}
+
 /** linker api for benchmarking */
 export function _linkSync(params: LinkParams): SrcMap {
   const { weslSrc, libs = [], packageName, debugWeslRoot, resolver } = params;
-  const { weslExtensions } = params;
+  const { weslExtensions, virtualLibs, constants, conditions = {} } = params;
+  const { rootModuleName = "main" } = params;
 
   if (!resolver && !weslSrc) {
     throw new Error("Either resolver or weslSrc must be provided");
@@ -142,55 +171,22 @@ export function _linkSync(params: LinkParams): SrcMap {
       weslExtensions,
     });
 
-  const libResolvers = createLibraryResolvers(libs, debugWeslRoot);
-  const allResolvers = [primaryResolver, ...libResolvers];
-  const finalResolver =
-    allResolvers.length === 1
-      ? allResolvers[0]
-      : new CompositeResolver(allResolvers);
+  // virtual modules resolve last, and constants shadow a virtualLib named 'constants'
+  const rootModulePath = normalizeModuleName(rootModuleName);
+  const hostPackage = rootModulePath.split("::")[0];
+  const finalResolver = composeResolvers(
+    primaryResolver,
+    ...createLibraryResolvers(libs, debugWeslRoot),
+    constants && createConstantsResolver(constants, hostPackage),
+    virtualLibs &&
+      createVirtualLibraryResolver(virtualLibs, {
+        conditions,
+        rootModulePath,
+        packageName: hostPackage,
+      }),
+  );
 
   return linkRegistry({ ...params, resolver: finalResolver });
-}
-
-function createLibraryResolvers(
-  libs: WeslBundle[],
-  debugWeslRoot?: string,
-): ModuleResolver[] {
-  const flattened = flattenLibraryTree(libs);
-  return flattened.map(lib => new BundleResolver(lib, debugWeslRoot));
-}
-
-/** Flatten library dependency tree, deduplicating by object identity rather than package name.
- *
- * Some packages (like Lygia) provide multiple bundles in the same npm package
- * to enable tree shaking. All bundles share the same package name, so we deduplicate
- * by object identity to keep them distinct. Also handles circular dependencies correctly. */
-function flattenLibraryTree(libs: WeslBundle[]): WeslBundle[] {
-  const result: WeslBundle[] = [];
-  const seen = new Set<WeslBundle>();
-
-  function visit(bundle: WeslBundle) {
-    if (seen.has(bundle)) return;
-    seen.add(bundle);
-    result.push(bundle);
-    bundle.dependencies?.forEach(visit);
-  }
-
-  libs.forEach(visit);
-  return result;
-}
-
-export interface LinkRegistryParams
-  extends Pick<
-    LinkParams,
-    | "rootModuleName"
-    | "conditions"
-    | "virtualLibs"
-    | "config"
-    | "constants"
-    | "mangler"
-  > {
-  resolver: ModuleResolver;
 }
 
 /** Link wesl from a registry of already parsed modules.
@@ -199,6 +195,10 @@ export interface LinkRegistryParams
  * from the same sources. (e.g. linking with different conditions
  * each time, or perhaps to produce multiple wgsl shaders
  * that share some sources.)
+ *
+ * Parsed ASTs are immutable: binding records its results in a per-link
+ * table, so the same resolver (and its cached ASTs) can be shared across
+ * link calls with different conditions.
  */
 export function linkRegistry(params: LinkRegistryParams): SrcMap {
   const bound = bindAndTransform(params);
@@ -208,38 +208,31 @@ export function linkRegistry(params: LinkRegistryParams): SrcMap {
     ast.srcModule,
     newDecls,
     newStatements,
+    ast.bindings,
     params.conditions,
   );
   return SrcMapBuilder.build(builders);
-}
-
-export interface BoundAndTransformed {
-  transformedAst: TransformedAST;
-  newDecls: DeclIdent[];
-  newStatements: EmittableElem[];
 }
 
 /** Bind identifiers and apply transform plugins */
 export function bindAndTransform(
   params: LinkRegistryParams,
 ): BoundAndTransformed {
-  const { resolver, mangler, constants, config } = params;
+  const { resolver, mangler, config } = params;
   const { rootModuleName = defaultRootModule, conditions = {} } = params;
 
   const modulePath = normalizeModuleName(rootModuleName);
   const rootAst = getRootModule(resolver, modulePath, rootModuleName);
-  const virtuals = setupVirtualLibs(params.virtualLibs, constants);
 
-  const bound = bindIdents({
+  const bound = bindIdents({ rootAst, resolver, conditions, mangler });
+  const { bindings, globalNames, decls: newDecls, newStatements } = bound;
+
+  const transformedAst = applyTransformPlugins(
     rootAst,
-    resolver,
-    conditions,
-    virtuals,
-    mangler,
-  });
-  const { globalNames, decls: newDecls, newStatements } = bound;
-
-  const transformedAst = applyTransformPlugins(rootAst, globalNames, config);
+    bindings,
+    globalNames,
+    config,
+  );
   return { transformedAst, newDecls, newStatements };
 }
 
@@ -252,6 +245,37 @@ export function normalizeModuleName(name: string): string {
     return "package::" + stripped.replaceAll("/", "::");
   }
   return "package::" + name;
+}
+
+/** Assemble WGSL output from prologue statements, root module, and imported declarations. */
+function emitWgsl(
+  rootModuleElem: ModuleElem,
+  srcModule: SrcModule,
+  newDecls: DeclIdent[],
+  newStatements: EmittableElem[],
+  bindings: LinkBindings,
+  conditions: Conditions = {},
+): SrcMapBuilder[] {
+  const prologueBuilders = newStatements.map(s =>
+    emitElem(s.srcModule, s.elem, conditions, bindings, { addNl: true }),
+  );
+
+  const rootBuilder = builderFromModule(srcModule);
+  lowerAndEmit({
+    srcBuilder: rootBuilder,
+    rootElems: [rootModuleElem],
+    conditions,
+    bindings,
+    extracting: false,
+  });
+
+  const declBuilders = newDecls.map(decl =>
+    emitElem(decl.srcModule, decl.declElem!, conditions, bindings, {
+      skipConditionalFiltering: true,
+    }),
+  );
+
+  return [...prologueBuilders, rootBuilder, ...declBuilders];
 }
 
 /** Resolve root module AST or throw if not found. */
@@ -272,63 +296,19 @@ function getRootModule(
   return rootAst;
 }
 
-/** Create virtual library set from code generators and host constants. */
-function setupVirtualLibs(
-  virtualLibs: Record<string, VirtualLibraryFn> | undefined,
-  constants: Record<string, string | number> | undefined,
-): VirtualLibrarySet | undefined {
-  let libs = virtualLibs;
-  if (constants) {
-    const constantsGen: VirtualLibraryFn = () =>
-      Object.entries(constants)
-        .map(([name, value]) => `const ${name} = ${value};`)
-        .join("\n");
-    libs = { ...libs, constants: constantsGen };
-  }
-  return libs && mapValues(libs, fn => ({ fn }));
-}
-
 /** Run registered transform plugins over the bound AST. */
 function applyTransformPlugins(
   rootModule: WeslAST,
+  bindings: LinkBindings,
   globalNames: Set<string>,
   config?: LinkConfig,
 ): TransformedAST {
   // for now only transform the root module
   const { moduleElem, srcModule } = rootModule;
-  const startAst = { moduleElem, srcModule, globalNames, notableElems: {} };
+  const startAst = { moduleElem, srcModule, bindings, globalNames };
   const plugins = config?.plugins ?? [];
   const transforms = filterMap(plugins, plugin => plugin.transform);
   return transforms.reduce((ast, transform) => transform(ast), startAst);
-}
-
-/** Assemble WGSL output from prologue statements, root module, and imported declarations. */
-function emitWgsl(
-  rootModuleElem: ModuleElem,
-  srcModule: SrcModule,
-  newDecls: DeclIdent[],
-  newStatements: EmittableElem[],
-  conditions: Conditions = {},
-): SrcMapBuilder[] {
-  const prologueBuilders = newStatements.map(s =>
-    emitElem(s.srcModule, s.elem, conditions, { addNl: true }),
-  );
-
-  const rootBuilder = builderFromModule(srcModule);
-  lowerAndEmit({
-    srcBuilder: rootBuilder,
-    rootElems: [rootModuleElem],
-    conditions,
-    extracting: false,
-  });
-
-  const declBuilders = newDecls.map(decl =>
-    emitElem(decl.srcModule, decl.declElem!, conditions, {
-      skipConditionalFiltering: true,
-    }),
-  );
-
-  return [...prologueBuilders, rootBuilder, ...declBuilders];
 }
 
 /** Emit a single element (prologue statement or imported declaration) into a SrcMapBuilder. */
@@ -336,6 +316,7 @@ function emitElem(
   srcModule: SrcModule,
   elem: AbstractElem,
   conditions: Conditions,
+  bindings: LinkBindings,
   opts: { addNl?: boolean; skipConditionalFiltering?: boolean } = {},
 ): SrcMapBuilder {
   const builder = builderFromModule(srcModule);
@@ -343,6 +324,7 @@ function emitElem(
     srcBuilder: builder,
     rootElems: [elem],
     conditions,
+    bindings,
     skipConditionalFiltering: opts.skipConditionalFiltering,
   });
   if (opts.addNl) builder.addNl();
@@ -367,9 +349,6 @@ Conditions
 - consolidated conditions are attached to Idents
   - only conditionally valid ref Idents are bound, and only to conditionaly valid declarations
   - a condition stack (akin to the scope stack) is maintained while parsing to attach consolidated conditions to Idents
-- re-linking with new conditions, conservatively 
-  - clear all mutated Ident fields (refersTo and mangled links) 
-  - re-bind Idents, re-emit 
 
 Generics & specialization
 - attach generic parameters to ref and decl Idents, effectively creating a new Ident for each specialization

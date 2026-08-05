@@ -17,15 +17,16 @@ test("nested scopes binding", () => {
     }
   `;
 
-  const { resolver } = bindTest(src);
+  const { bound, resolver } = bindTest(src);
+  const { bindings } = bound.transformedAst;
   const ast = resolver.resolveModule("package::test")!;
 
-  expect(scopeToStringLong(ast.rootScope)).toMatchInlineSnapshot(`
+  expect(scopeToStringLong(ast.rootScope, bindings)).toMatchInlineSnapshot(`
     "{ %main(main)   
       { 
-        { %bar(bar) #1  
+        { %bar #1  
           { 
-            { %new_bar #2  bar #3 -> %bar(bar) #1  } #4
+            { %new_bar #2  bar #3 -> %bar #1  } #4
             %bar #4 
           } #3
         } #2
@@ -43,18 +44,19 @@ test("@location attribute const", () => {
       let x = pos;
     }
   `;
-  const { resolver } = bindTest(src);
+  const { bound, resolver } = bindTest(src);
+  const { bindings } = bound.transformedAst;
   const ast = resolver.resolveModule("package::test")!;
-  expect(scopeToStringLong(ast.rootScope)).toMatchInlineSnapshot(`
+  expect(scopeToStringLong(ast.rootScope, bindings)).toMatchInlineSnapshot(`
     "{ 
       -{ %pos(pos)   } #1
       %fragmentMain(fragmentMain) #1  
       { 
-        { %pos(pos) #2  
-          { vec3f #3 -> undefined } #4
-          %x #6  pos #7 -> %pos(pos) #2 
+        { %pos #2  
+          { vec3f #3 -> std } #4
+          %x #6  pos #7 -> %pos #2 
         } #3
-        pos #4 -> %pos(pos)   vec4f #5 -> undefined
+        pos #4 -> %pos(pos)   vec4f #5 -> std
       } #2
     } #0"
   `);
@@ -102,9 +104,9 @@ test("publicDecl finds valid conditional declaration", () => {
   expect(decl1).toBeDefined();
   expect(decl1!.originalName).toBe("testFn");
 
-  // Second call should use cache and return same result
+  // Repeated calls return the same decl object from the scope tree
   const decl2 = publicDecl(ast.rootScope, "testFn", conditions);
-  expect(decl2).toBe(decl1); // Same object reference - caching works
+  expect(decl2).toBe(decl1);
 
   // Should find other declarations too
   const otherDecl = publicDecl(ast.rootScope, "otherFn", conditions);

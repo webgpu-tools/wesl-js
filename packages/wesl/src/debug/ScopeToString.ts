@@ -1,13 +1,16 @@
+import { type LinkBindings, type RefTarget, refTarget } from "../BindIdents.ts";
 import type { Ident, Scope } from "../Scope.ts";
 import { childScope } from "../Scope.ts";
 import { attributeToString } from "./ASTtoString.ts";
 import { LineWrapper } from "./LineWrapper.ts";
 
-/** A debugging print of the scope tree with identifiers in nested brackets */
+/** A debugging print of the scope tree with identifiers in nested brackets.
+ * Pass bindings to include ref targets and mangled names from a link. */
 export function scopeToString(
   scope: Scope,
   indent = 0,
   shortIdents = true,
+  bindings?: LinkBindings,
 ): string {
   const { contents, kind, condAttribute } = scope;
 
@@ -23,7 +26,12 @@ export function scopeToString(
   contents.forEach((elem, i) => {
     if (childScope(elem)) {
       const childScope: Scope = elem;
-      const childBlock = scopeToString(childScope, indent + 2, shortIdents);
+      const childBlock = scopeToString(
+        childScope,
+        indent + 2,
+        shortIdents,
+        bindings,
+      );
       if (!lastWasScope) str.nl();
       str.addBlock(childBlock);
       lastWasScope = true;
@@ -35,7 +43,7 @@ export function scopeToString(
       if (shortIdents) {
         str.add(identShortString(ident));
       } else {
-        str.add(identToString(ident));
+        str.add(identToString(ident, bindings));
       }
       if (i < last) str.add(" ");
     }
@@ -54,8 +62,26 @@ export function scopeToString(
 }
 
 /** A debug print of the scope tree with identifiers in long form in nested brackets */
-export function scopeToStringLong(scope: Scope): string {
-  return scopeToString(scope, 0, false);
+export function scopeToStringLong(
+  scope: Scope,
+  bindings?: LinkBindings,
+): string {
+  return scopeToString(scope, 0, false, bindings);
+}
+
+/** A debug print of one ident; prints its unbound form without bindings. */
+export function identToString(ident?: Ident, bindings?: LinkBindings): string {
+  if (!ident) return JSON.stringify(ident);
+  const { kind, originalName } = ident;
+  const idStr = ident.id ? `#${ident.id}` : "";
+  if (kind === "ref") {
+    const target = bindings && refTarget(ident, bindings);
+    return `${originalName} ${idStr} -> ${refToString(target, bindings)}`;
+  } else {
+    const mangledName = bindings?.mangled.get(ident);
+    const mangled = mangledName ? `(${mangledName})` : "";
+    return `%${originalName}${mangled} ${idStr} `;
+  }
 }
 
 /** name of an identifier, with decls prefixed with '%' */
@@ -65,16 +91,9 @@ function identShortString(ident: Ident): string {
   return `${prefix}${originalName}`;
 }
 
-export function identToString(ident?: Ident): string {
-  if (!ident) return JSON.stringify(ident);
-  const { kind, originalName } = ident;
-  const idStr = ident.id ? `#${ident.id}` : "";
-  if (kind === "ref") {
-    const ref = identToString(ident.refersTo!);
-    return `${originalName} ${idStr} -> ${ref}`;
-  } else {
-    const { mangledName } = ident;
-    const mangled = mangledName ? `(${mangledName})` : "";
-    return `%${originalName}${mangled} ${idStr} `;
-  }
+/** A debug print of what a ref bound to; unbound refs print like pre-link refs. */
+function refToString(target?: RefTarget, bindings?: LinkBindings): string {
+  if (target === "std") return "std";
+  if (!target || target === "unbound") return "undefined";
+  return identToString(target, bindings);
 }

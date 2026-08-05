@@ -34,8 +34,9 @@ Modules are referenced using `::` separators (e.g. `package::foo::bar`)
 which map to file paths (`foo/bar.wesl`).
 
 **Virtual Libraries:**
-Code can be generated at runtime via virtual library functions.
-For example, host constants are injected via a `constants` virtual library:
+Runtime generated code is provided through resolvers too:
+`VirtualLibraryResolver` parses generator function output on demand,
+and `ConstantsResolver` exposes host constants as the `constants` module:
 ```wgsl
 import constants::maxLights;
 ```
@@ -47,7 +48,11 @@ Linking proceeds in four phases:
 ### 1. Setup Resolvers
 - RecordResolver from app sources
 - BundleResolvers for library dependencies
-- Combine with CompositeResolver if multiple sources
+- ConstantsResolver and VirtualLibraryResolver for runtime generated modules
+- Combine with composeResolvers() if multiple sources
+
+link() builds this composition from its parameters (weslSrc, libs, constants,
+virtualLibs). linkWithResolver() links with a caller-composed resolver instead.
 
 ### 2. Parse and Bind (`bindIdents`)
 The binding pass walks the scope tree depth-first, linking references to declarations.
@@ -79,7 +84,9 @@ References inside filtered branches don't pull in declarations.
 **Output:**
 - List of reachable declarations (tree shaking eliminates dead code)
 - Mangled names for all global declarations
-- RefIdents linked to DeclIdents via `refersTo` field
+- RefIdents linked to DeclIdents in the `LinkBindings.refersTo` table
+  (read it with `refDecl()` or `refTarget()`: a ref resolves to a declaration,
+  to a standard WGSL name like `sin`, or to nothing)
 
 ### 3. Transform (optional plugins)
 Plugins can transform the bound AST before emission.
@@ -88,8 +95,8 @@ Plugins can transform the bound AST before emission.
 Traverse the AST, emitting WGSL text:
 - Filter elements based on active conditions
 - Write declarations in emitted order
-- Rewrite DeclIdents to use their `mangledName`
-- Rewrite RefIdents to use the `mangledName` from their `refersTo` DeclIdent
+- Rewrite DeclIdents to use their mangled name from `LinkBindings.mangled`
+- Rewrite RefIdents to use the mangled name of the DeclIdent they bound to
 - Drop import statements and conditional directives
 
 **TextElems:**

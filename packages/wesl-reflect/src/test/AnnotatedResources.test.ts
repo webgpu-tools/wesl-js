@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { link, parseSrcModule, type WeslAST } from "wesl";
+import {
+  link,
+  linkWithResolver,
+  parseSrcModule,
+  RecordResolver,
+  type WeslAST,
+} from "wesl";
 import {
   annotatedResourcesPlugin,
   findAnnotatedResources,
@@ -155,6 +161,25 @@ test("@texture plugin emits @group/@binding", async () => {
     /@group\(0\)\s*@binding\(1\)\s+var photo: texture_2d<f32>/,
   );
   expect(linked.dest).not.toContain("@texture");
+});
+
+test("relinking with the plugin doesn't accumulate attributes in the ast", async () => {
+  const src = `
+@buffer var<storage, read_write> data: array<f32, 4>;
+
+@compute @workgroup_size(1) fn main() { data[0] = 1.0; }
+`;
+  // one resolver, so both links share the same parsed (and immutable) ast
+  const resolver = new RecordResolver({ main: src });
+  const plugins = [
+    annotatedResourcesPlugin(findAnnotatedResources(parse(src))),
+  ];
+  const params = { resolver, rootModuleName: "main", config: { plugins } };
+
+  const first = await linkWithResolver(params);
+  const second = await linkWithResolver(params);
+  expect(second.dest).toBe(first.dest);
+  expect(first.dest).toMatch(/@group\(0\)\s*@binding\(1\)\s+var<storage/);
 });
 
 test("plugin errors on @buffer with user @group/@binding", async () => {

@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
+import { bindIdents } from "../BindIdents.ts";
+import { errorDiagnostic } from "../Diagnostics.ts";
 import { astToString } from "../debug/ASTtoString.ts";
+import { link } from "../Linker.ts";
+import { RecordResolver } from "../ModuleResolver.ts";
+import { WeslParseError } from "../ParseWESL.ts";
 import { childScope, type Scope } from "../Scope.ts";
 import { parseWESL } from "./TestUtil.ts";
 
@@ -383,3 +388,82 @@ test("long member chains parse without recursion limits", () => {
   expect(ast.diagnostics).toEqual([]);
 });
 
+test("link() still throws on syntax errors", async () => {
+  const weslSrc = { "main.wesl": "fn main() { let }" };
+  const promise = link({ weslSrc, rootModuleName: "main" });
+  await expect(promise).rejects.toThrow(WeslParseError);
+  await expect(promise).rejects.toThrow(/Expected identifier after 'let'/);
+});
+
+test("the link() error carries every syntax error in the module", async () => {
+  const weslSrc = { "main.wesl": "fn a() { let }\nconst b = ;" };
+  const promise = link({ weslSrc, rootModuleName: "main" });
+  const error: WeslParseError = await promise.then(
+    () => expect.unreachable("link should throw"),
+    e => e,
+  );
+  expect(error).toBeInstanceOf(WeslParseError);
+  expect(error.diagnostics.length).toBe(2);
+  expect(error.message.match(/ error: /g)?.length).toBe(2);
+});
+
+test("link() throws on a syntax error in an imported module", async () => {
+  const weslSrc = {
+    "main.wesl": "import package::util::helper;\nfn main() { helper(); }",
+    "util.wesl": "fn helper() { let }",
+  };
+  const promise = link({ weslSrc, rootModuleName: "main" });
+  await expect(promise).rejects.toThrow(/Expected identifier after 'let'/);
+});
+
+test("warning diagnostics never fail a strict bind, errors still do", () => {
+  const resolver = new RecordResolver({ "main.wesl": "fn main() { }" });
+  const rootAst = resolver.resolveModule("package::main")!;
+  rootAst.diagnostics.push({
+    message: "some future lint warning",
+    start: 0,
+    end: 2,
+    severity: "warning",
+  });
+  expect(() => bindIdents({ rootAst, resolver })).not.toThrow();
+
+  rootAst.diagnostics.push(errorDiagnostic("broken", 0, 2));
+  expect(() => bindIdents({ rootAst, resolver })).toThrow(WeslParseError);
+});
+
+test("lenient binding covers the valid part of an erroneous module", () => {
+  const src = `
+    fn broken() { let }
+    fn ok() { helper(); }
+  `;
+  const resolver = new RecordResolver({ "main.wesl": src });
+  const rootAst = resolver.resolveModule("package::main")!;
+  expect(rootAst.diagnostics.length).toBe(1);
+
+  const params = { rootAst, resolver, accumulateUnbound: true } as const;
+  expect(() => bindIdents(params)).toThrow(/Expected identifier after 'let'/);
+
+  const result = bindIdents({ ...params, lenient: true });
+  expect(result.unbound?.map(u => u.path.join("::"))).toEqual(["helper"]);
+});
+
+test("a bad attribute parameter doesn't hide later refs from binding", () => {
+  // the throw escapes parseStandardAttribute while parsingAttrParam is still
+  // set; recovery must restore it, or every ref parsed afterwards is marked as
+  // an '@note' attribute param and silently skipped by binding
+  const src = `
+    @note() fn broken() { }
+    fn ok() { helper(); }
+  `;
+  const resolver = new RecordResolver({ "main.wesl": src });
+  const rootAst = resolver.resolveModule("package::main")!;
+  expect(rootAst.diagnostics.length).toBe(1);
+
+  const result = bindIdents({
+    rootAst,
+    resolver,
+    accumulateUnbound: true,
+    lenient: true,
+  });
+  expect(result.unbound?.map(u => u.path.join("::"))).toEqual(["helper"]);
+});

@@ -1,13 +1,14 @@
 import type {
   Conditions,
   ExpressionElem,
+  LinkBindings,
   RefIdent,
   StructElem,
   StructMemberElem,
   TypeRefElem,
   WeslAST,
 } from "wesl";
-import { declsOfKind, filterValidElements } from "wesl";
+import { declsOfKind, filterValidElements, refDecl } from "wesl";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 import { originalTypeName } from "./WeslStructs.ts";
 
@@ -29,8 +30,18 @@ export interface TypeInfo {
 }
 
 /** Optional registry of top-level structs by name, used when a parsed AST has
- *  not been bound (refersTo unresolved). */
+ *  not been bound (no bindings table available). */
 export type StructRegistry = ReadonlyMap<string, StructElem>;
+
+/** Optional context for resolving nested struct types and conditional members. */
+export interface LayoutOptions {
+  /** Filter conditional (@if) members. */
+  conditions?: Conditions;
+  /** Name-keyed structs, for resolving nested types in unbound ASTs. */
+  structs?: StructRegistry;
+  /** Link results, for resolving nested types across modules in bound ASTs. */
+  bindings?: LinkBindings;
+}
 
 const typeTable: Record<string, TypeInfo> = {
   // scalars
@@ -82,17 +93,24 @@ const typeTable: Record<string, TypeInfo> = {
   mat4x4h: mat(4, 4, 2),
 };
 
-/** Compute byte offsets and buffer size for a bound WGSL struct.
- *  Nested structs resolved via refersTo links. Conditional members filtered when conditions provided. */
+/** Compute byte offsets and buffer size for a WGSL struct.
+ *  Nested structs resolved via opts.bindings (bound ASTs) or opts.structs
+ *  (unbound ASTs). Conditional members filtered when opts.conditions provided. */
 export function structLayout(
   struct: StructElem,
-  conditions?: Conditions,
-  structs?: StructRegistry,
+  opts: LayoutOptions = {},
 ): StructLayout {
-  const members = conditions
-    ? filterValidElements(struct.members, conditions)
-    : struct.members;
-  return membersLayout(members, conditions, structs);
+  return membersLayout(validMembers(struct, opts.conditions), opts);
+}
+
+/** A struct's members after conditional (@if) filtering; all members
+ *  when no conditions are provided. */
+export function validMembers(
+  struct: StructElem,
+  conditions?: Conditions,
+): StructMemberElem[] {
+  if (!conditions) return struct.members;
+  return filterValidElements(struct.members, conditions);
 }
 
 /** Build a StructRegistry from all top-level struct declarations in `ast`. */
@@ -107,8 +125,7 @@ export function buildStructRegistry(ast: WeslAST): StructRegistry {
 /** Resolve alignment and size for any host-shareable typeRef (primitive, array, or nested struct). */
 export function typeRefLayout(
   typeRef: TypeRefElem,
-  conditions?: Conditions,
-  structs?: StructRegistry,
+  opts: LayoutOptions = {},
 ): TypeInfo {
   const name = originalTypeName(typeRef);
 
@@ -119,15 +136,15 @@ export function typeRefLayout(
     const params = typeRef.templateParams;
     if (!params?.length)
       throw new Error("array type missing template parameters");
-    const elem = elemTypeInfo(params[0], conditions, structs);
+    const elem = elemTypeInfo(params[0], opts);
     const stride = roundUp(elem.alignment, elem.size);
     const p = params[1];
     const count = p && "value" in p ? Number(p.value) : 0;
     return { alignment: elem.alignment, size: count * stride };
   }
 
-  // nested struct via refersTo (post-binding) or registry (pre-binding)
-  const nested = resolveStructInfo(typeRef.name, conditions, structs, name);
+  // nested struct via bindings (post-binding) or registry (pre-binding)
+  const nested = resolveStructInfo(typeRef.name, opts, name);
   if (nested) return nested;
 
   throw new Error(`unsupported type for layout: '${name}'`);
@@ -165,15 +182,14 @@ function mat(cols: number, rows: number, scalarSize: number): TypeInfo {
 /** Compute layout from a flat member list (used internally and for nested resolution). */
 function membersLayout(
   members: StructMemberElem[],
-  conditions?: Conditions,
-  structs?: StructRegistry,
+  opts: LayoutOptions,
 ): StructLayout {
   let offset = 0;
   let structAlign = 1;
   const fields: FieldLayout[] = [];
 
   for (const m of members) {
-    let { alignment, size } = typeRefLayout(m.typeRef, conditions, structs);
+    let { alignment, size } = typeRefLayout(m.typeRef, opts);
 
     const alignAttr = findAnnotation(m, "align");
     if (alignAttr) {
@@ -198,43 +214,39 @@ function membersLayout(
 }
 
 /** Extract type info from an array template param (TypeRefElem or RefIdentElem). */
-function elemTypeInfo(
-  param: ExpressionElem,
-  conditions?: Conditions,
-  structs?: StructRegistry,
-): TypeInfo {
-  if (param.kind === "type") return typeRefLayout(param, conditions, structs);
+function elemTypeInfo(param: ExpressionElem, opts: LayoutOptions): TypeInfo {
+  if (param.kind === "type") return typeRefLayout(param, opts);
   const ident = param.kind === "ref" ? param.ident : undefined;
   const typeName = ident?.originalName;
   if (!typeName) throw new Error("cannot resolve array element type");
   const primitive = typeTable[typeName];
   if (primitive) return primitive;
-  const nested = resolveStructInfo(ident, conditions, structs, typeName);
+  const nested = resolveStructInfo(ident, opts, typeName);
   if (nested) return nested;
   throw new Error(`unsupported type for layout: '${typeName}'`);
 }
 
-/** Resolve a struct typeRef via refersTo (bound) or struct registry (unbound). */
+/** Resolve a struct typeRef via bindings (bound) or struct registry (unbound). */
 function resolveStructInfo(
   ident: RefIdent | undefined,
-  conditions: Conditions | undefined,
-  structs: StructRegistry | undefined,
+  opts: LayoutOptions,
   fallbackName?: string,
 ): TypeInfo | undefined {
-  const fromRefersTo = ident && structFromRefersTo(ident);
+  const fromBindings = ident && boundStruct(ident, opts.bindings);
   const name = ident?.originalName ?? fallbackName;
-  const fromRegistry = name ? structs?.get(name) : undefined;
-  const elem = fromRefersTo ?? fromRegistry;
+  const fromRegistry = name ? opts.structs?.get(name) : undefined;
+  const elem = fromBindings ?? fromRegistry;
   if (!elem) return undefined;
-  const inner = structLayout(elem, conditions, structs);
+  const inner = structLayout(elem, opts);
   return { alignment: inner.alignment, size: inner.bufferSize };
 }
 
-/** Walk a bound RefIdent's refersTo chain to find its StructElem, if any. */
-function structFromRefersTo(ident: RefIdent): StructElem | undefined {
-  const decl = ident.refersTo;
-  if (decl?.kind !== "decl") return undefined;
-  const elem = decl.declElem;
+/** Find the StructElem a bound RefIdent resolved to, if any. */
+function boundStruct(
+  ident: RefIdent,
+  bindings: LinkBindings | undefined,
+): StructElem | undefined {
+  const elem = bindings && refDecl(ident, bindings)?.declElem;
   if (elem?.kind !== "struct") return undefined;
   return elem;
 }

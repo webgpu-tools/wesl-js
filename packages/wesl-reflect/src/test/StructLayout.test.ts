@@ -1,21 +1,35 @@
 import { expect, test } from "vitest";
-import { bindAndTransform, RecordResolver, type StructElem } from "wesl";
+import {
+  bindAndTransform,
+  type LinkBindings,
+  RecordResolver,
+  type StructElem,
+} from "wesl";
 import { structLayout, typeLayout } from "../StructLayout.ts";
 
-/** Parse and bind WESL source(s), return all structs. */
-function bindModules(weslSrc: Record<string, string>): StructElem[] {
+interface BoundStructs {
+  structs: StructElem[];
+  bindings: LinkBindings;
+}
+
+/** Parse and bind WESL source(s), return all structs plus link bindings. */
+function bindModules(weslSrc: Record<string, string>): BoundStructs {
   const resolver = new RecordResolver(weslSrc, { debugWeslRoot: "test" });
-  bindAndTransform({ rootModuleName: "test", resolver });
-  return [...resolver.allModules()].flatMap(([, ast]) =>
+  const { transformedAst } = bindAndTransform({
+    rootModuleName: "test",
+    resolver,
+  });
+  const structs = [...resolver.allModules()].flatMap(([, ast]) =>
     ast.moduleElem.decls.filter((e): e is StructElem => e.kind === "struct"),
   );
+  return { structs, bindings: transformedAst.bindings };
 }
 
 /** Parse a single struct and compute its layout. */
 function layoutOf(src: string, structName = "S") {
-  const allStructs = bindModules({ "./test.wesl": src });
-  const s = allStructs.find(s => s.name.ident.originalName === structName)!;
-  return structLayout(s);
+  const { structs, bindings } = bindModules({ "./test.wesl": src });
+  const s = structs.find(s => s.name.ident.originalName === structName)!;
+  return structLayout(s, { bindings });
 }
 
 test("scalar f32", () => {
@@ -312,8 +326,8 @@ test("f16 vectors: vec2h, vec3h", () => {
   expect(layout.bufferSize).toBe(16);
 });
 
-test("cross-module: struct in another file resolved via refersTo", () => {
-  const allStructs = bindModules({
+test("cross-module: struct in another file resolved via bindings", () => {
+  const { structs, bindings } = bindModules({
     "./test.wesl": `
       import package::file1::Inner;
       struct S { id: u32, inner: Inner }
@@ -322,8 +336,8 @@ test("cross-module: struct in another file resolved via refersTo", () => {
       struct Inner { position: vec3f, radius: f32 }
     `,
   });
-  const s = allStructs.find(s => s.name.ident.originalName === "S")!;
-  const layout = structLayout(s);
+  const s = structs.find(s => s.name.ident.originalName === "S")!;
+  const layout = structLayout(s, { bindings });
   expect(layout.fields.map(f => [f.name, f.offset])).toEqual([
     ["id", 0],
     ["inner", 16],
@@ -332,7 +346,7 @@ test("cross-module: struct in another file resolved via refersTo", () => {
 });
 
 test("cross-module: same-named structs in different modules don't collide", () => {
-  const allStructs = bindModules({
+  const { structs, bindings } = bindModules({
     "./test.wesl": `
       import package::file1::Data;
       struct S { a: Data }
@@ -344,15 +358,15 @@ test("cross-module: same-named structs in different modules don't collide", () =
       struct Data { a: u32 }
     `,
   });
-  const s = allStructs.find(s => s.name.ident.originalName === "S")!;
-  const layout = structLayout(s);
+  const s = structs.find(s => s.name.ident.originalName === "S")!;
+  const layout = structLayout(s, { bindings });
   // file1::Data has vec3f+f32 ==> size=16, align=16
   expect(layout.fields[0].size).toBe(16);
   expect(layout.alignment).toBe(16);
 });
 
 test("@if filters conditional members", () => {
-  const allStructs = bindModules({
+  const { structs } = bindModules({
     "./test.wesl": `struct S {
       a: u32,
       @if(MOBILE) b: f32,
@@ -360,10 +374,10 @@ test("@if filters conditional members", () => {
       c: f32,
     }`,
   });
-  const s = allStructs.find(s => s.name.ident.originalName === "S")!;
+  const s = structs.find(s => s.name.ident.originalName === "S")!;
 
   // MOBILE=true: a(u32), b(f32), c(f32) => offsets 0, 4, 8
-  const mobile = structLayout(s, { MOBILE: true });
+  const mobile = structLayout(s, { conditions: { MOBILE: true } });
   expect(mobile.fields.map(f => [f.name, f.offset])).toEqual([
     ["a", 0],
     ["b", 4],
@@ -372,7 +386,7 @@ test("@if filters conditional members", () => {
   expect(mobile.bufferSize).toBe(12);
 
   // MOBILE=false: a(u32), b(vec3f), c(f32) => offsets 0, 16, 28
-  const desktop = structLayout(s, { MOBILE: false });
+  const desktop = structLayout(s, { conditions: { MOBILE: false } });
   expect(desktop.fields.map(f => [f.name, f.offset])).toEqual([
     ["a", 0],
     ["b", 16],
@@ -382,26 +396,26 @@ test("@if filters conditional members", () => {
 });
 
 test("@if/@else filters conditional members", () => {
-  const allStructs = bindModules({
+  const { structs } = bindModules({
     "./test.wesl": `struct S {
       @if(false) a: u32,
       @else a: f32,
     }`,
   });
-  const s = allStructs.find(s => s.name.ident.originalName === "S")!;
-  const layout = structLayout(s, {});
+  const s = structs.find(s => s.name.ident.originalName === "S")!;
+  const layout = structLayout(s, { conditions: {} });
   expect(layout.fields).toEqual([{ name: "a", offset: 0, size: 4 }]);
 });
 
 test("no conditions: all members included", () => {
-  const allStructs = bindModules({
+  const { structs } = bindModules({
     "./test.wesl": `struct S {
       a: u32,
       @if(MOBILE) b: f32,
       c: f32,
     }`,
   });
-  const s = allStructs.find(s => s.name.ident.originalName === "S")!;
+  const s = structs.find(s => s.name.ident.originalName === "S")!;
   // without conditions, all members present (including conditional ones)
   const layout = structLayout(s);
   expect(layout.fields.length).toBe(3);

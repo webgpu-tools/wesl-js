@@ -15,6 +15,11 @@ export function makeLiveDecls(parent: LiveDecls | null = null): LiveDecls {
   return { decls: new Map<string, DeclIdent>(), parent };
 }
 
+/** create a root LiveDecls with the provided decls indexed by name */
+export function makeRootLiveDecls(decls: DeclIdent[]): LiveDecls {
+  return { decls: new Map(decls.map(d => [d.originalName, d])), parent: null };
+}
+
 /** debug routine for logging LiveDecls */
 export function liveDeclsToString(liveDecls: LiveDecls): string {
   const { decls, parent } = liveDecls;
