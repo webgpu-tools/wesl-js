@@ -1,0 +1,90 @@
+{
+  "group": "keep",
+  "specs": {
+    "const_assert/const_assert": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "scope": "function",
+            "case": "variable_not_false"
+          },
+          "code": "\nconst one = 1;\nconst two = 2;\nconst three = 3;\nconst is_true = true;\nconst is_false = false;\nfn f() { const_assert (!is_false); }"
+        }
+      ]
+    },
+    "types/alias": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "target": "i32"
+          },
+          "code": "\nalias S = T;\nalias T = i32;\n"
+        }
+      ]
+    },
+    "expression/access/array": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "type": "i32"
+          },
+          "code": "\n    fn foo() {\n      var x = array(1,2,3);\n      let tmp = x[i32(0)];\n    }"
+        }
+      ]
+    },
+    "decl/const": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "target": "a"
+          },
+          "code": "\nconst a : i32 = 42;\nconst b : i32 = a;\n"
+        }
+      ]
+    },
+    "expression/call/builtin/ldexp": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "case": "abstract 1st arg past f32 max with an i32 exponent, the call:ldexp const-eval gap"
+          },
+          "code": "const big_ldexp = ldexp(-1.7976931348623157e+308, i32(0));"
+        }
+      ]
+    },
+    "expression/binary/bitwise_shift": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "case": "abstract-int vector shifted by the full bit width, the binary:>>:vec const-eval gap"
+          },
+          "code": "fn f() { const r = vec2(1) >> vec2(64); }"
+        }
+      ]
+    },
+    "expression/call/builtin/radians": {
+      "total": 1,
+      "unique": 1,
+      "shaders": [
+        {
+          "params": {
+            "case": "near-max abstract float: a naive (a * PI) / 180 overflows the intermediate"
+          },
+          "code": "const big_radians = radians(-1.7976931348623157e+308);"
+        }
+      ]
+    }
+  }
+}

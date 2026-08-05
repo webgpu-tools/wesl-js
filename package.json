@@ -38,6 +38,7 @@
     "test:built": "run-s build:all test:built:fast",
     "test:built:fast": "pnpm --filter built-test test:built:fast",
     "test:cts": "pnpm --filter \"*\" --if-present test:cts",
+    "test:cts:full": "pnpm --filter \"*\" --if-present test:cts:full",
     "test:e2e": "pnpm --filter \"*\" --if-present test:e2e",
     "test:examples": "pnpm --filter \"./examples/**\" test",
     "test:integration": "pnpm --filter \"./packages/**\" test:integration",

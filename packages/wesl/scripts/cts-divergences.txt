@@ -1,0 +1,6 @@
+# WESL strips unknown attributes so tooling annotations such as @test(name) do
+# not reach the WGSL compiler. These negative CTS cases use unknown attributes
+# as misspellings, so stripping them makes the test shaders compile.
+webgpu:shader,validation,shader_io,align:parsing:align="misspelling"
+webgpu:shader,validation,shader_io,id:id:attr="misspelling"
+webgpu:shader,validation,shader_io,size:size:attr="misspelling"

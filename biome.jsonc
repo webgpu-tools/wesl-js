@@ -26,7 +26,8 @@
       "!**/GEMINI.md",
       "!**/clank",
       "!**/lezer-wesl/src/parser.*",
-      "!**/tests/fixtures"
+      "!**/tests/fixtures",
+      "!**/.cts-cache" // generated CTS oracle sample corpus (also gitignored)
     ]
   },
   "formatter": {

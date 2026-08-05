@@ -26,6 +26,60 @@ rpr turbo:validate --dry-run    # show what would run
 - Only tasks run via `turbo run <task>` need turbo.json entries
 - Undefined tasks still run but with default settings (no caching)
 
+### CTS tests
+The WebGPU CTS (a git submodule in `cts/`) is used two different ways.
+
+**Transpile-diff** runs the CTS twice, once plain and once with the linker
+spliced into `createShaderModule`, and diffs the results. Dawn judges the
+shaders, so this tests parse and emit fidelity, not our type checker. It needs
+a real GPU adapter, so it does not run under a sandbox.
+
+```bash
+rpr test:cts        # two fast queries (~5s), runs on every prepush
+rpr test:cts:full   # the whole validation suite (~2 min), run before a merge
+```
+
+**Fixture replay** decodes CTS data as ordinary vitest suites with no CTS
+runtime and no GPU:
+
+- const-eval case tables -> `CtsConstEval.test.ts`: the CTS's own case tables
+  (inputs and expected values or float acceptance intervals), used as an
+  oracle for `src/types/`.
+- validation shaders -> `CtsValidation.test.ts`: shaders the CTS considers
+  valid. We must not reject or crash on any of them, and their `const_assert`s
+  must evaluate to `true`. Where we simply give up (an unimplemented builtin,
+  say) the construct must carry a reasoned `skip` (out of scope) or `todo` (want
+  it, don't have it) tag in `gapTriage`; an untriaged gap construct fails the
+  test. The by-construct tallies, the typed and evaluated fractions, and any
+  triage entries nothing matches any more go to
+  `packages/wesl/.cts-cache/gap-report.md` (report only, nothing gates on it).
+
+The sampled dumps both live IN the `cts/` fork, under `dumps/cases/` and
+`dumps/shaders/`, versioned with the `src/` tree they derive from. A dump is a
+deterministic function of that tree, so the submodule SHA pins the dumps too, and
+a bare wesl checkout just reads the files (no CTS npm toolchain to install). Each
+dump stamps its src tree hash into a `manifest.json`; `CtsDumps.test.ts` compares
+that stamp to the live submodule's `HEAD:src`, so a submodule bump without a
+matching regen fails loudly instead of testing stale data. A tiny curated
+keep-set (`cts-keep/`) is checked into wesl and always runs, smoke testing the
+decode machinery even when the submodule is not checked out.
+
+Regenerate the dumps in the same commit that bumps the submodule:
+
+```bash
+rpr dump:cts:cases     # rebuild cts/dumps/cases/ (no GPU)
+rpr dump:cts:shaders   # rebuild cts/dumps/shaders/ (~70s, needs a GPU)
+```
+
+Extending const eval (a new builtin, matrix operators) means deleting a name
+from the exclusion filters in `packages/wesl/scripts/dump-cts-cases.ts`, then
+re-running `rpr dump:cts:cases`.
+
+To iterate on the offline oracles alone: `rpr test:cts:offline`. For the full
+corpus, hand-dump with the fork tools at `--max 0` to a scratch dir and point the
+oracle at it with `WESL_CTS_CASES` / `WESL_CTS_SHADERS` (see
+`cts/transpiler/README-DumpTools.md`).
+
 ### version bumps and releases
 - version bumps should be done on the `tomain` branch
 - after bumping, push with tags: `git push && git push --tags`
@@ -60,6 +114,18 @@ is useful so that visitors can have a clean version to copy from,
 and so that stackblitz examples will work.
 - prep:examples should be run after each new release, 
 so that the examples use the latest version of wesl-js.
+
+### benchmark perf check
+- After a change that could affect linker perf, A/B the working tree against the
+  committed code (default scope is `bevy_env_map` through the `link` variant, ~1 min):
+
+```bash
+rpr bench:baseline HEAD    # snapshot the "before" side (presuming change is in the working tree)
+rpr bench --baseline       # A/B run; the HTML viewer opens when it finishes
+```
+
+- `equivalent` is the pass. `inconclusive` is not - the machine was too noisy or
+  the settings need recalibrating (rerun, or `--preset thorough`).
 
 ### _baseline
 - Holds a flat copy of the repo for benchmark comparisons.
