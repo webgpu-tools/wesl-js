@@ -187,13 +187,6 @@ export function createLibraryResolvers(
   return flattened.map(lib => new BundleResolver(lib, debugWeslRoot));
 }
 
-/** @deprecated No longer needed: binding no longer mutates ASTs (results go
- * in a per-link LinkBindings table), so resolvers can be shared across link()
- * calls directly. Now an identity wrapper; will be removed in a future release. */
-export function freshResolver(inner: ModuleResolver): ModuleResolver {
-  return inner;
-}
-
 /** Convert file path to module path (e.g., "foo/bar.wesl" to "package::foo::bar"). */
 export function fileToModulePath(
   filePath: string,
