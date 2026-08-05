@@ -35,6 +35,10 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: pnpm ci:check
 
+      - name: Run CTS fast queries (macOS)
+        if: matrix.os == 'macos-latest'
+        run: pnpm --filter wesl test:cts
+
       - name: Run CI checks (Windows)
         if: matrix.os == 'windows-latest'
         run: pnpm ci:check-windows
