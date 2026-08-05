@@ -1,4 +1,6 @@
 import type {
+  AssignElem,
+  AssignOp,
   AttributeElem,
   ContinuingElem,
   ExpressionElem,
@@ -6,9 +8,10 @@ import type {
   ForInit,
   ForUpdate,
   LoopElem,
+  PhonyTarget,
   WhileElem,
 } from "../AbstractElems.ts";
-import { parseLocalVarDecl } from "./ParseLocalVar.ts";
+import { parseLetDecl, parseLocalVarDecl } from "./ParseLocalVar.ts";
 import { parseAssignmentRhs, parseIncDecOp } from "./ParseSimpleStatement.ts";
 import {
   beginStatement,
@@ -21,6 +24,7 @@ import {
   parseContentExpression,
   throwParseError,
 } from "./ParseUtil.ts";
+import { parseConstDecl } from "./ParseValueDeclaration.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 
 /**
@@ -100,24 +104,46 @@ export function parseContinuingStatement(
 
 /** Grammar: for_init? ';'
  *           for_init : variable_or_value_statement | variable_updating_statement | func_call_statement
+ *           variable_or_value_statement : variable_decl ('=' expression)? | 'let' ... | 'const' ...
  */
 function parseForInit(ctx: ParsingContext): ForInit | undefined {
   const { stream } = ctx;
-  const varDecl = parseLocalVarDecl(ctx);
-  if (varDecl) {
-    return varDecl; // parseLocalVarDecl already consumed the ';'
-  }
-  const expr = parseContentExpression(ctx); // null for empty case
-  const update = expr ? finishForUpdate(ctx, expr) : undefined;
+  // each declaration parser consumes its own ';'
+  const decl =
+    parseLocalVarDecl(ctx) ?? parseLetDecl(ctx) ?? parseConstDecl(ctx);
+  if (decl) return decl;
+
+  const update = parseForUpdate(ctx); // undefined for the empty case
   expect(stream, ";", "for loop init");
   return update;
 }
 
 /** Grammar: for_update : variable_updating_statement | func_call_statement */
 function parseForUpdate(ctx: ParsingContext): ForUpdate | undefined {
+  const phony = parseForPhony(ctx);
+  if (phony) return phony;
+
   const expr = parseContentExpression(ctx);
   if (!expr) return undefined;
   return finishForUpdate(ctx, expr);
+}
+
+/** Grammar: variable_updating_statement : '_' '=' expression
+ * The statement form of a phony assignment consumes a trailing ';', which a for
+ * clause must not, so it is parsed separately here. */
+function parseForPhony(ctx: ParsingContext): AssignElem | undefined {
+  const { stream } = ctx;
+  const underscore = stream.matchText("_");
+  if (!underscore) return undefined;
+
+  const lhs: PhonyTarget = { kind: "phony", span: underscore.span };
+  const eq = stream.matchText("=");
+  if (!eq) throwParseError(stream, "Expected '=' after '_'");
+  const op: AssignOp = { value: "=", span: eq.span };
+  const rhs = expectExpression(ctx, "Expected expression after '_ ='");
+
+  const start = underscore.span[0];
+  return { kind: "assign", lhs, op, rhs, start, end: stream.checkpoint() };
 }
 
 /**

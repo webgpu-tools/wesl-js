@@ -1,4 +1,5 @@
 import type { ModuleElem } from "../AbstractElems.ts";
+import { errorDiagnostic } from "../Diagnostics.ts";
 import { ParseError } from "../ParseError.ts";
 import type { WeslAST, WeslParseState } from "../ParseWESL.ts";
 import { WeslParseError } from "../ParseWESL.ts";
@@ -17,18 +18,20 @@ export function parseWesl(
   const { ctx, state } = createParseState(srcModule, options);
   try {
     parseModule(ctx);
-    const { moduleElem } = state.stable;
+    const { moduleElem, diagnostics } = state.stable;
     attachComments(ctx, moduleElem);
-    checkDoBlockNames(moduleElem);
+    diagnostics.push(...checkDoBlockNames(moduleElem));
     return state.stable;
   } catch (e) {
-    if (e instanceof ParseError) {
-      throw new WeslParseError({ cause: e, src: srcModule });
-    }
-    // unexpected error (bug in parser), wrap for user-friendly reporting
+    // parseModule recovers from syntax errors, so an error escaping here is a
+    // parser bug; wrap it (keeping any recovered diagnostics) for reporting
     const message = e instanceof Error ? e.message : String(e);
-    const parseError = new ParseError(message, [0, 0]);
-    throw new WeslParseError({ cause: parseError, src: srcModule });
+    const cause = e instanceof ParseError ? e : new ParseError(message, [0, 0]);
+    const diagnostics = [
+      ...state.stable.diagnostics,
+      errorDiagnostic(cause.message, ...cause.span),
+    ];
+    throw new WeslParseError({ cause, src: srcModule, diagnostics });
   }
 }
 
@@ -47,7 +50,14 @@ function createParseState(
   };
   const state: WeslParseState = {
     context: { scope: rootScope },
-    stable: { srcModule, moduleElem, rootScope, imports: [], parseOptions },
+    stable: {
+      srcModule,
+      moduleElem,
+      rootScope,
+      imports: [],
+      parseOptions,
+      diagnostics: [],
+    },
   };
   const ctx = new ParsingContext(stream, state, parseOptions);
   return { ctx, state };

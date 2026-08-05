@@ -74,10 +74,18 @@ export function throwParseError(stream: Stream<Token>, message: string): never {
   throw new ParseError(message, span);
 }
 
-/** Parse comma-separated items. Caller handles delimiters. */
+/**
+ * Parse comma-separated items, up to (but not consuming) the closing `end`
+ * token. Caller handles delimiters.
+ *
+ * Grammar: item (',' item)* ','?
+ * WGSL allows one trailing comma before the terminator, so a comma followed by
+ * `end` closes the list rather than promising another item.
+ */
 export function parseCommaList<T>(
   ctx: ParsingContext,
   parseItem: (ctx: ParsingContext) => T | null,
+  end = ")",
 ): T[] {
   const items: T[] = [];
   while (true) {
@@ -85,6 +93,7 @@ export function parseCommaList<T>(
     if (item === null) break;
     items.push(item);
     if (!ctx.stream.matchText(",")) break;
+    if (ctx.stream.peek()?.text === end) break;
   }
   return items;
 }

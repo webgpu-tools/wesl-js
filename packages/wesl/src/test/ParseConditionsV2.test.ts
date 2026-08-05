@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { astToString } from "../debug/ASTtoString.ts";
-import { parseTest, parseWESL } from "./TestUtil.ts";
+import { parseErrorText, parseTest } from "./TestUtil.ts";
 
 test("@if() with an empty condition is a parse error", () => {
   // Past `@if(` the parser is committed: a missing condition must error rather
   // than silently return null on a half-consumed stream.
-  expect(() => parseWESL("@if() fn a() {}")).toThrow(/Expected expression/);
+  expect(parseErrorText("@if() fn a() {}")).toMatch(/Expected expression/);
 });
 
 test("parse complex condition", () => {

@@ -178,6 +178,7 @@ function parseBuiltinAttribute(
   const { stream } = ctx;
   expect(stream, "(", "@builtin");
   const nameToken = expectWord(stream, "Expected identifier in @builtin");
+  stream.matchText(","); // attrib_end : ','? ')'
   expect(stream, ")", "@builtin parameter");
 
   const builtinAttr: BuiltinAttribute = {
@@ -226,6 +227,7 @@ function parseDiagnosticAttribute(
   } else {
     rule = [firstName, null];
   }
+  stream.matchText(","); // attrib_end : ','? ')'
   expect(stream, ")", "@diagnostic parameters");
 
   const kind = "@diagnostic";

@@ -1,4 +1,5 @@
 import type { AbstractElem } from "../AbstractElems.ts";
+import { errorDiagnostic } from "../Diagnostics.ts";
 import type { WeslParseContext, WeslParseState } from "../ParseWESL.ts";
 import {
   type DeclIdent,
@@ -53,6 +54,11 @@ export class ParsingContext {
   /** Append a top-level declaration to the module, in source order. */
   addModuleDecl(elem: AbstractElem): void {
     this.state.stable.moduleElem.decls.push(elem);
+  }
+
+  /** Record a recovered syntax error. */
+  addError(message: string, start: number, end: number): void {
+    this.state.stable.diagnostics.push(errorDiagnostic(message, start, end));
   }
 
   pushScope(kind: Scope["kind"] = "scope"): void {

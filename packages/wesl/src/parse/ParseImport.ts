@@ -13,9 +13,11 @@ import { parseMany, throwParseError } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 import type { WeslStream } from "./WeslStream.ts";
 
-/** WESL Grammar: translation_unit : import_statement* global_directive* global_decl* */
-export function parseWeslImports(ctx: ParsingContext): ImportElem[] {
-  return [...parseMany(ctx, parseImportStatement)];
+/** WESL Grammar: translation_unit : import_statement* global_directive* global_decl*
+ * Yields each import as it parses (lazy, so callers keep imports parsed
+ * before a syntax error). */
+export function* parseWeslImports(ctx: ParsingContext): Generator<ImportElem> {
+  yield* parseMany(ctx, parseImportStatement);
 }
 
 /** Grammar: import_statement : conditional_attribute? 'import' import_relative? (import_collection | import_path_or_item) ';' */

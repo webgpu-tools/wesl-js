@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { CallElem, DoBlockElem } from "../AbstractElems.ts";
-import { freshResolver, RecordResolver } from "../ModuleResolver.ts";
-import { linkTestOpts, parseTest } from "./TestUtil.ts";
+import { RecordResolver } from "../ModuleResolver.ts";
+import { linkTestOpts, parseErrorText, parseTest } from "./TestUtil.ts";
 
 /** `do` blocks are an opt-in WESL extension (default off). */
 const doExt = { weslExtensions: { doBlocks: true } } as const;
@@ -97,9 +97,11 @@ test("link drops the do block, keeps surrounding declarations", async () => {
 });
 
 test("do block body links without spurious binding errors", async () => {
-  // example2 has no fn/global decls, only do blocks: a clean emit proves the
-  // do bodies (u.frame, steps, step_sim, render, reduce) bypass bindIdents.
+  // example2 has no fn/global decls, only do blocks: linking drops them all and
+  // emits nothing, proving the do bodies (u.frame, steps, step_sim, render,
+  // reduce) bypass bindIdents (an unbound ident there would throw).
   const wgsl = await linkTestOpts(doExt, example2);
+  expect(wgsl.trim()).toBe(""); // do blocks fully dropped, nothing leaked
   for (const name of [
     "reduce",
     "frame",
@@ -117,7 +119,7 @@ test("error: fn and do block with the same name", () => {
     fn reduce() {}
     do reduce() {}
   `;
-  expect(() => parseTest(src, doExt)).toThrow(/declared as both fn and do/);
+  expect(parseErrorText(src, doExt)).toMatch(/declared as both fn and do/);
 });
 
 test("error: two do blocks with the same name", () => {
@@ -127,31 +129,30 @@ test("error: two do blocks with the same name", () => {
     do same() {}
     do same() {}
   `;
-  expect(() => parseTest(src, doExt)).toThrow(/declared as do more than once/);
+  expect(parseErrorText(src, doExt)).toMatch(/declared as do more than once/);
 });
 
 test("default off: do block syntax is not recognized without the extension", () => {
   // Without the extension, `do` stays a reserved word and module-level `do`
   // fails to parse (no DoBlockElem is produced).
-  expect(() => parseTest(example1)).toThrow();
-  expect(() => parseTest("do tick() {}")).toThrow();
+  expect(parseErrorText(example1)).not.toBe("");
+  expect(parseErrorText("do tick() {}")).not.toBe("");
 });
 
-test("freshResolver preserves weslExtensions across re-parse", () => {
-  // Resolver reuse re-parses via parseSrcModule(ast.srcModule, ast.parseOptions);
-  // the do-block extension must survive that round trip.
+test("RecordResolver applies weslExtensions when parsing", () => {
   const src = "do tick() {}";
-  const inner = new RecordResolver({ "package::main": src }, doExt);
-  const wrapped = freshResolver(freshResolver(inner));
-  const ast = wrapped.resolveModule("package::main")!;
+  const resolver = new RecordResolver({ "package::main": src }, doExt);
+  const ast = resolver.resolveModule("package::main")!;
   const blocks = ast.moduleElem.decls.filter(
     (e): e is DoBlockElem => e.kind === "do",
   );
   expect(blocks.map(b => b.name.name)).toEqual(["tick"]);
 
-  // an optionless resolver stays OFF (fails to parse `do`, as before)
-  const off = freshResolver(new RecordResolver({ "package::main": src }));
-  expect(() => off.resolveModule("package::main")).toThrow();
+  // an optionless resolver stays OFF (`do` is a syntax error)
+  const off = new RecordResolver({ "package::main": src });
+  const offAst = off.resolveModule("package::main")!;
+  expect(offAst.diagnostics).not.toEqual([]);
+  expect(offAst.moduleElem.decls.filter(e => e.kind === "do")).toEqual([]);
 });
 
 test("regression: a normal fn named do_something is unaffected", async () => {
@@ -160,5 +161,5 @@ test("regression: a normal fn named do_something is unaffected", async () => {
 });
 
 test("regression: do as a reserved word still errors when the extension is off", () => {
-  expect(() => parseTest("fn f() { do }")).toThrow(/Expected ';'/);
+  expect(parseErrorText("fn f() { do }")).toMatch(/Expected ';'/);
 });

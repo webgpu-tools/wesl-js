@@ -44,7 +44,7 @@ function parseExtensionDirective(
   const token = stream.matchText(keyword);
   if (!token) return null;
 
-  const extensions = parseCommaList(ctx, parseDirectiveName);
+  const extensions = parseCommaList(ctx, parseDirectiveName, ";");
   expect(stream, ";", `${keyword} directive`);
   const directive = { kind: keyword, extensions };
   return makeDirectiveElem(directive, token, stream, attributes);

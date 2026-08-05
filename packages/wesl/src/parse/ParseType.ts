@@ -28,7 +28,11 @@ export function parseSimpleTypeRef(ctx: ParsingContext): TypeRefElem | null {
   return { kind: "type", name: refIdent, templateParams, start, end };
 }
 
-/** Parse comma-separated template parameters until closing '>'. */
+/**
+ * Parse comma-separated template parameters until closing '>'.
+ *
+ * Grammar: template_arg_comma_list : template_arg_expression (',' template_arg_expression)* ','?
+ */
 export function parseTemplateParams(
   ctx: ParsingContext,
 ): TypeTemplateParameter[] {
@@ -40,6 +44,7 @@ export function parseTemplateParams(
 
   const params = [parseTemplateParam(ctx)];
   while (stream.matchText(",")) {
+    if (consumeTemplateEnd(stream)) return params; // a trailing comma ends the list
     params.push(parseTemplateParam(ctx));
   }
 

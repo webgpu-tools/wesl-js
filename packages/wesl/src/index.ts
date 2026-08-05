@@ -1,6 +1,7 @@
 export * from "./AbstractElems.ts";
 export * from "./BindIdents.ts";
 export { filterValidElements } from "./Conditions.ts";
+export * from "./Diagnostics.ts";
 export * from "./debug/ASTtoString.ts";
 export * from "./debug/ScopeToString.ts";
 export * from "./discovery/FindUnboundIdents.ts";

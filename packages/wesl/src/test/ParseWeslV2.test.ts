@@ -1201,3 +1201,19 @@ test("parse @location", () => {
             ref pos"
   `);
 });
+
+// WGSL allows one trailing comma in these lists, and the CTS validation corpus
+// leans on it. Emit normalizes the comma away, so these are parse-only tests.
+test("parse a trailing comma in template, attribute, and directive lists", () => {
+  const src = `
+    enable f16,;
+    alias T = array<u32, 4,>;
+    struct S {
+      @align(4,) @location(0,) @interpolate(flat,) a: f32,
+    }
+    @vertex fn main() -> @builtin(position,) vec4f {
+      return vec4f(0);
+    }
+  `;
+  expect(parseTest(src).diagnostics).toEqual([]);
+});

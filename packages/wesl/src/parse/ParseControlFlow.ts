@@ -7,7 +7,9 @@ import type {
   SwitchElem,
 } from "../AbstractElems.ts";
 import { parseAttributeList } from "./ParseAttribute.ts";
+import { markAttempt, recoverListItem } from "./ParseRecovery.ts";
 import {
+  atModuleKeyword,
   beginStatement,
   expectCompound,
   finishStatement,
@@ -21,6 +23,7 @@ import {
   throwParseError,
 } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
+import type { WeslToken } from "./WeslStream.ts";
 
 /**
  * Grammar: if_statement : attribute* if_clause else_if_clause* else_clause?
@@ -97,6 +100,10 @@ function parseElseChain(ctx: ParsingContext): IfElem | BlockElem | undefined {
  * Grammar: switch_clause : case_clause | default_alone_clause
  * Grammar: case_clause : 'case' case_selectors ':'? compound_statement
  * Grammar: default_alone_clause : 'default' ':'? compound_statement
+ *
+ * The switch owns the body's `{`, so a clause with a syntax error is recovered
+ * here: the enclosing block's skip scan never saw that brace and would take the
+ * switch's `}` for the block's own.
  */
 function expectSwitchClauses(ctx: ParsingContext): {
   bodyAttributes?: AttributeElem[];
@@ -106,8 +113,17 @@ function expectSwitchClauses(ctx: ParsingContext): {
   const bodyAttrs = parseAttributeList(ctx);
   expect(stream, "{", "switch expression");
   const clauses: SwitchClauseElem[] = [];
-  while (!stream.matchText("}")) {
-    clauses.push(parseSwitchClause(ctx));
+  while (true) {
+    const attempt = markAttempt(ctx);
+    try {
+      // inside the try: matching '}' peeks, which throws on an unlexable token
+      if (stream.matchText("}")) break;
+      clauses.push(parseSwitchClause(ctx));
+    } catch (e) {
+      // bail at a module-only keyword: a stray '{' swallowed the switch's own
+      // '}', so module-level recovery must restart at that declaration
+      recoverListItem(ctx, e, attempt, atClauseBoundary, atModuleKeyword);
+    }
   }
   return { bodyAttributes: attrsOrUndef(bodyAttrs), clauses };
 }
@@ -145,18 +161,45 @@ function parseSwitchClause(ctx: ParsingContext): SwitchClauseElem {
   );
 }
 
-/** Grammar: case_selectors : case_selector (',' case_selector)* ','? */
+/** @return true if the token ends a failed clause's skip: the next clause
+ * (`case`/`default`, or the `@` starting its attributes), the switch body's
+ * `}`, or - at any depth - a module-only keyword. */
+function atClauseBoundary(token: WeslToken, depth: number): boolean {
+  if (atModuleKeyword(token)) return true;
+  if (depth !== 0) return false;
+  if (token.kind === "keyword")
+    return token.text === "case" || token.text === "default";
+  return token.text === "}" || token.text === "@";
+}
+
+/**
+ * Grammar: case_selectors : case_selector (',' case_selector)* ','?
+ * Grammar: case_selector : 'default' | expression
+ */
 function parseCaseSelectors(
   ctx: ParsingContext,
 ): (ExpressionElem | "default")[] {
   const { stream } = ctx;
-  const selectors = [expectExpression(ctx, "Expected expression after 'case'")];
+  const selectors = [
+    parseCaseSelector(ctx, "Expected expression after 'case'"),
+  ];
   while (stream.matchText(",")) {
-    selectors.push(
-      expectExpression(ctx, "Expected expression after ',' in case values"),
-    );
+    // a trailing comma ends the list: the body (or its optional ':') follows
+    const next = stream.peek()?.text;
+    if (next === "{" || next === ":") break;
+    const msg = "Expected expression after ',' in case values";
+    selectors.push(parseCaseSelector(ctx, msg));
   }
   return selectors;
+}
+
+/** `default` may appear among a case's selectors, not only alone. */
+function parseCaseSelector(
+  ctx: ParsingContext,
+  message: string,
+): ExpressionElem | "default" {
+  if (ctx.stream.matchText("default")) return "default";
+  return expectExpression(ctx, message);
 }
 
 /**

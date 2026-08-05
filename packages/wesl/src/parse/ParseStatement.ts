@@ -16,6 +16,7 @@ import {
   parseLoopStatement,
   parseWhileStatement,
 } from "./ParseLoop.ts";
+import { markAttempt, recoverListItem } from "./ParseRecovery.ts";
 import { parseSimpleStatement } from "./ParseSimpleStatement.ts";
 import {
   attachAttributes,
@@ -27,6 +28,7 @@ import {
 } from "./ParseUtil.ts";
 import { parseConstDecl } from "./ParseValueDeclaration.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
+import type { WeslToken } from "./WeslStream.ts";
 
 interface CompoundOptions {
   loopBody?: boolean;
@@ -37,6 +39,41 @@ interface CompoundOptions {
 // e.g. @if(X) { let y = 1; } makes y visible outside the block.
 // see https://github.com/webgpu-tools/wesl-spec/issues/158
 const conditionalBlockFeature = true;
+
+/** Tokens that begin a statement, so one bounds a failed statement's skip. */
+const statementStartKeywords = new Set([
+  "let",
+  "var",
+  "const",
+  "const_assert",
+  "if",
+  "switch",
+  "loop",
+  "for",
+  "while",
+  "return",
+  "break",
+  "continue",
+  "continuing",
+  "discard",
+]);
+
+/** Keywords that begin module-level declarations but can never appear in a
+ * statement. One of these during a failed statement's skip means a stray `{`
+ * consumed the enclosing block's real closing `}` and the scan escaped the
+ * function, so it bounds at any depth (and parseBlockStatements bails).
+ * `diagnostic` is omitted: it also names an attribute, so it can legitimately
+ * appear inside a statement. */
+const moduleOnlyKeywords = new Set([
+  "fn",
+  "struct",
+  "override",
+  "alias",
+  "import",
+  "enable",
+  "requires",
+  "do",
+]);
 
 /** Function bodies share scope with parameters (per WGSL spec). */
 export function parseFunctionBody(ctx: ParsingContext): BlockElem | null {
@@ -119,21 +156,41 @@ function hasConditionalAttr(attributes?: AttributeElem[]): boolean {
   return !!attributes && hasConditionalAttribute(attributes);
 }
 
-/** Grammar: statement* '}' (after '{' consumed). Loop bodies may end with continuing. */
+/**
+ * Grammar: statement* '}' (after '{' consumed). Loop bodies may end with continuing.
+ *
+ * A statement with a syntax error is dropped and parsing resumes at the next
+ * statement, so the rest of the block (and the enclosing function) survives.
+ */
 function parseBlockStatements(
   ctx: ParsingContext,
   loopBody?: boolean,
 ): Statement[] {
   const { stream } = ctx;
   const body: Statement[] = [];
+  let afterContinuing = false;
   while (true) {
-    if (stream.matchText("}")) break;
-    const stmt = parseStatement(ctx);
-    if (!stmt) throwParseError(stream, "Expected statement or '}'");
-    body.push(stmt);
-    if (loopBody && stmt.kind === "continuing") {
-      expect(stream, "}", "continuing block");
-      break;
+    let attempt = markAttempt(ctx);
+    try {
+      // inside the try: matching '}' peeks, which throws on an unlexable token
+      if (stream.matchText("}")) break;
+      const stmt = parseStatement(ctx);
+      if (!stmt) throwParseError(stream, "Expected statement or '}'");
+      // recovery from a missing '}' resumes the loop, so a broken loop body can
+      // parse statements past its continuing. Drop them: continuing is last by
+      // grammar, and their idents are in the scope tree either way.
+      if (!afterContinuing) body.push(stmt);
+      if (loopBody && stmt.kind === "continuing") {
+        afterContinuing = true;
+        attempt = markAttempt(ctx); // the statement is kept; don't roll it back
+        expect(stream, "}", "continuing block");
+        break;
+      }
+    } catch (e) {
+      // bail at a module-only keyword: a stray '{' swallowed the block's real
+      // closing '}', so module-level recovery must restart at that declaration
+      recoverListItem(ctx, e, attempt, atStatementBoundary, atModuleKeyword);
+      stream.matchText(";"); // consume the terminator, if that's what we synced on
     }
   }
   return body;
@@ -185,4 +242,19 @@ function parseStatement(ctx: ParsingContext): Statement | null {
     if (stmt) partialScope.condAttribute = conditionalAttribute(attributes);
   }
   return stmt ? (stmt as Statement) : null;
+}
+
+/** @return true if the token ends a failed statement's skip: the statement's own
+ * `;`, the enclosing block's `}`, the next statement's start (a statement
+ * keyword or an attribute `@`), or - at any depth - a module-only keyword. */
+function atStatementBoundary(token: WeslToken, depth: number): boolean {
+  if (atModuleKeyword(token)) return true;
+  if (depth !== 0) return false;
+  if (token.kind === "keyword") return statementStartKeywords.has(token.text);
+  return token.text === ";" || token.text === "}" || token.text === "@";
+}
+
+/** @return true for a keyword that only occurs at module level (like `fn`). */
+export function atModuleKeyword(token: WeslToken): boolean {
+  return token.kind === "keyword" && moduleOnlyKeywords.has(token.text);
 }

@@ -96,6 +96,40 @@ test("structural emit of loop, continuing, and switch", async () => {
   expectTrimmedMatch(result, src);
 });
 
+test("'default' among a case's selectors", async () => {
+  const src = `
+    fn main() {
+      var i = 0;
+      switch i {
+        case 0, default, 1: {
+          i = 5;
+        }
+      }
+    }
+  `;
+  const result = await linkTest(src);
+  expectTrimmedMatch(result, src);
+});
+
+test("a for clause takes a let decl, a const decl, and a phony assignment", async () => {
+  const src = `
+    fn main() {
+      var v = 1;
+      for (let i = 1; i < 2; _ = v) {
+        break;
+      }
+      for (const c = 1; c < 2; ) {
+        break;
+      }
+      for (_ = v; ; ) {
+        break;
+      }
+    }
+  `;
+  const result = await linkTest(src);
+  expectTrimmedMatch(result, src);
+});
+
 test("linked WGSL keeps an inline comment before a call argument", async () => {
   const src = `
     fn main() {
