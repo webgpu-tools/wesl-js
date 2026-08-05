@@ -1,5 +1,6 @@
-# (we copy the README from the root dir)
-README.md
+# the package README is copied from the root dir; hand-written subdir READMEs
+# (src/types, cts-keep, ...) stay tracked
+/README.md
 
 # generated html documentation
 docs

@@ -24,6 +24,30 @@ export * from "./Scope.ts";
 export * from "./Span.ts";
 export * from "./SrcMap.ts";
 export * from "./StandardTypes.ts";
+// The type core publishes a curated surface: the modules below export more
+// than this so that they can share code with their siblings in types/.
+export {
+  checkExpr,
+  checkedTypeOf,
+  checkFn,
+  checkModule,
+} from "./types/Bidirectional.ts";
+export * from "./types/BuiltinSignatures.ts";
+export * from "./types/ConstEval.ts";
+export {
+  type CompositeValue,
+  type ConstValue,
+  convertValue,
+  type ScalarValue,
+  scalarToNumber,
+} from "./types/ConstValues.ts";
+export * from "./types/Conversions.ts";
+export {
+  resolveTypeRef,
+  type TypeContext,
+  typeOfDecl,
+  typeOfExpr,
+} from "./types/TypeSynthesis.ts";
 export * from "./types/Types.ts";
 export * from "./Util.ts";
 export * from "./VirtualLibraryResolver.ts";

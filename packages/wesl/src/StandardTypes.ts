@@ -1,16 +1,48 @@
 // From https://www.w3.org/TR/WGSL/#predeclared
 // Use https://github.com/webgpu-tools/wgsl-spec to regenerate these list in the future
 
-export const stdFns = `bitcast all any select arrayLength 
-  abs acos acosh asin asinh atan atanh atan2 ceil clamp cos cosh 
-  countLeadingZeros countOneBits countTrailingZeros cross 
-  degrees determinant distance dot dot4U8Packed dot4I8Packed 
-  exp exp2 extractBits faceForward firstLeadingBit firstTrailingBit 
+// Names outside core WGSL live in their own list, one per extension, which the
+// std lists below interpolate. Each list names the directive that enables it.
+//
+// We still accept every name unconditionally: wesl doesn't check a use against
+// the directives in scope, leaving that to naga/tint. So the split is for
+// readers, and for deciding which builtins deserve type signatures.
+//
+// Only extensions that add *names* appear here. Most add an attribute, an
+// enumerant, or a behavior instead (dual_source_blending,
+// pointer_composite_access), and WebGPU device features are a separate axis
+// again - see texelFormats.
+
+/** `enable subgroups`: the subgroup and quad operations. */
+export const subgroupFns = `
+  subgroupAdd subgroupAll subgroupAnd subgroupAny subgroupBallot
+  subgroupBroadcast subgroupBroadcastFirst subgroupElect
+  subgroupExclusiveAdd subgroupExclusiveMul subgroupInclusiveAdd
+  subgroupInclusiveMul subgroupMax subgroupMin subgroupMul subgroupOr
+  subgroupShuffle subgroupShuffleDown subgroupShuffleUp subgroupShuffleXor
+  subgroupXor
+  quadBroadcast quadSwapDiagonal quadSwapX quadSwapY`;
+
+/** `enable atomic_vec2u_min_max` (stores, so they return no value). */
+export const atomicMinMaxFns = `atomicStoreMin atomicStoreMax`;
+
+/** `requires packed_4x8_integer_dot_product` - a language extension, so it
+ * comes in through requires rather than enable. */
+export const packed4x8Fns = `
+  dot4U8Packed dot4I8Packed
+  pack4xI8 pack4xU8 pack4xI8Clamp pack4xU8Clamp
+  unpack4xI8 unpack4xU8`;
+
+export const stdFns = names(`bitcast all any select arrayLength
+  abs acos acosh asin asinh atan atanh atan2 ceil clamp cos cosh
+  countLeadingZeros countOneBits countTrailingZeros cross
+  degrees determinant distance dot
+  exp exp2 extractBits faceForward firstLeadingBit firstTrailingBit
   floor fma fract frexp insertBits inverseSqrt ldexp length log log2
   max min mix modf normalize pow quantizeToF16 radians reflect refract
   reverseBits round saturate sign sin sinh smoothstep sqrt step tan tanh
   transpose trunc
-  dpdx dpdxCoarse dpdxFine dpdy dpdyCoarse dpdyFine fwidth 
+  dpdx dpdxCoarse dpdxFine dpdy dpdyCoarse dpdyFine fwidth
   fwidthCoarse fwidthFine
   textureDimensions textureGather textureGatherCompare textureLoad
   textureNumLayers textureNumLevels textureNumSamples
@@ -19,19 +51,14 @@ export const stdFns = `bitcast all any select arrayLength
   textureStore
   atomicLoad atomicStore atomicAdd atomicSub atomicMax atomicMin
   atomicAnd atomicOr atomicXor atomicExchange atomicCompareExchangeWeak
-  atomicStoreMin atomicStoreMax
-  pack4x8snorm pack4x8unorm pack4xI8 pack4xU8 pack4xI8Clamp pack4xU8Clamp
+  pack4x8snorm pack4x8unorm
   pack2x16snorm pack2x16unorm pack2x16float
-  unpack4x8snorm unpack4x8unorm unpack4xI8 unpack4xU8 
+  unpack4x8snorm unpack4x8unorm
   unpack2x16snorm unpack2x16unorm unpack2x16float
   storageBarrier textureBarrier workgroupBarrier workgroupUniformLoad
-  subgroupAdd subgroupAll subgroupAnd subgroupAny subgroupBallot 
-  subgroupBroadcast subgroupBroadcastFirst subgroupElect 
-  subgroupExclusiveAdd subgroupExclusiveMul subgroupInclusiveAdd 
-  subgroupInclusiveMul subgroupMax subgroupMin subgroupMul subgroupOr
-  subgroupShuffle subgroupShuffleDown subgroupShuffleUp subgroupShuffleXor
-  subgroupXor
-  quadBroadcast quadSwapDiagonal quadSwapX quadSwapY`.split(/\s+/);
+  ${subgroupFns}
+  ${atomicMinMaxFns}
+  ${packed4x8Fns}`);
 
 export const sampledTextureTypes = `
   texture_1d texture_2d texture_2d_array texture_3d 
@@ -66,15 +93,21 @@ export const texelFormats = `
   rgba16unorm rgba16snorm
 `;
 
-export const stdTypes = `array atomic bool f16 f32 i32
+/** `enable f16`: the scalar, and the vector/matrix aliases spelled with it
+ * (vec2h is vec2<f16>, mat2x2h is mat2x2<f16>). */
+export const f16Types = `f16
+  mat2x2h mat2x3h mat2x4h mat3x2h mat3x3h mat3x4h
+  mat4x2h mat4x3h mat4x4h
+  vec2h vec3h vec4h`;
+
+export const stdTypes = names(`array atomic bool f32 i32
   mat2x2 mat2x3 mat2x4 mat3x2 mat3x3 mat3x4 mat4x2 mat4x3 mat4x4
   mat2x2f mat2x3f mat2x4f mat3x2f mat3x3f mat3x4f
   mat4x2f mat4x3f mat4x4f
-  mat2x2h mat2x3h mat2x4h mat3x2h mat3x3h mat3x4h
-  mat4x2h mat4x3h mat4x4h
   u32 vec2 vec3 vec4 ptr
   vec2i vec3i vec4i vec2u vec3u vec4u
-  vec2f vec3f vec4f vec2h vec3h vec4h
+  vec2f vec3f vec4f
+  ${f16Types}
   ${sampledTextureTypes}
   ${multisampledTextureTypes}
   texture_external
@@ -82,16 +115,12 @@ export const stdTypes = `array atomic bool f16 f32 i32
   texture_depth_2d texture_depth_2d_array texture_depth_cube
   texture_depth_cube_array
   sampler sampler_comparison
-  ${texelFormats}`
-  .split(/\s+/)
-  .filter(Boolean);
+  ${texelFormats}`);
 
 /** https://www.w3.org/TR/WGSL/#predeclared-enumerants  */
-export const stdEnumerants = `read write read_write
+export const stdEnumerants = names(`read write read_write
   function private workgroup uniform storage
-  ${texelFormats}`
-  .split(/\s+/)
-  .filter(Boolean);
+  ${texelFormats}`);
 
 /* Note the texel formats like rgba8unorm are also in stdTypes because they appear
  in type position in <templates> for texture_storage_* types.
@@ -118,22 +147,33 @@ export const wgslStandardAttributes = new Set([
   "workgroup_size",
 ]);
 
+// membership Sets: these queries run per otherwise-unresolved ident during
+// binding, where a linear scan of the name lists would be wasteful
+const stdTypeSet = new Set(stdTypes);
+const stdFnSet = new Set(stdFns);
+const stdEnumerantSet = new Set(stdEnumerants);
+
 /** return true if the name is for a built in type (not a user struct) */
 export function stdType(name: string): boolean {
-  return stdTypes.includes(name);
+  return stdTypeSet.has(name);
 }
 
 /** return true if the name is for a built in fn (not a user function) */
 export function stdFn(name: string): boolean {
-  return stdFns.includes(name) || stdType(name);
+  return stdFnSet.has(name) || stdTypeSet.has(name);
 }
 
 /** return true if the name is for a built in enumerant */
 export function stdEnumerant(name: string): boolean {
-  return stdEnumerants.includes(name);
+  return stdEnumerantSet.has(name);
 }
 
 /** @return true if ident is a standard WGSL type, fn, or enumerant. */
 export function stdWgsl(name: string): boolean {
   return stdType(name) || stdFn(name) || stdEnumerant(name); // TODO add tests for enumerants case (e.g. var x = read;)
+}
+
+/** The names in a whitespace-separated list. */
+function names(list: string): string[] {
+  return list.split(/\s+/).filter(Boolean);
 }
