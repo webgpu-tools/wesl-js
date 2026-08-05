@@ -57,7 +57,7 @@ test("uninitialized override", ctx => caseTest(ctx));
 test("import var with struct type", ctx => caseTest(ctx));
 test("import var<private> with struct type", ctx => caseTest(ctx));
 test("const_asserts in root module are included", ctx => caseTest(ctx));
-test.skip("const_asserts in used modules are included", ctx => caseTest(ctx));
+test("const_asserts in used modules are included", ctx => caseTest(ctx));
 test("const_asserts in unused modules are not included", ctx => caseTest(ctx));
 
 // LATER add case for diagnostic in non-root module (should fail?)

@@ -391,12 +391,31 @@ test("@else const_assert in an imported module is included", async () => {
     @else const_assert 1 == 1;
     fn half() -> f32 { return 1.0; }`;
   const expected = `
-    const_assert 1 == 1;
     fn main() {
       let x = half();
     }
+    const_assert 1 == 1;
     fn half() -> f32 {
       return 1.0;
+    }
+  `;
+  expectTrimmedMatch(await linkTest(main, lib), expected);
+});
+
+test("imported const_assert emits after a directive the root declares in place", async () => {
+  const main = `import package::file1::half;
+    enable f16;
+    fn main() { let x = half(); }`;
+  const lib = `const_assert 1 == 1;
+    fn half() -> f16 { return 1.0h; }`;
+  const expected = `
+    enable f16;
+    fn main() {
+      let x = half();
+    }
+    const_assert 1 == 1;
+    fn half() -> f16 {
+      return 1.0h;
     }
   `;
   expectTrimmedMatch(await linkTest(main, lib), expected);

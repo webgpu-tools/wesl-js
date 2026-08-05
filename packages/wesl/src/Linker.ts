@@ -248,8 +248,10 @@ export function normalizeModuleName(name: string): string {
   return "package::" + name;
 }
 
-/** Assemble WGSL output in emit order: hoisted directives, statements from
- * imported modules, the root module, then imported declarations. */
+/** Assemble WGSL output in emit order: hoisted directives, the root module,
+ * statements from imported modules, then imported declarations. Statements
+ * follow the root so an imported const_assert can't precede directives the
+ * root declares in place (WGSL requires directives before any declaration). */
 function emitWgsl(
   rootModuleElem: ModuleElem,
   srcModule: SrcModule,
@@ -291,8 +293,8 @@ function emitWgsl(
 
   return [
     ...directiveBuilders,
-    ...statementBuilders,
     rootBuilder,
+    ...statementBuilders,
     ...declBuilders,
   ];
 }
