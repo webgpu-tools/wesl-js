@@ -37,6 +37,7 @@ test-results/
 
 # Benchmark reports
 bench-report/
+size-report/
 
 # test built packages
 /temp-built-test/

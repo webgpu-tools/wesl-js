@@ -8,6 +8,7 @@
     "bench:baseline": "pnpm --filter wesl-bench bench:baseline",
     "bench:validate": "pnpm --filter wesl-bench bench:validate",
     "build:all": "pnpm --filter \"*\" --parallel build",
+    "build:size": "pnpm --filter wesl-bench build:size",
     "bump": "monobump",
     "check:lockfile": "pnpm install --frozen-lockfile --lockfile-only",
     "check:versions": "syncpack lint",

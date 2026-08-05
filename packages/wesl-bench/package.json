@@ -12,6 +12,8 @@
     "browser:build": "vite build browser",
     "browser:dev": "vite browser",
     "browser:preview": "vite preview browser",
+    "build:size": "bin/size.ts",
+    "size:baseline": "bin/choose_baseline.mts",
     "typecheck": "tsgo"
   },
   "dependencies": {
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "dexnode": "^1.2.2",
+    "terser": "^5.43.1",
     "vite": "^8.0.1",
     "wesl-plugin": "workspace:x"
   }

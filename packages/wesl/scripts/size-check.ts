@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // Measures realistic bundle size: what users pay when importing `link` from the package.
+// Measures the published `dist` build, so the number reflects code we actually ship
+// (debug flags and parser error messages included).
 // Uses terser for minification. tsdown's built-in minifier (Oxc) is ~0.6% larger
 // and still in alpha, but we may switch to it later.
 //
@@ -61,10 +63,10 @@ async function main() {
 
 /** Build (if needed) and bundle the wesl package at `weslDir`, returning sizes. */
 async function measure(weslDir: string, label: string): Promise<Sizes> {
-  const distDir = resolve(weslDir, "dist-nodebug");
+  const distDir = resolve(weslDir, "dist");
   if (!existsSync(resolve(distDir, "index.js"))) {
-    console.log(`Building nodebug for ${label}...`);
-    execSync("pnpm build:nodebug", { cwd: weslDir, stdio: "inherit" });
+    console.log(`Building ${label}...`);
+    execSync("pnpm build", { cwd: weslDir, stdio: "inherit" });
   }
 
   const outDir = resolve(tmpRoot, label);

@@ -10,7 +10,6 @@
   "scripts": {
     "build": "tsdown",
     "build:docs": "typedoc --plugin typedoc-theme-hierarchy --entryPoints ./src/index.ts --entryPointStrategy expand --out ./docs",
-    "build:nodebug": "vite build --config vite.nodebug.config.ts",
     "build:size": "./scripts/size-check.ts",
     "deploy:docsite": "run-s build:docs pages:deploy",
     "dump:cts:cases": "./scripts/dump-cts-cases.ts",
@@ -21,7 +20,6 @@
     "test:cts": "./scripts/test-cts.ts",
     "test:cts:full": "./scripts/test-cts.ts --full",
     "test:cts:offline": "vitest run CtsConstEval CtsValidation",
-    "test:nodebug": "vitest run --config vitest.nodebug.config.ts",
     "test:once": "vitest run",
     "typecheck": "tsgo"
   },

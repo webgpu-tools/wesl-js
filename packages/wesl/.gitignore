@@ -8,8 +8,5 @@ docs
 # cloned test fixtures (bevy shaders, etc.)
 fixtures
 
-# nodebug build output (for testing against prod builds)
-dist-nodebug
-
 # generated CTS oracle sample corpus (keyed by cts SHA + params; see cts-keep/)
 .cts-cache
