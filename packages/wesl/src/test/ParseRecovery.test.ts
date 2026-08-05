@@ -141,6 +141,33 @@ test("a missing comma between struct members doesn't cost the struct", () => {
   expect(struct.match(/member/g)).toHaveLength(3);
 });
 
+test("a bad attribute in a struct doesn't cost the struct", () => {
+  // from tint's error_resync_test.cc StructMembers case: `@-` must error as a
+  // bad attribute, not silently no-match (a no-match ends the member list, so
+  // the struct's '}' expect failed and dropped the whole struct)
+  const src = "struct S { a: i32, @- x: i32, c: u32 }\nfn ok() { }";
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Expected attribute name after '@'",
+  ]);
+  expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["struct", "fn"]);
+  const struct = astToString(ast.moduleElem.decls[0]);
+  expect(struct.match(/member/g)).toHaveLength(2); // a and c survive
+});
+
+test("a bad attribute in a statement gets a precise diagnostic", () => {
+  // the error costs only the attribute: the statement it decorates and the
+  // rest of the body still parse
+  const src = "fn f() { @- let x = 1; ok(); }";
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Expected attribute name after '@'",
+  ]);
+  const fn = astToString(ast.moduleElem.decls[0]);
+  expect(fn).toContain("let %x");
+  expect(fn).toContain("ref ok");
+});
+
 test("an error after a kept continuing statement doesn't strand its idents", () => {
   // 'bad;' fails the '}' expect after continuing, but the continuing statement
   // already parsed: its scope and idents must survive the recovery rollback

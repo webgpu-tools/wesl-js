@@ -134,15 +134,17 @@ function attributeElem(
 /** Parse a standard attribute (not @if/@elif/@else) */
 function parseStandardAttribute(ctx: ParsingContext): AttributeElem | null {
   const { stream } = ctx;
-  const resetPos = stream.checkpoint();
   const atToken = stream.matchText("@");
   if (!atToken) return null;
   const startPos = atToken.span[0]; // Use actual @ position, not before whitespace
 
+  // `@` can begin nothing but an attribute, so a bad name is a hard error here.
+  // Backtracking would instead surface a mispointed error at the caller, and in
+  // a struct body it would cost the whole struct: a member that doesn't match
+  // ends the member list, so the struct's closing '}' then fails to parse.
   const nameToken = stream.peek();
   if (nameToken?.kind !== "word" && nameToken?.kind !== "keyword") {
-    stream.reset(resetPos);
-    return null;
+    throwParseError(stream, "Expected attribute name after '@'");
   }
 
   stream.nextToken();
