@@ -89,19 +89,26 @@ export function parseCompoundStatement(
   attributes?: AttributeElem[],
   options?: CompoundOptions,
 ): BlockElem | null {
-  const brace = ctx.stream.matchText("{");
-  if (!brace) return null;
+  // check depth before consuming the brace, so a too-deep block's `{` is
+  // still ahead of the recovery skip and the text stays brace-balanced
+  const brace = ctx.stream.peek();
+  if (brace?.text !== "{") return null;
+  ctx.enterNesting();
+  try {
+    ctx.stream.nextToken(); // consume the peeked '{'
+    const startPos = getStartWithAttributes(attributes, brace.span[0]);
 
-  const startPos = getStartWithAttributes(attributes, brace.span[0]);
+    const skipScope =
+      options?.noScope ||
+      (conditionalBlockFeature && hasConditionalAttr(attributes));
+    if (!skipScope) ctx.pushScope();
+    const body = parseBlockStatements(ctx, options?.loopBody);
+    if (!skipScope) ctx.popScope();
 
-  const skipScope =
-    options?.noScope ||
-    (conditionalBlockFeature && hasConditionalAttr(attributes));
-  if (!skipScope) ctx.pushScope();
-  const body = parseBlockStatements(ctx, options?.loopBody);
-  if (!skipScope) ctx.popScope();
-
-  return finishStatement("block", startPos, ctx, { body }, attributes);
+    return finishStatement("block", startPos, ctx, { body }, attributes);
+  } finally {
+    ctx.exitNesting();
+  }
 }
 
 /** Grammar: attribute* compound_statement (for control flow bodies) */
@@ -150,6 +157,11 @@ export function finishStatement<K extends keyof ElemKindMap>(
   const elem = { kind, start, end, ...params } as ElemKindMap[K];
   attachAttributes(elem as HasAttributes, attributes);
   return elem;
+}
+
+/** @return true for a keyword that only occurs at module level (like `fn`). */
+export function atModuleKeyword(token: WeslToken): boolean {
+  return token.kind === "keyword" && moduleOnlyKeywords.has(token.text);
 }
 
 function hasConditionalAttr(attributes?: AttributeElem[]): boolean {
@@ -252,9 +264,4 @@ function atStatementBoundary(token: WeslToken, depth: number): boolean {
   if (depth !== 0) return false;
   if (token.kind === "keyword") return statementStartKeywords.has(token.text);
   return token.text === ";" || token.text === "}" || token.text === "@";
-}
-
-/** @return true for a keyword that only occurs at module level (like `fn`). */
-export function atModuleKeyword(token: WeslToken): boolean {
-  return token.kind === "keyword" && moduleOnlyKeywords.has(token.text);
 }

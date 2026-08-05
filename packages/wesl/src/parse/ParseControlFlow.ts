@@ -71,28 +71,14 @@ function parseElseChain(ctx: ParsingContext): IfElem | BlockElem | undefined {
   const elseToken = stream.matchText("else");
   if (!elseToken) return undefined;
 
-  if (stream.matchText("if")) {
-    const condition = expectExpression(
-      ctx,
-      "Expected expression after 'else if'",
-    );
-    const body = expectCompound(ctx, "Expected '{' after else if");
-    const elseBranch = parseElseChain(ctx);
-    const end = stream.checkpoint();
-    // Start at the 'else' keyword, not the pre-keyword position, so a comment
-    // before 'else if' falls in the gap and leads the branch (matches
-    // beginStatement); otherwise the nested if swallows it.
-    return {
-      kind: "if",
-      condition,
-      body,
-      else: elseBranch,
-      start: elseToken.span[0],
-      end,
-    };
+  // each else-if link recurses without entering a new statement, so bound the
+  // chain here (WGSL counts chain length against its statement nesting limit)
+  ctx.enterNesting();
+  try {
+    return parseElseBody(ctx, elseToken);
+  } finally {
+    ctx.exitNesting();
   }
-
-  return expectCompound(ctx, "Expected '{' after else");
 }
 
 /**
@@ -126,6 +112,29 @@ function expectSwitchClauses(ctx: ParsingContext): {
     }
   }
   return { bodyAttributes: attrsOrUndef(bodyAttrs), clauses };
+}
+
+/** Parse what follows an `else`: an `if` continuing the chain, or a block. */
+function parseElseBody(
+  ctx: ParsingContext,
+  elseToken: WeslToken,
+): IfElem | BlockElem {
+  const { stream } = ctx;
+  if (!stream.matchText("if")) {
+    return expectCompound(ctx, "Expected '{' after else");
+  }
+
+  const msg = "Expected expression after 'else if'";
+  const condition = expectExpression(ctx, msg);
+  const body = expectCompound(ctx, "Expected '{' after else if");
+  const elseBranch = parseElseChain(ctx);
+  const end = stream.checkpoint();
+
+  // Start at the 'else' keyword, not the pre-keyword position, so a comment
+  // before 'else if' falls in the gap and leads the branch (matches
+  // beginStatement); otherwise the nested if swallows it.
+  const start = elseToken.span[0];
+  return { kind: "if", condition, body, else: elseBranch, start, end };
 }
 
 /** Parse one 'case'/'default' clause (the keyword has not yet been consumed). */
@@ -193,15 +202,6 @@ function parseCaseSelectors(
   return selectors;
 }
 
-/** `default` may appear among a case's selectors, not only alone. */
-function parseCaseSelector(
-  ctx: ParsingContext,
-  message: string,
-): ExpressionElem | "default" {
-  if (ctx.stream.matchText("default")) return "default";
-  return expectExpression(ctx, message);
-}
-
 /**
  * Grammar: case_clause : 'case' case_selectors ':'? compound_statement
  * Grammar: default_alone_clause : 'default' ':'? compound_statement
@@ -213,4 +213,13 @@ function parseCaseBody(ctx: ParsingContext, errorMsg: string): BlockElem {
   const body = parseCompoundStatement(ctx, attrs);
   if (!body) throwParseError(ctx.stream, errorMsg);
   return body;
+}
+
+/** `default` may appear among a case's selectors, not only alone. */
+function parseCaseSelector(
+  ctx: ParsingContext,
+  message: string,
+): ExpressionElem | "default" {
+  if (ctx.stream.matchText("default")) return "default";
+  return expectExpression(ctx, message);
 }

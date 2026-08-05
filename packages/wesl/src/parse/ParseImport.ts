@@ -10,7 +10,11 @@ import type {
 import { parseWeslConditional } from "./ParseAttribute.ts";
 import { weslKeywords } from "./ParseIdent.ts";
 import { parseMany, throwParseError } from "./ParseUtil.ts";
-import type { ParsingContext } from "./ParsingContext.ts";
+import {
+  maxNesting,
+  nestedTooDeeply,
+  type ParsingContext,
+} from "./ParsingContext.ts";
 import type { WeslStream } from "./WeslStream.ts";
 
 /** WESL Grammar: translation_unit : import_statement* global_directive* global_decl*
@@ -46,7 +50,8 @@ function parseImportStatementBase(
   if (!importToken) return null;
 
   const relative = parseImportRelative(stream) ?? [];
-  const parsed = parseImportCollection(stream) || parseImportPathOrItem(stream);
+  const parsed =
+    parseImportCollection(stream, 0) || parseImportPathOrItem(stream, 0);
   if (!parsed) throwParseError(stream, "invalid import, expected { or name");
   if (!stream.matchText(";"))
     throwParseError(stream, "invalid import, expected ';'");
@@ -70,17 +75,20 @@ function parseImportRelative(stream: WeslStream): ImportSegment[] | null {
 }
 
 /** WESL Grammar: import_collection : '{' import_path_or_item (',' import_path_or_item)* ','? '}' */
-function parseImportCollection(stream: WeslStream): ImportCollection | null {
+function parseImportCollection(
+  stream: WeslStream,
+  depth: number,
+): ImportCollection | null {
   if (!stream.matchText("{")) return null;
 
   const msg = "invalid import collection, expected name";
-  const first = parseImportPathOrItem(stream);
+  const first = parseImportPathOrItem(stream, depth);
   if (!first) throwParseError(stream, msg);
   const statements: ImportStatement[] = [first];
 
   while (stream.matchText(",")) {
     if (stream.peek()?.text === "}") break;
-    const item = parseImportPathOrItem(stream);
+    const item = parseImportPathOrItem(stream, depth);
     if (!item) throwParseError(stream, msg + " after ','");
     statements.push(item);
   }
@@ -94,17 +102,22 @@ function parseImportCollection(stream: WeslStream): ImportCollection | null {
  * WESL Grammar: import_path_or_item :
  *   ident '::' (import_collection | import_path_or_item) | ident ('as' ident)?
  */
-function parseImportPathOrItem(stream: WeslStream): ImportStatement | null {
+function parseImportPathOrItem(
+  stream: WeslStream,
+  depth: number,
+): ImportStatement | null {
   const name = parsePackageWord(stream);
   if (!name) return null;
 
   if (stream.matchText("::")) {
+    // both branches below recurse, once per path segment or nested collection
+    if (depth >= maxNesting) throwParseError(stream, nestedTooDeeply);
     const segment = makeSegment(name);
 
-    const collection = parseImportCollection(stream);
+    const collection = parseImportCollection(stream, depth + 1);
     if (collection) return makeStatement([segment], collection);
 
-    const pathOrItem = parseImportPathOrItem(stream);
+    const pathOrItem = parseImportPathOrItem(stream, depth + 1);
     if (pathOrItem) return prependSegments([segment], pathOrItem);
 
     throwParseError(stream, "invalid import, expected '{' or name");

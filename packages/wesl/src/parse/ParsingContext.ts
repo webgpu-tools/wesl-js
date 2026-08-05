@@ -1,5 +1,6 @@
 import type { AbstractElem } from "../AbstractElems.ts";
 import { errorDiagnostic } from "../Diagnostics.ts";
+import { ParseError } from "../ParseError.ts";
 import type { WeslParseContext, WeslParseState } from "../ParseWESL.ts";
 import {
   type DeclIdent,
@@ -23,6 +24,22 @@ export interface ParseOptions {
   weslExtensions?: WeslExtensions;
 }
 
+/**
+ * Bound on recursive nesting (blocks, parenthesized expressions, else-if
+ * chains, import trees), so pathologically nested input fails with a
+ * recoverable ParseError instead of overflowing the JS stack.
+ *
+ * WGSL programs are limited to 127 nested statements, and Tint's parser stops
+ * recursion at 128, so 384 accepts far more than any shader that could run.
+ * The shallowest measured overflow (nested braces) is at ~1200 levels, leaving
+ * ~3x stack headroom for callers that invoke the parser from deep call stacks.
+ */
+export const maxNesting = 384;
+
+/** Error message when maxNesting is exceeded (the import parser reports it
+ * too, from its own depth count). */
+export const nestedTooDeeply = "Syntax nested too deeply";
+
 /** Context for parsers to build AST and manage scopes. */
 export class ParsingContext {
   src: string;
@@ -45,6 +62,25 @@ export class ParsingContext {
 
   position(): number {
     return this.stream.checkpoint();
+  }
+
+  /** Nesting depth of recursive constructs, bounded by maxNesting. */
+  nesting = 0;
+
+  /** Enter a recursive construct (block, paren expression, else-if link).
+   * Callers pair this with exitNesting in a finally block.
+   * @throws ParseError when input is nested too deeply to parse recursively. */
+  enterNesting(): void {
+    if (this.nesting >= maxNesting) {
+      const pos = this.stream.checkpoint();
+      const span = this.stream.peek()?.span;
+      throw new ParseError(nestedTooDeeply, span ?? [pos, pos]);
+    }
+    this.nesting++;
+  }
+
+  exitNesting(): void {
+    this.nesting--;
   }
 
   currentScope(): Scope {

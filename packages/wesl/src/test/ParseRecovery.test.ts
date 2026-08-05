@@ -307,3 +307,52 @@ test("a stray unmatched brace does not swallow a following do block", () => {
   expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["do"]);
 });
 
+test("deeply nested braces become a diagnostic, not a stack overflow", () => {
+  const depth = 2000;
+  const src = `fn deep() ${"{".repeat(depth)}${"}".repeat(depth)}\nfn ok() { }`;
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Syntax nested too deeply",
+  ]);
+  // the over-deep body is truncated, but both functions survive
+  expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["fn", "fn"]);
+});
+
+test("deeply nested parens become a diagnostic, not a stack overflow", () => {
+  const depth = 2000;
+  const parens = "(".repeat(depth) + "1" + ")".repeat(depth);
+  const src = `fn f() { x = ${parens}; ok(); }\nfn g() { }`;
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Syntax nested too deeply",
+  ]);
+  // only the over-deep statement is dropped
+  expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["fn", "fn"]);
+  expect(astToString(ast.moduleElem)).toContain("ref ok");
+});
+
+test("an over-long else-if chain is bounded, parsing continues", () => {
+  const chain = "else if a { } ".repeat(450);
+  const src = `fn f() { if a { } ${chain}}\nfn g() { }`;
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Syntax nested too deeply",
+  ]);
+  expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["fn", "fn"]);
+});
+
+test("a deeply nested import tree is bounded, later decls survive", () => {
+  const src = "import a::" + "{ b::".repeat(800) + "c;\nfn ok() { }";
+  const ast = parseWESL(src);
+  expect(ast.diagnostics.map(d => d.message)).toEqual([
+    "Syntax nested too deeply",
+  ]);
+  expect(ast.moduleElem.decls.map(d => d.kind)).toEqual(["fn"]);
+});
+
+test("long member chains parse without recursion limits", () => {
+  const src = `fn f() { x = a${".b".repeat(20_000)}; }`;
+  const ast = parseWESL(src);
+  expect(ast.diagnostics).toEqual([]);
+});
+

@@ -90,18 +90,24 @@ function parseUnaryExpression(
   const { stream } = ctx;
   const token = stream.peek();
   if (!token) return null;
-
   const unaryOps = "-!&*~";
-  if (unaryOps.includes(token.text)) {
+
+  // every nested expression (unary, paren, index, call, template) passes
+  // through here, so this one counter bounds all expression recursion
+  ctx.enterNesting();
+  try {
+    if (!unaryOps.includes(token.text))
+      return parsePrimaryExpr(ctx, conditionRef);
+
     stream.nextToken();
     const operator = makeUnaryOperator(token as WeslToken<"symbol">);
     const operand = parseUnaryExpression(ctx, conditionRef);
     if (!operand)
       throwParseError(stream, "Expected expression after unary operator");
     return makeUnaryExpression(operator, operand);
+  } finally {
+    ctx.exitNesting();
   }
-
-  return parsePrimaryExpr(ctx, conditionRef);
 }
 
 /**
@@ -235,14 +241,18 @@ function parseTemplateElaboratedIdent(
   };
 }
 
-/** Parse postfix operators: member access, indexing, function calls. */
+/** Parse postfix operators: member access, indexing, function calls.
+ * Iterative, so arbitrarily long chains (a.b.c...) can't overflow the stack. */
 function parsePostfixExpression(
   ctx: ParsingContext,
   base: ExpressionElem,
 ): ExpressionElem {
-  const next = parsePostfixOp(ctx, base);
-  if (next) return parsePostfixExpression(ctx, next);
-  return base;
+  let expr = base;
+  while (true) {
+    const next = parsePostfixOp(ctx, expr);
+    if (!next) return expr;
+    expr = next;
+  }
 }
 
 /** Grammar: bool_literal : 'true' | 'false' */
