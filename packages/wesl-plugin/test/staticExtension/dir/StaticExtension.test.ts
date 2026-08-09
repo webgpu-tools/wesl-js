@@ -15,6 +15,7 @@ test("verify ?static", async () => {
       let a = pcg_2u_3f(start);
     }
 
+    // backticks \`like this\` and \${interpolation} must survive ?static emit
     const mobileStart = vec2u(1, 2);
 
     // PCG pseudo random generator from vec2u to vec3f

@@ -47,8 +47,9 @@ async function emitStaticJs(
     conditions,
   });
 
+  // JSON.stringify, not a template literal: wgsl comments may contain ` or ${
   return `
-    export const wgsl = \`${wgsl}\`;
+    export const wgsl = ${JSON.stringify(wgsl)};
     export default wgsl;
   `;
 }
