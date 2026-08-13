@@ -1,7 +1,7 @@
 /// <reference types="wesl-plugin/suffixes" />
 import type { SlIconButton } from "@shoelace-style/shoelace";
 import rand from "random_wgsl";
-import { link } from "wesl";
+import { createShaderModule, link } from "wesl";
 import main from "../shaders/main.wgsl?link";
 import type { Loopable } from "./Drawable.ts";
 import { gpuDevice } from "./GpuUtil.ts";
@@ -17,7 +17,7 @@ export async function startApp(
 ): Promise<void> {
   const device = await gpuDevice();
   const linked = await link(main);
-  const shaderModule = linked.createShaderModule(device, {});
+  const shaderModule = createShaderModule(linked, device, {});
   const animation = await gpuAnimation(device, canvas, shaderModule);
 
   const randFiles = mapKeys(rand.modules, s => "random_wgsl/" + s);

@@ -8,7 +8,7 @@ import {
   RecordResolver,
   scopeToString,
   type WeslBundle,
-} from "wesl";
+} from "wesl/core";
 import {
   dependencyBundles,
   loadModules,

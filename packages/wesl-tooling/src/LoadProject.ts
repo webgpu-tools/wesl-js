@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { sanitizePackageName, type WeslBundle } from "wesl";
+import { sanitizePackageName, type WeslBundle } from "wesl/core";
 import { loadModules } from "./LoadModules.ts";
 import { findWeslToml } from "./LoadWeslToml.ts";
 import { dependencyBundles } from "./ParseDependencies.ts";

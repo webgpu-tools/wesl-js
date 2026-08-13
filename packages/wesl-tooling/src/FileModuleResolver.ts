@@ -1,6 +1,10 @@
 import * as fs from "node:fs";
-import type { ModuleResolver, WeslAST } from "wesl";
-import { moduleToRelativePath, normalizeDebugRoot, parseSrcModule } from "wesl";
+import type { ModuleResolver, WeslAST } from "wesl/core";
+import {
+  moduleToRelativePath,
+  normalizeDebugRoot,
+  parseSrcModule,
+} from "wesl/core";
 
 /**
  * Loads WESL modules from the filesystem on demand with caching.

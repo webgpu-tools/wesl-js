@@ -9,7 +9,7 @@ import {
   type UnpluginContextMeta,
   type UnpluginOptions,
 } from "unplugin";
-import type { Conditions, RecordResolver } from "wesl";
+import type { Conditions, RecordResolver } from "wesl/core";
 import type { WeslToml, WeslTomlInfo } from "wesl-tooling";
 import { linkBuildExtension } from "./extensions/LinkExtension.ts";
 import { staticBuildExtension } from "./extensions/StaticExtension.ts";

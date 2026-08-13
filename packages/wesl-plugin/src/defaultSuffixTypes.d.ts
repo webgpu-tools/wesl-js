@@ -1,6 +1,6 @@
 /** @hidden */
 declare module "*?link" {
-  import type { LinkParams } from "wesl";
+  import type { LinkParams } from "wesl/core";
   const linkParams: LinkParams;
   export default linkParams;
 }

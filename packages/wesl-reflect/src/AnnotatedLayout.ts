@@ -1,4 +1,4 @@
-import type { StructElem, StructMemberElem } from "wesl";
+import type { StructElem, StructMemberElem } from "wesl/core";
 import {
   type FieldLayout,
   type LayoutOptions,

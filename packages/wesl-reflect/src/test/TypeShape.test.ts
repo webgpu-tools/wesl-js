@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseSrcModule, type WeslAST } from "wesl";
+import { parseSrcModule, type WeslAST } from "wesl/core";
 import { decodeBuffer } from "../Decode.ts";
 import { TypeShapeError, varReflection } from "../TypeShape.ts";
 

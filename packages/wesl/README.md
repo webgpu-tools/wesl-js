@@ -40,6 +40,21 @@ fn random_color(uv: vec2u) -> vec3f {
 }
 </pre>
 
+## Entry points
+
+`wesl` is the entry point for browser code. It includes the WebGPU layer
+(`createShaderModule`, `requestWeslDevice`, `WeslDevice`), so it needs WebGPU
+types: TypeScript 7's `DOM` lib, or the `@webgpu/types` package.
+
+`wesl/core` is the same linker without the WebGPU layer, for code that runs
+outside the browser: vite configs, cli tools, and codegen scripts. It
+typechecks with `"lib": ["ESNext"]` and no WebGPU types, so a node program
+doesn't need browser types to build.
+
+```ts
+import { link } from "wesl/core";  // node build script, no DOM lib needed
+```
+
 [wesl plugin]: https://www.npmjs.com/package/wesl-plugin
 [examples]: https://github.com/webgpu-tools/wesl-js/tree/main/examples 
 [wesl]: https://www.npmjs.com/package/wesl

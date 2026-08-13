@@ -1,7 +1,7 @@
 import path from "node:path";
 import url from "node:url";
 import { resolve } from "import-meta-resolve";
-import { type Conditions, link, noSuffix } from "wesl";
+import { type Conditions, link, noSuffix } from "wesl/core";
 import type {
   PluginExtension,
   PluginExtensionApi,

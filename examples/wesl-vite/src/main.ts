@@ -1,5 +1,5 @@
 /// <reference types="wesl-plugin/suffixes" />
-import { link } from "wesl";
+import { createShaderModule, link } from "wesl";
 import mainWesl from "../shaders/main.wesl?link";
 
 const app = document.getElementById("app")!;
@@ -17,7 +17,7 @@ if (device === undefined) {
 }
 
 const linked = await link({ ...mainWesl, conditions: { DEBUG: true } });
-const shader = linked.createShaderModule(device, {});
+const shader = createShaderModule(linked, device, {});
 const context = canvas.getContext("webgpu")!;
 
 const devicePixelRatio = window.devicePixelRatio;

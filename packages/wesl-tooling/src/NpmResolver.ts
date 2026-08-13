@@ -1,5 +1,5 @@
 import { resolve } from "import-meta-resolve";
-import { npmNameVariations } from "wesl";
+import { npmNameVariations } from "wesl/core";
 
 /** Find longest resolvable npm subpath from WESL module path segments.
  *

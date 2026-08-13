@@ -1,4 +1,4 @@
-import type { BatchModuleResolver, WeslJsPlugin } from "wesl";
+import type { BatchModuleResolver, WeslJsPlugin } from "wesl/core";
 import type { WeslTomlInfo } from "wesl-tooling";
 
 /** function type required for emit extensions */

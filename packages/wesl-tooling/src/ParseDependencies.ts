@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { resolve } from "import-meta-resolve";
-import type { WeslBundle, WeslExtensions } from "wesl";
-import { filterMap, WeslParseError } from "wesl";
+import type { WeslBundle, WeslExtensions } from "wesl/core";
+import { filterMap, WeslParseError } from "wesl/core";
 import { npmResolveWESL } from "./NpmResolver.ts";
 import { scanDependencies } from "./ScanDependencies.ts";
 

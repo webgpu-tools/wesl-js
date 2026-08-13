@@ -1,7 +1,11 @@
 import type { SrcMap, SrcWithPath } from "./SrcMap.ts";
 
+/** a console.log-like sink (declared structurally so that "wesl/core"
+ * doesn't depend on ambient DOM or node globals) */
+export type LogFn = (...data: any[]) => void;
+
 /** base logger (can be overridden to a capturing logger for tests) */
-export let log = console.log;
+export let log: LogFn = console.log;
 
 /** enable debug assertions and verbose error messages (set false via bundler for smaller builds) */
 export const debug = true;
@@ -10,7 +14,7 @@ export const debug = true;
 export const validation = true;
 
 /** use temporary logger for tests */
-export function withLogger<T>(logFn: typeof console.log, fn: () => T): T {
+export function withLogger<T>(logFn: LogFn, fn: () => T): T {
   const orig = log;
   try {
     log = logFn;
@@ -22,7 +26,7 @@ export function withLogger<T>(logFn: typeof console.log, fn: () => T): T {
 
 /** use temporary logger for async tests */
 export async function withLoggerAsync<T>(
-  logFn: typeof console.log,
+  logFn: LogFn,
   fn: () => Promise<T>,
 ): Promise<T> {
   const orig = log;
@@ -75,7 +79,7 @@ function mapSrcPositions(
 }
 
 function logInternalSrc(
-  logFn: typeof console.log,
+  logFn: LogFn,
   src: string,
   pos: number | [number, number],
   ...msgs: any[]

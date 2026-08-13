@@ -3,7 +3,7 @@ import type {
   HasAttributes,
   StandardAttribute,
   UnknownExpressionElem,
-} from "wesl";
+} from "wesl/core";
 
 /** Find a StandardAttribute by name on an element with attributes. */
 export function findAnnotation(

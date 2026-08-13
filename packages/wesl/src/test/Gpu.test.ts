@@ -1,8 +1,9 @@
 import { setTimeout } from "node:timers";
 import { expect, test, vi } from "vitest";
-import { LinkedWesl } from "../LinkedWesl";
+import { createShaderModule } from "../gpu/ShaderModule.ts";
+import { makeWeslDevice } from "../gpu/WeslDevice.ts";
+import { LinkedWesl } from "../LinkedWesl.ts";
 import { SrcMap } from "../SrcMap.ts";
-import { makeWeslDevice } from "../WeslDevice";
 
 test("WeslDevice doesn't conflict with uncapturederror", async () => {
   const GPUDeviceMock = vi.fn(function (this: GPUDevice) {
@@ -116,7 +117,7 @@ test("LinkedWesl createShaderModule skips if it's not a WeslDevice", async () =>
   );
 
   // Test that this doesnt' throw
-  linkedWesl.createShaderModule(device, {});
+  createShaderModule(linkedWesl, device, {});
 
   expect(createShaderModuleSpy).toHaveBeenCalledTimes(1);
 });
@@ -182,7 +183,7 @@ test("Point at WESL code", async () => {
   );
 
   device.pushErrorScope("validation");
-  linkedWesl.createShaderModule(device, {});
+  createShaderModule(linkedWesl, device, {});
   const result = await device.popErrorScope();
 
   // Expect that it's not the original, but instead the changed version
@@ -257,7 +258,7 @@ test("Invokes error throwing", async () => {
     }),
   );
 
-  linkedWesl.createShaderModule(device, {});
+  createShaderModule(linkedWesl, device, {});
 
   expect(injectErrorSpy).toHaveBeenCalledTimes(1);
 

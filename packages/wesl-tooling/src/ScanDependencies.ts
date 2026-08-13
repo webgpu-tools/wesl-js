@@ -1,4 +1,8 @@
-import { findUnboundIdents, RecordResolver, type WeslExtensions } from "wesl";
+import {
+  findUnboundIdents,
+  RecordResolver,
+  type WeslExtensions,
+} from "wesl/core";
 
 export interface ScanDependenciesOptions {
   packageName?: string;

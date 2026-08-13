@@ -5,7 +5,7 @@ import {
   parseSrcModule,
   RecordResolver,
   type WeslAST,
-} from "wesl";
+} from "wesl/core";
 import {
   annotatedResourcesPlugin,
   findAnnotatedResources,

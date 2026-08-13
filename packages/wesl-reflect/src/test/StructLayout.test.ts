@@ -4,7 +4,7 @@ import {
   type LinkBindings,
   RecordResolver,
   type StructElem,
-} from "wesl";
+} from "wesl/core";
 import { structLayout, typeLayout } from "../StructLayout.ts";
 
 interface BoundStructs {

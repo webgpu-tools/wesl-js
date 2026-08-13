@@ -50,7 +50,7 @@ export default {
 
 ```ts
 // app.ts
-import { link } from "wesl";
+import { createShaderModule, link } from "wesl";
 import shaderConfig from "./shaders/main.wesl?link";
 
 const linked = await link({
@@ -59,7 +59,7 @@ const linked = await link({
   constants: { num_lights: 4 }
 });
 
-const module = linked.createShaderModule(device, {});
+const module = createShaderModule(linked, device, {});
 ```
 
 ## Other Bundlers

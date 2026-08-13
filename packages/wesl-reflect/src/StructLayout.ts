@@ -7,8 +7,8 @@ import type {
   StructMemberElem,
   TypeRefElem,
   WeslAST,
-} from "wesl";
-import { declsOfKind, filterValidElements, refDecl } from "wesl";
+} from "wesl/core";
+import { declsOfKind, filterValidElements, refDecl } from "wesl/core";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 import { originalTypeName } from "./WeslStructs.ts";
 

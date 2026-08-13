@@ -1,4 +1,4 @@
-import type { StructElem, TypeRefElem } from "wesl";
+import type { StructElem, TypeRefElem } from "wesl/core";
 
 export interface WeslStruct {
   members: Record<string, WeslMember>;

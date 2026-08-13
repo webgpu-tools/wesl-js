@@ -1,5 +1,5 @@
 import path from "node:path";
-import { type LinkParams, noSuffix } from "wesl";
+import { type LinkParams, noSuffix } from "wesl/core";
 import type {
   PluginExtension,
   PluginExtensionApi,

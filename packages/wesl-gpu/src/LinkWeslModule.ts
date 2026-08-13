@@ -1,4 +1,9 @@
-import { CompositeResolver, link, RecordResolver } from "wesl";
+import {
+  CompositeResolver,
+  createShaderModule,
+  link,
+  RecordResolver,
+} from "wesl";
 import type { AnnotatedLayout } from "wesl-reflect";
 import type { WeslOptions } from "./FragmentParams.ts";
 import { scanUniforms } from "./UniformsVirtualLib.ts";
@@ -53,5 +58,6 @@ export async function linkWeslModule(
     config,
   });
 
-  return { module: linked.createShaderModule(device), layout: scan.layout };
+  const module = createShaderModule(linked, device);
+  return { module, layout: scan.layout };
 }

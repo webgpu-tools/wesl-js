@@ -5,7 +5,7 @@ import {
   type StructElem,
   type TypeRefElem,
   type WeslAST,
-} from "wesl";
+} from "wesl/core";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 import {
   buildStructRegistry,

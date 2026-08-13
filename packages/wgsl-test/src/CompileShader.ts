@@ -6,7 +6,12 @@ import type {
   WeslBundle,
   WeslJsPlugin,
 } from "wesl";
-import { CompositeResolver, link, RecordResolver } from "wesl";
+import {
+  CompositeResolver,
+  createShaderModule,
+  link,
+  RecordResolver,
+} from "wesl";
 import {
   dependencyBundles,
   FileModuleResolver,
@@ -127,7 +132,7 @@ export async function compileShader(
     config: params.plugins ? { plugins: params.plugins } : undefined,
     weslExtensions: { doBlocks: true }, // applies to the weslSrc fallback path
   });
-  const module = linked.createShaderModule(device);
+  const module = createShaderModule(linked, device);
 
   await verifyCompilation(module);
   return module;

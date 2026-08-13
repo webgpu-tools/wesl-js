@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { bindAndTransform, RecordResolver, type StructElem } from "wesl";
+import { bindAndTransform, RecordResolver, type StructElem } from "wesl/core";
 import { annotatedLayout } from "../AnnotatedLayout.ts";
 import {
   autoAnnotation,

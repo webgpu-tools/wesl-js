@@ -6,7 +6,7 @@ import {
   type StandardAttribute,
   type WeslAST,
   type WeslJsPlugin,
-} from "wesl";
+} from "wesl/core";
 import { findAnnotation, firstRefName, numericParams } from "./Annotations.ts";
 import { buildStructRegistry, type StructRegistry } from "./StructLayout.ts";
 import { typeShape } from "./TypeShape.ts";

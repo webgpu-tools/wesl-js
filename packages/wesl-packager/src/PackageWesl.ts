@@ -1,13 +1,13 @@
 import fs, { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { Biome, Distribution } from "@biomejs/js-api";
+import { weslBundleDeclUrl } from "wesl/bundle-decl";
 import {
   noSuffix,
   sanitizePackageName,
   validWgslIdent,
   type WeslBundle,
-} from "wesl";
-import { weslBundleDeclUrl } from "wesl/bundle-decl";
+} from "wesl/core";
 import { loadModules, parseDependencies, zip } from "wesl-tooling";
 import type { CliArgs } from "./PackagerCli.ts";
 

@@ -1,4 +1,4 @@
-import { declsOfKind, type FnElem, type WeslAST } from "wesl";
+import { declsOfKind, type FnElem, type WeslAST } from "wesl/core";
 import { findAnnotation, numericParams } from "./Annotations.ts";
 
 export type EntryPointStage = "compute" | "fragment" | "vertex";

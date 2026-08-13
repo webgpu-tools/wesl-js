@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { declsOfKind, type StructElem } from "wesl";
+import { declsOfKind, type StructElem } from "wesl/core";
 import { originalTypeName, weslStructs, wgslTypeToTs } from "wesl-reflect";
 import type {
   PluginExtension,

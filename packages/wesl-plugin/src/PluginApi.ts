@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { glob } from "glob";
 import type { UnpluginBuildContext, UnpluginContext } from "unplugin";
-import { discoverModules, fileToModulePath, RecordResolver } from "wesl";
+import { discoverModules, fileToModulePath, RecordResolver } from "wesl/core";
 import {
   findWeslToml,
   parseDependencies,
