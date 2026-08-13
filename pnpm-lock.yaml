@@ -341,6 +341,9 @@ importers:
       wesl-packager:
         specifier: workspace:*
         version: link:../wesl-packager
+      wesl-reflect:
+        specifier: workspace:*
+        version: link:../wesl-reflect
       wesl-tooling:
         specifier: workspace:*
         version: link:../wesl-tooling
@@ -555,8 +558,8 @@ importers:
   packages/wesl-gpu:
     dependencies:
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       wesl:
         specifier: workspace:*
         version: link:../wesl
@@ -678,8 +681,8 @@ importers:
         specifier: workspace:*
         version: link:../../../random_wgsl
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       webgpu:
         specifier: ^0.3.8
         version: 0.3.8
@@ -696,8 +699,8 @@ importers:
         specifier: workspace:*
         version: link:../../../random_wgsl
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       webgpu:
         specifier: ^0.3.8
         version: 0.3.8
@@ -711,8 +714,8 @@ importers:
         specifier: workspace:*
         version: link:../../../random_wgsl
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       webgpu:
         specifier: ^0.3.8
         version: 0.3.8
@@ -741,8 +744,8 @@ importers:
         specifier: workspace:*
         version: link:../../../random_wgsl
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       webgpu:
         specifier: ^0.3.8
         version: 0.3.8
@@ -756,8 +759,8 @@ importers:
         specifier: workspace:*
         version: link:../../../random_wgsl
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       webgpu:
         specifier: ^0.3.8
         version: 0.3.8
@@ -925,8 +928,8 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
       thimbleberry:
-        specifier: ^0.2.10
-        version: 0.2.10
+        specifier: ^0.2.11
+        version: 0.2.11
       vitest:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@25.5.0)(@vitest/ui@4.1.0)(vite@8.1.4(@types/node@25.5.0)(esbuild@0.27.7)(jiti@2.6.1)(terser@5.43.1)(tsx@4.21.0)(yaml@2.8.2))
@@ -5660,8 +5663,8 @@ packages:
     resolution: {integrity: sha512-cAGWPIyOHU6zlmg88jwm7VRyXnMN7iV68OGAbYDk/Mh/xC/pzVPlQtY6ngoIH/5/tciuhGfvESU8GrHrcxD56w==}
     engines: {node: '>=8'}
 
-  thimbleberry@0.2.10:
-    resolution: {integrity: sha512-sWQIKq9FdqYZbsUfw7l7/HqxNmvze0e6/FUlgjBkwYtfd5A30cjfY2M+mHUGlO0+bGZro5J0c7lfeHJ1Zu7/JQ==}
+  thimbleberry@0.2.11:
+    resolution: {integrity: sha512-ykn/LrFhm6Y33Bo+PKWYS4wAY78WdNNpwOOqYSj0h5ESSYL6Yuz+MR7bs55JOfLvkRf6AlmUWvCzN7jdqXj7Jw==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -10795,7 +10798,7 @@ snapshots:
       glob: 7.2.3
       minimatch: 3.1.5
 
-  thimbleberry@0.2.10:
+  thimbleberry@0.2.11:
     dependencies:
       '@petamoriken/float16': 3.9.2
       '@reactively/core': 0.0.8

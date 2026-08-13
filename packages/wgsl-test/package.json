@@ -54,7 +54,7 @@
   "dependencies": {
     "glob": "^13.0.6",
     "pngjs": "^7.0.0",
-    "thimbleberry": "^0.2.10",
+    "thimbleberry": "^0.2.11",
     "vitest-image-snapshot": "workspace:*",
     "webgpu": "^0.3.8",
     "wesl": "workspace:*",

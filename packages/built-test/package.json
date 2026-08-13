@@ -10,13 +10,16 @@
     "test:built:fast": "run-s prep:packed:fast test:test-packed-version",
     "test:once": "vitest run",
     "test:test-packed-version": "cd ../../temp-built-test && pnpm vitest run",
-    "typecheck": "tsgo"
+    "typecheck": "tsgo",
+    "typecheck:browser": "tsgo --project tsconfig.browser.json",
+    "typecheck:node": "tsgo --project tsconfig.node.json"
   },
   "dependencies": {
     "wesl": "workspace:*",
     "wesl-gpu": "workspace:*",
     "wesl-link": "workspace:*",
     "wesl-packager": "workspace:*",
+    "wesl-reflect": "workspace:*",
     "wesl-tooling": "workspace:*",
     "wgsl-edit": "workspace:*",
     "wgsl-play": "workspace:*",

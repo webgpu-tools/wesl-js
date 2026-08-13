@@ -1,0 +1,28 @@
+{
+  // The node flavored consumer: a vite config or cli script, with no DOM lib,
+  // no WebGPU types, and skipLibCheck off (TypeScript's default).
+  //
+  // A second config isn't incidental. Every vite project compiles in two
+  // programs with different libs, app and build tooling, and typically keeps a
+  // tsconfig for each. Published types that name a WebGPU global only fail in
+  // the program without DOM, which is the shape that produced wesl-js#201.
+  //
+  // Run by the "typecheck a node side consumer" test in
+  // test/BuiltPackages.test.ts, and only meaningful there: in temp-built-test
+  // the wesl packages resolve from packed tarballs through their published
+  // export maps. See README.md for the other two configs.
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "esnext",
+    "lib": ["ES2024"],
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": false,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["node-consumer", "vitest.config.ts"]
+}

@@ -9,7 +9,7 @@
   "dependencies": {
     "multi_pkg": "workspace:*",
     "random_wgsl": "workspace:*",
-    "thimbleberry": "^0.2.10",
+    "thimbleberry": "^0.2.11",
     "webgpu": "^0.3.8",
     "wesl-plugin": "workspace:*"
   }

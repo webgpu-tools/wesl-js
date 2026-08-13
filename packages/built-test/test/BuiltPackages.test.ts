@@ -32,6 +32,18 @@ test.skipIf(!externalTest)(
   30_000,
 );
 
+// The two consumer shapes, both with skipLibCheck off (TypeScript's default,
+// which the monorepo never uses). Node: no DOM or WebGPU types, catching a
+// WebGPU global that leaked into an environment neutral package. Browser: DOM
+// lib only, catching a published type that doesn't resolve on its own.
+test.skipIf(!externalTest)("typecheck a node side consumer", () => {
+  execSync(`pnpm run typecheck:node`, { stdio: "inherit" });
+});
+
+test.skipIf(!externalTest)("typecheck a browser side consumer", () => {
+  execSync(`pnpm run typecheck:browser`, { stdio: "inherit" });
+});
+
 // All published packages - check for TypeScript exports (Node.js can't run .ts in node_modules)
 const packagesToCheck = [
   "wesl",

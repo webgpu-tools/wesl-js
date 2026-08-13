@@ -1,0 +1,19 @@
+{
+  // The browser flavored consumer, checked strictly: DOM lib, and
+  // skipLibCheck off (TypeScript's default, which many apps keep).
+  //
+  // WebGPU types come from lib.dom rather than @webgpu/types. The two can't
+  // coexist with lib checking on, since TypeScript 7's lib.dom declares WebGPU
+  // itself and the pair produces ~180 duplicate identifier errors.
+  //
+  // Only meaningful in temp-built-test, where the wesl packages resolve to
+  // packed tarballs. In the monorepo they resolve to source, and wgsl-test's
+  // `webgpu` (Dawn) import drags @webgpu/types back in transitively, so this
+  // config would fail there. The sibling tsconfig.json stays lenient for that
+  // reason, and is what the monorepo `typecheck` script uses.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "types": ["vitest/globals", "node"]
+  }
+}
