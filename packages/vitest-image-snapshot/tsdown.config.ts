@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["./src/index.ts", "src/reporter.ts"],
+  entry: ["./src/index.ts", "src/core/index.ts", "src/reporter.ts"],
   target: "node22",
   clean: true,
   dts: true,
