@@ -14,9 +14,12 @@ import type { CommentTrivia } from "./WeslStream.ts";
  *  node can carry comments via the {@link AbstractElemBase} fields. */
 type Positioned = Exclude<AbstractElem, SyntheticElem>;
 
-/** Positioned children per node, computed once per attach pass. Attached
- *  comments are not structural fields, so entries never go stale. */
-type ChildCache = Map<Positioned, Positioned[]>;
+/** The comment lists an element can carry: the {@link AbstractElemBase} pair
+ *  plus a block's `innerComments`. */
+type CommentHolder = Pick<
+  AbstractElemBase,
+  "commentsBefore" | "commentsAfter"
+> & { innerComments?: CommentElem[] };
 
 const tab = 0x09;
 const lineFeed = 0x0a;
@@ -45,77 +48,144 @@ const paragraphSeparator = 0x2029;
  *
  * Descending into expressions (via {@link childElems}) means interior comments
  * like the one in `foo(1, /* x *\/ 2)` are preserved on the `2`, not dropped.
+ *
+ * The runs arrive in source order (see `WeslStream.commentRuns`), so one
+ * in-order walk of the tree places them all: see {@link attachWithin}.
  */
 export function attachComments(
   ctx: ParsingContext,
   moduleElem: ModuleElem,
 ): void {
   const { srcModule } = ctx.state.stable;
-  const cache: ChildCache = new Map();
-  for (const run of ctx.stream.commentRuns()) {
-    const anchor = deepestContaining(
-      moduleElem,
-      run[0].start,
-      runEnd(run),
-      cache,
-    );
-    distribute(anchor, run, srcModule, cache);
-  }
+  const runs = ctx.stream.commentRuns();
+  if (runs.length === 0) return; // no comments: don't walk the tree at all
+  // the module spans the whole source, so it contains every run and the walk
+  // returns having placed all of them
+  attachWithin(moduleElem, runs, 0, srcModule);
 }
 
-/** The deepest node whose span contains the whole [start, end) range, found by
- *  descending into the child that brackets it. Comments live in gaps between
- *  tokens, so the result is the node holding the gap, with the run between two
- *  of its children. */
-function deepestContaining(
-  root: Positioned,
-  start: number,
-  end: number,
-  cache: ChildCache,
-): Positioned {
-  let node = root;
-  while (true) {
-    const child = positionedChildren(node, cache).find(
-      c => c.start <= start && end <= c.end,
-    );
-    if (!child) return node;
-    node = child;
+/**
+ * Attach the runs that lie inside `node`, starting at `runs[firstRunIndex]`,
+ * and return the index of the first run left for an ancestor to place.
+ *
+ * A run's anchor is the deepest node containing it, so the walk descends into
+ * the child holding the run and otherwise treats `node` as the anchor, splitting
+ * the run across the gap between the two children that bracket it.
+ *
+ * Both the child index and the run cursor only move forward. Sibling spans are
+ * disjoint and in source order, and so are the runs, so a child that ends before
+ * the current run ends before every later run too, and can never bracket or hold
+ * one again. Each node is therefore visited once, its children computed once,
+ * and the whole pass costs one scan of the tree rather than a descent per run.
+ *
+ * Recursion depth is AST depth, which loop-built operator chains (`a + a + ...`)
+ * can push past the parser's maxNesting recursion guard; that's acceptable
+ * because bind/emit recurse over the same tree and overflow on shallower input,
+ * and an overflow here surfaces as a wrapped WeslParseError.
+ */
+function attachWithin(
+  node: Positioned,
+  runs: CommentTrivia[][],
+  firstRunIndex: number,
+  srcModule: SrcModule,
+): number {
+  const children = positioned(childElems(node));
+  let childIndex = 0; // first child that can still hold or bracket a run
+  let runIndex = firstRunIndex;
+  while (runIndex < runs.length) {
+    const run = runs[runIndex];
+    const start = run[0].start;
+    const end = runEnd(run);
+    if (start < node.start || node.end < end) return runIndex; // an ancestor owns it
+
+    while (childIndex < children.length && children[childIndex].end <= start) {
+      childIndex++;
+    }
+    const child: Positioned | undefined = children[childIndex];
+
+    // a child containing the whole run holds the anchor: it ends at/after the
+    // run, so the scan above never passed it
+    if (child !== undefined && child.start <= start && end <= child.end) {
+      // the same containment test gates the recursion, so the call places at
+      // least this run and `runIndex` always advances
+      runIndex = attachWithin(child, runs, runIndex, srcModule);
+      continue; // later runs may sit in a gap of this node, after `child`
+    }
+
+    // no child contains the run, so `node` is its anchor. The bracketing
+    // children are in hand:
+    //   prev ends at/before the comments
+    //   next starts at/after the comments
+    //   prev, next may be missing:
+    //     prev when the run leads the anchor's first child
+    //     next when the run dangles after the last child
+    //     both when the anchor has no children (e.g. an empty block)
+    const prev = childIndex > 0 ? children[childIndex - 1] : undefined;
+    const next = firstAfter(children, childIndex, end);
+    distribute(node, run, prev, next, srcModule);
+    runIndex++;
   }
+  return runIndex;
+}
+
+/** Source-positioned children, sorted in source order. Synthetic elems (no
+ *  source position) cannot anchor comments and are dropped. Children usually
+ *  arrive already in source order, so the sort is skipped when possible.
+ *  Filtering and order-checking share one pass: this runs per node, so it's
+ *  kept deliberately lean. */
+function positioned(elems: readonly AbstractElem[]): Positioned[] {
+  const result: Positioned[] = [];
+  let sorted = true; // starts in source order until proven otherwise
+  let lastStart = -1;
+  for (const e of elems) {
+    if (e.kind === "synthetic") continue;
+    if (e.start < lastStart) sorted = false;
+    lastStart = e.start;
+    result.push(e);
+  }
+  if (!sorted) result.sort((a, b) => a.start - b.start);
+  return result;
 }
 
 function runEnd(run: CommentTrivia[]): number {
   return run[run.length - 1].end;
 }
 
+/** The first child at or after `fromIndex` that starts at/after source position
+ *  `end`, i.e. the child a run ending at `end` leads. Children before
+ *  `fromIndex` all end at/before the run, so they start before it too and could
+ *  never qualify. Sorted starts make this the first match; the loop steps only
+ *  over children overlapping the run, and real spans never overlap a comment. */
+function firstAfter(
+  children: Positioned[],
+  fromIndex: number,
+  end: number,
+): Positioned | undefined {
+  for (let i = fromIndex; i < children.length; i++) {
+    if (children[i].start >= end) return children[i];
+  }
+  return undefined;
+}
+
 /** Split a comment run between the previous child (trailing) and the next child
  *  (leading) of its anchor, or onto the last child / inner comments when it
- *  dangles before a closing token. */
+ *  dangles before a closing token. The walk supplies the bracketing children,
+ *  which it already found while locating the anchor. */
 function distribute(
   anchor: Positioned,
   run: CommentTrivia[],
+  prev: Positioned | undefined,
+  next: Positioned | undefined,
   srcModule: SrcModule,
-  cache: ChildCache,
 ): void {
-  const children = positionedChildren(anchor, cache);
-  const start = run[0].start;
-  const end = runEnd(run);
-
-  // the AbstractElem nodes bracketing the comment run.
-  //   prev ends at/before the comments
-  //   next starts at/after the comments
-  //   prev, next may be missing:
-  //     prev when the run leads the anchor's first child
-  //     next when the run dangles after the last child
-  //     both when the anchor has no children (e.g. an empty block)
-  const prev = children.findLast(c => c.end <= start);
-  const next = children.find(c => c.start >= end);
-
   if (!next) {
     // run dangles after the last child, before the anchor's closing token
     if (prev) addComments(prev, "commentsAfter", run, srcModule);
-    // empty block: nothing to attach to, so the comments live inside it
+    // empty block: nothing to attach to, so the comments live inside it.
+    // A block left empty by error recovery can take more than one run (the
+    // dropped statement separated them), so append rather than replace.
     else if (anchor.kind === "block")
-      anchor.innerComments = run.map(t => makeComment(t, srcModule));
+      addComments(anchor, "innerComments", run, srcModule);
     // empty non-block container: keep the comments rather than drop them
     else addComments(anchor, "commentsBefore", run, srcModule);
     return;
@@ -131,39 +201,16 @@ function distribute(
     addComments(next, "commentsBefore", run.slice(split), srcModule);
 }
 
-function positionedChildren(node: Positioned, cache: ChildCache): Positioned[] {
-  let children = cache.get(node);
-  if (children === undefined) {
-    children = positioned(childElems(node));
-    cache.set(node, children);
-  }
-  return children;
-}
-
-/** Append converted comments to an element's leading or trailing list. */
+/** Append converted comments to one of an element's comment lists. */
 function addComments(
-  elem: AbstractElemBase,
-  field: "commentsBefore" | "commentsAfter",
+  elem: CommentHolder,
+  field: keyof CommentHolder,
   trivia: CommentTrivia[],
   srcModule: SrcModule,
 ): void {
   const comments = trivia.map(t => makeComment(t, srcModule));
   const existing = elem[field];
   elem[field] = existing ? [...existing, ...comments] : comments;
-}
-
-function makeComment(trivia: CommentTrivia, srcModule: SrcModule): CommentElem {
-  const { style, start, end } = trivia;
-  const comment: CommentElem = {
-    kind: "comment",
-    style,
-    start,
-    end,
-    srcModule,
-  };
-  // a fully blank line above the comment is preserved in the output
-  if (lineBreaksBefore(srcModule.src, start) >= 2) comment.blankBefore = true;
-  return comment;
 }
 
 /**
@@ -191,46 +238,18 @@ function splitPoint(
   return ownLine >= 0 ? ownLine : hugsNextStart(run, next.start, src);
 }
 
-/** Source-positioned children, sorted in source order. Synthetic elems (no
- *  source position) cannot anchor comments and are dropped. Children usually
- *  arrive already in source order, so the sort is skipped when possible.
- *  Filtering and order-checking share one pass: this runs per node, so it's
- *  kept deliberately lean. */
-function positioned(elems: readonly AbstractElem[]): Positioned[] {
-  const result: Positioned[] = [];
-  let sorted = true; // starts in source order until proven otherwise
-  let lastStart = -1;
-  for (const e of elems) {
-    if (e.kind === "synthetic") continue;
-    if (e.start < lastStart) sorted = false;
-    lastStart = e.start;
-    result.push(e);
-  }
-  if (!sorted) result.sort((a, b) => a.start - b.start);
-  return result;
-}
-
-// Blankspace classification per https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
-// (the tokenizer matches the same set via the blankspaces/lineBreak regexes).
-
-/** Count line breaks in the whitespace run immediately before `pos`, capped at 2:
- *  callers only need none / one line break / a blank line. Scans backward over
- *  blankspace, stopping at the first non-blankspace char, so cost is the gap
- *  length, not the source length. `\r\n` counts as one break. */
-function lineBreaksBefore(src: string, pos: number): number {
-  let count = 0;
-  for (let i = pos - 1; i >= 0; i--) {
-    const c = src.charCodeAt(i);
-    if (isLineBreak(c)) {
-      if (c === lineFeed && src.charCodeAt(i - 1) === carriageReturn) i--; // \r\n
-    } else if (isInlineSpace(c)) {
-      continue; // still inside the run
-    } else {
-      break; // run ended at a non-blankspace char
-    }
-    if (++count >= 2) return 2;
-  }
-  return count;
+function makeComment(trivia: CommentTrivia, srcModule: SrcModule): CommentElem {
+  const { style, start, end } = trivia;
+  const comment: CommentElem = {
+    kind: "comment",
+    style,
+    start,
+    end,
+    srcModule,
+  };
+  // a fully blank line above the comment is preserved in the output
+  if (lineBreaksBefore(srcModule.src, start) >= 2) comment.blankBefore = true;
+  return comment;
 }
 
 /** Index of the first comment that begins its own line (after a line break),
@@ -259,6 +278,38 @@ function hugsNextStart(
   return suffixStart;
 }
 
+// Blankspace classification per https://www.w3.org/TR/WGSL/#blankspace-and-line-breaks
+// (the tokenizer matches the same set via the blankspaces/lineBreak regexes).
+
+/** Count line breaks in the whitespace run immediately before `pos`, capped at 2:
+ *  callers only need none / one line break / a blank line. Scans backward over
+ *  blankspace, stopping at the first non-blankspace char, so cost is the gap
+ *  length, not the source length. `\r\n` counts as one break. */
+function lineBreaksBefore(src: string, pos: number): number {
+  let count = 0;
+  for (let i = pos - 1; i >= 0; i--) {
+    const c = src.charCodeAt(i);
+    if (isLineBreak(c)) {
+      if (c === lineFeed && src.charCodeAt(i - 1) === carriageReturn) i--; // \r\n
+    } else if (isInlineSpace(c)) {
+      continue; // still inside the run
+    } else {
+      break; // run ended at a non-blankspace char
+    }
+    if (++count >= 2) return 2;
+  }
+  return count;
+}
+
+/** True when [from, to) is inline blankspace only (no line break): the two ends
+ *  sit on the same line with nothing but same-line spaces between. */
+function sameLineGap(src: string, from: number, to: number): boolean {
+  for (let i = from; i < to; i++) {
+    if (!isInlineSpace(src.charCodeAt(i))) return false;
+  }
+  return true;
+}
+
 /** A WGSL line break code point. `\r\n` is two of these; callers coalesce it. */
 function isLineBreak(c: number): boolean {
   return (
@@ -277,13 +328,4 @@ function isInlineSpace(c: number): boolean {
   return (
     c === space || c === tab || c === leftToRightMark || c === rightToLeftMark
   );
-}
-
-/** True when [from, to) is inline blankspace only (no line break): the two ends
- *  sit on the same line with nothing but same-line spaces between. */
-function sameLineGap(src: string, from: number, to: number): boolean {
-  for (let i = from; i < to; i++) {
-    if (!isInlineSpace(src.charCodeAt(i))) return false;
-  }
-  return true;
 }

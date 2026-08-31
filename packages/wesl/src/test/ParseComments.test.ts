@@ -261,3 +261,56 @@ test("attach a comment inside parentheses", () => {
           literal literal(1) before['/* inner */']"
   `);
 });
+
+test("keep every comment run in a block emptied by error recovery", () => {
+  const src = `fn f() { /*a*/ ~~~ /*b*/ }`;
+  const parsed = parseWESL(src);
+  expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
+    "module
+      fn f()
+        decl %f
+        block inner['/*a*/', '/*b*/']"
+  `);
+});
+
+test("attach a leading comment above a return statement", () => {
+  const src = `
+    fn f() -> u32 {
+      // leading
+      return 1;
+    }`;
+  const parsed = parseWESL(src);
+  expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
+    "module
+      fn f() -> u32
+        decl %f
+        type u32
+          ref u32
+        block
+          return before['// leading']
+            literal literal(1)"
+  `);
+});
+
+test("attach a leading comment above an assignment statement", () => {
+  const src = `
+    fn f() {
+      var x = 0;
+      // leading
+      x = 1;
+    }`;
+  const parsed = parseWESL(src);
+  expect(astToString(parsed.moduleElem)).toMatchInlineSnapshot(`
+    "module
+      fn f()
+        decl %f
+        block
+          var %x
+            typeDecl %x
+              decl %x
+            literal literal(0)
+          assign before['// leading']
+            ref x
+            literal literal(1)"
+  `);
+});
