@@ -148,10 +148,12 @@ export const wgslStandardAttributes = new Set([
 ]);
 
 // membership Sets: these queries run per otherwise-unresolved ident during
-// binding, where a linear scan of the name lists would be wasteful
+// binding, where a linear scan of the name lists would be wasteful.
+// stdWgslSet is the union, so the "any builtin?" test costs one lookup.
 const stdTypeSet = new Set(stdTypes);
 const stdFnSet = new Set(stdFns);
 const stdEnumerantSet = new Set(stdEnumerants);
+const stdWgslSet = new Set([...stdTypes, ...stdFns, ...stdEnumerants]);
 
 /** return true if the name is for a built in type (not a user struct) */
 export function stdType(name: string): boolean {
@@ -170,7 +172,7 @@ export function stdEnumerant(name: string): boolean {
 
 /** @return true if ident is a standard WGSL type, fn, or enumerant. */
 export function stdWgsl(name: string): boolean {
-  return stdType(name) || stdFn(name) || stdEnumerant(name); // TODO add tests for enumerants case (e.g. var x = read;)
+  return stdWgslSet.has(name); // TODO add tests for enumerants case (e.g. var x = read;)
 }
 
 /** The names in a whitespace-separated list. */

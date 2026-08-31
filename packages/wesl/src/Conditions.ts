@@ -1,9 +1,9 @@
 import type {
   AbstractElem,
   AttributeElem,
+  ConditionalAttribute,
   ElemWithAttributes,
   ElifAttribute,
-  ElseAttribute,
   ExpressionElem,
   IfAttribute,
 } from "./AbstractElems.ts";
@@ -21,16 +21,9 @@ export function scopeValid(scope: Scope, conditions: Conditions): boolean {
   const { condAttribute } = scope;
   if (!condAttribute) return true;
 
-  // @if attributes are evaluated based on conditions
-  if (condAttribute.kind === "@if") {
-    const result = evaluateIfAttribute(condAttribute, conditions); // LATER cache?
-    return result;
-  }
-
-  // @elif attributes are evaluated based on conditions
-  if (condAttribute.kind === "@elif") {
-    const result = evaluateElifAttribute(condAttribute, conditions);
-    return result;
+  // @if and @elif attributes are evaluated based on conditions
+  if (condAttribute.kind === "@if" || condAttribute.kind === "@elif") {
+    return evaluateCondAttribute(condAttribute, conditions); // LATER cache?
   }
 
   // @else attributes are never valid on their own (need parent context)
@@ -44,36 +37,41 @@ export function* validScopeItems(
 ): Generator<ScopeItem> {
   let elseValid = false;
   for (const item of scope.contents) {
-    const cond = validateConditional(getCondAttr(item), elseValid, conditions);
-    elseValid = cond.nextElseState;
-    if (cond.valid) yield item;
+    const condAttr = getCondAttr(item);
+    if (!condAttr) {
+      // common case: unconditional item, and elseValid carries over unchanged
+      yield item;
+    } else {
+      const cond = validateConditional(condAttr, elseValid, conditions);
+      elseValid = cond.nextElseState;
+      if (cond.valid) yield item;
+    }
   }
 }
 
 /**
- * Filter elements based on @if/@else conditional logic.
- * This function processes elements sequentially to handle @if/@else chains correctly.
- *
- * @param elements Array of elements at the same scope level
- * @param conditions Current conditional compilation settings
- * @return Array of valid elements after applying @if/@else logic
+ * Filter elements to those valid under the current conditions.
+ * @param elements sibling elements at one scope level, in source order -
+ *   an @if/@elif/@else chain is only read correctly in sequence
  */
 export function filterValidElements<T extends AbstractElem>(
   elements: readonly T[],
   conditions: Conditions,
 ): T[] {
   let elseValid = false;
-
-  return elements.flatMap(e => {
-    const attributes = (e as ElemWithAttributes).attributes;
-    const { valid, nextElseState } = validateAttributes(
-      attributes,
-      elseValid,
-      conditions,
-    );
-    elseValid = nextElseState;
-    return valid ? [e] : [];
-  });
+  const valid: T[] = [];
+  for (const e of elements) {
+    const condAttr = findConditional((e as ElemWithAttributes).attributes);
+    if (!condAttr) {
+      // common case: unconditional element, and elseValid carries over unchanged
+      valid.push(e);
+    } else {
+      const cond = validateConditional(condAttr, elseValid, conditions);
+      elseValid = cond.nextElseState;
+      if (cond.valid) valid.push(e);
+    }
+  }
+  return valid;
 }
 
 /**
@@ -81,7 +79,7 @@ export function filterValidElements<T extends AbstractElem>(
  * @return valid: whether to process this element, nextElseState: state for next sibling
  */
 export function validateConditional(
-  condAttribute: IfAttribute | ElifAttribute | ElseAttribute | undefined,
+  condAttribute: ConditionalAttribute | undefined,
   elseValid: boolean,
   conditions: Conditions,
 ): ConditionalResult {
@@ -90,7 +88,7 @@ export function validateConditional(
   }
 
   if (condAttribute.kind === "@if") {
-    const valid = evaluateIfAttribute(condAttribute, conditions);
+    const valid = evaluateCondAttribute(condAttribute, conditions);
     return { valid, nextElseState: !valid };
   } else if (condAttribute.kind === "@elif") {
     // @elif is only valid if no previous condition in the chain was true
@@ -98,7 +96,7 @@ export function validateConditional(
       // Previous condition was true, skip this @elif
       return { valid: false, nextElseState: false };
     }
-    const valid = evaluateElifAttribute(condAttribute, conditions);
+    const valid = evaluateCondAttribute(condAttribute, conditions);
     return { valid, nextElseState: !valid };
   } else {
     // @else
@@ -106,28 +104,12 @@ export function validateConditional(
   }
 }
 
-/**
- * Validate element based on attributes (or lack thereof).
- * @return valid if the element is valid under current Conditions and the next elseValid state
- * i.e. `@if(MOBILE) const x = 1;` is valid if MOBILE is true
- * Note that only elements marked with an @if or @else attribute can be invalid
- */
-export function validateAttributes(
-  attributes: AttributeElem[] | undefined,
-  elseValid: boolean,
-  conditions: Conditions,
-): ConditionalResult {
-  const condAttr = findConditional(attributes);
-  return validateConditional(condAttr, elseValid, conditions);
-}
-
 /** Extract @if, @elif, or @else attribute from an array of attributes */
 export function findConditional(
   attributes: AttributeElem[] | undefined,
-): IfAttribute | ElifAttribute | ElseAttribute | undefined {
+): ConditionalAttribute | undefined {
   if (!attributes) return;
 
-  // Find first @if, @elif, or @else attribute
   for (const attr of attributes) {
     const kind = attr.attribute.kind;
     if (kind === "@if" || kind === "@elif" || kind === "@else") {
@@ -137,24 +119,16 @@ export function findConditional(
   return undefined;
 }
 
-/** @return true if the @if attribute is valid with current Conditions */
-function evaluateIfAttribute(
-  ifAttribute: IfAttribute,
+/** @return true if an @if or @elif attribute is valid with current Conditions */
+function evaluateCondAttribute(
+  attribute: IfAttribute | ElifAttribute,
   conditions: Conditions,
 ): boolean {
-  return evaluateIfExpression(ifAttribute.param.expression, conditions);
-}
-
-/** @return true if the @elif attribute is valid with current Conditions */
-function evaluateElifAttribute(
-  elifAttribute: ElifAttribute,
-  conditions: Conditions,
-): boolean {
-  return evaluateIfExpression(elifAttribute.param.expression, conditions);
+  return evaluateIfExpression(attribute.param.expression, conditions);
 }
 
 /** Get conditional attribute from any scope item. */
-function getCondAttr(item: ScopeItem): Scope["condAttribute"] {
+function getCondAttr(item: ScopeItem): ConditionalAttribute | undefined {
   // Decls inside PartialScopes don't need their own conditional checked -
   // the PartialScope.condAttribute handles filtering at the scope level.
   if (item.kind === "decl" && item.containingScope.kind === "partial")

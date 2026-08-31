@@ -1,8 +1,6 @@
 import type {
+  ConditionalAttribute,
   DeclarationElem,
-  ElifAttribute,
-  ElseAttribute,
-  IfAttribute,
   RefIdentElem,
 } from "./AbstractElems.ts";
 import { assertThatDebug } from "./Assertions.ts";
@@ -93,8 +91,8 @@ interface ScopeBase {
   /* Child scopes and idents in lexical order  */
   contents: ScopeItem[];
 
-  /** Conditional attribute (@if or @else) for this scope */
-  condAttribute?: IfAttribute | ElifAttribute | ElseAttribute;
+  /** Conditional attribute (@if, @elif, or @else) for this scope */
+  condAttribute?: ConditionalAttribute;
 }
 
 let scopeId = 0;

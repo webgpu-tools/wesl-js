@@ -335,7 +335,9 @@ export function bindIdentsRecursive(
   const newFromRefs = dontFollowDecls
     ? []
     : handleDecls(newGlobals, bindContext);
-  return [newGlobals, newFromChildren, newFromRefs].flat();
+  // handleDecls is done reading newGlobals, so reuse it as the result list
+  newGlobals.push(...newFromChildren, ...newFromRefs);
+  return newGlobals;
 }
 
 /** Initialize root declarations with mangled names and add to tracking sets. */
@@ -386,7 +388,12 @@ function handleDecls(
   newGlobals: DeclIdent[],
   bindContext: BindContext,
 ): DeclIdent[] {
-  return newGlobals.flatMap(decl => processDependentScope(decl, bindContext));
+  const found: DeclIdent[] = [];
+  for (const decl of newGlobals) {
+    const decls = processDependentScope(decl, bindContext);
+    if (decls.length) found.push(...decls);
+  }
+  return found;
 }
 
 /** Given a global declIdent, return the liveDecls for its root scope. */
