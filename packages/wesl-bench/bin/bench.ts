@@ -1,6 +1,4 @@
 #!/usr/bin/env -S node --expose-gc --allow-natives-syntax
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   type BenchMatrix,
   gcSections,
@@ -10,26 +8,20 @@ import {
   runsSection,
 } from "benchforge";
 import { baselineDir, hasBaselineModule } from "../src/BaselineVariations.ts";
-import type { WeslSource } from "../src/LoadExamples.ts";
-import { ensureBevyFixture } from "../src/LoadExamples.ts";
+import { ensureBevyFixture, type WeslSource } from "../src/LoadExamples.ts";
 import { locSection } from "../src/LocSection.ts";
 import { meanTimeSection } from "../src/MeanTimeSection.ts";
 
-const fixturesDir = join(
-  fileURLToPath(new URL(".", import.meta.url)),
-  "..",
-  "fixtures",
-);
-
 await runBenchCli({
-  // Run-settings bundles; --equiv-margin per preset comes from --calibrate at
-  // that preset's batches/duration/warmup. Explicit CLI flags override these.
-  // quick: cold-start-inclusive mean (each batch resets the heap). warm: skips
-  // the per-batch warmup ramp for steady-state hot-loop throughput and a
-  // steadier noise floor. Both calibrate to 0.5%. validate: one iteration per
-  // benchmark, timings meaningless -- just checks that every case+variant runs.
   presets: {
     validate: { batches: 1, iterations: 1, "equiv-margin": 0 },
+    profile: {
+      batches: 50,
+      iterations: 100,
+      warmup: 50,
+      "equiv-margin": 0,
+      profile: true,
+    },
     quick: {
       batches: 100,
       duration: 0.1,
@@ -58,9 +50,10 @@ await runBenchCli({
         default: false,
         describe: "Compare against baseline version in _baseline/ directory",
       })
-      .default("gc-stats", true),
+      .default("gc-stats", true)
+      .default("profile-rows", 50),
   build: async args => {
-    await ensureBevyFixture(fixturesDir);
+    await ensureBevyFixture();
     const hasBaseline = args.baseline && hasBaselineModule();
     if (args.baseline && !hasBaseline) {
       console.warn(

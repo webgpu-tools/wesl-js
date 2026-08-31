@@ -1,12 +1,28 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { fetchBulkTest } from "wesl-testsuite/fetch-bulk-tests";
 
+/** source files for one benchmark case, keyed by module path */
 export interface WeslSource {
   weslSrc: Record<string, string>;
   rootModule: string;
   lineCount?: number;
 }
+
+const packageDir = fileURLToPath(new URL("..", import.meta.url));
+
+/** single .wgsl benchmark examples, in this package */
+const examplesDir = join(packageDir, "wesl-examples");
+
+/** fetched multi-file fixtures, in this package */
+const fixturesDir = join(packageDir, "fixtures");
+
+/** fetched multi-file fixtures, shared from the wesl package */
+const weslFixturesDir = join(packageDir, "..", "wesl", "fixtures");
+
+/** shader dir inside a fetched bevy-wgsl fixture (the path loading requires) */
+const bevyShadersSubpath = "bevy-wgsl/src/shaders/bevy";
 
 const bevyBulkTest = {
   name: "Bevy",
@@ -18,39 +34,14 @@ const bevyBulkTest = {
 };
 
 /** Ensure bevy-wgsl fixture is available (fetches if needed) */
-export async function ensureBevyFixture(fixturesDir: string): Promise<void> {
-  // First check if fixture exists in wesl package (shared location)
-  const weslFixturesDir = join(dirname(fixturesDir), "wesl/fixtures");
-  if (existsSync(join(weslFixturesDir, "bevy-wgsl"))) {
-    return; // Already available via wesl package
+export async function ensureBevyFixture(): Promise<void> {
+  // check the full shader path findBevyDir needs, so a partial fetch (the
+  // repo root without the shader tree) still triggers a re-fetch
+  if (existsSync(join(weslFixturesDir, bevyShadersSubpath))) {
+    return; // already available via the wesl package
   }
-  // Otherwise fetch to local fixtures directory
-  const fixturesUrl = new URL(`file://${fixturesDir}/`);
+  const fixturesUrl = pathToFileURL(`${fixturesDir}/`);
   await fetchBulkTest(bevyBulkTest, fixturesUrl);
-}
-
-/** @return default benchmark examples (just bevy multi-file linking) */
-export function loadDefaultExamples(
-  fixturesDir: string,
-): Record<string, WeslSource> {
-  return {
-    bevy_env_map: loadBevyEnvMap(fixturesDir),
-  };
-}
-
-/** @return all benchmark examples including extended set */
-export function loadAllExamples(
-  examplesDir: string,
-  fixturesDir: string,
-): Record<string, WeslSource> {
-  return {
-    bevy_env_map: loadBevyEnvMap(fixturesDir),
-    rasterize_05_fine: loadFile(examplesDir, "rasterize_05_fine.wgsl"),
-    particle: loadFile(examplesDir, "particle.wgsl"),
-    unity: loadFile(examplesDir, "unity_webgpu_000002B8376A5020.fs.wgsl"),
-    tiny: loadFile(examplesDir, "tiny.wgsl"),
-    op_dense: loadFile(examplesDir, "op_dense.wgsl"),
-  };
 }
 
 // Files needed for environment_map.wesl (root + transitive deps)
@@ -62,9 +53,21 @@ const envMapFiles = [
   "./pbr/clustered_forward.wesl",
 ];
 
+/** @return every benchmark example, keyed by case id */
+export function loadAllExamples(): Record<string, WeslSource> {
+  return {
+    bevy_env_map: loadBevyEnvMap(),
+    rasterize_05_fine: loadFile("rasterize_05_fine.wgsl"),
+    particle: loadFile("particle.wgsl"),
+    unity: loadFile("unity_webgpu_000002B8376A5020.fs.wgsl"),
+    tiny: loadFile("tiny.wgsl"),
+    op_dense: loadFile("op_dense.wgsl"),
+  };
+}
+
 /** @return bevy environment_map multi-file example */
-function loadBevyEnvMap(fixturesDir: string): WeslSource {
-  const bevyDir = findBevyDir(fixturesDir);
+function loadBevyEnvMap(): WeslSource {
+  const bevyDir = findBevyDir();
   const weslSrc: Record<string, string> = {};
   for (const file of envMapFiles) {
     const fullPath = join(bevyDir, file.slice(2)); // remove "./"
@@ -77,26 +80,26 @@ function loadBevyEnvMap(fixturesDir: string): WeslSource {
   };
 }
 
+/** @return source data for a single WESL file */
+function loadFile(filename: string): WeslSource {
+  const content = readFileSync(join(examplesDir, filename), "utf-8");
+  const modulePath = `./${filename}`;
+  const weslSrc = { [modulePath]: content };
+  return { weslSrc, rootModule: modulePath, lineCount: totalLines(weslSrc) };
+}
+
 /** @return path to bevy shaders directory, checking multiple locations */
-function findBevyDir(fixturesDir: string): string {
+function findBevyDir(): string {
   const locations = [
-    join(fixturesDir, "bevy-wgsl/src/shaders/bevy"),
-    join(dirname(fixturesDir), "wesl/fixtures/bevy-wgsl/src/shaders/bevy"),
+    join(fixturesDir, bevyShadersSubpath),
+    join(weslFixturesDir, bevyShadersSubpath),
   ];
   for (const loc of locations) {
     if (existsSync(loc)) return loc;
   }
   const tried = locations.join(", ");
-  const msg = `Bevy fixture not found. Tried: ${tried}. Run 'bb test' in wesl package first to fetch fixtures.`;
+  const msg = `Bevy fixture not found. Tried: ${tried}. Run 'rpr test' in the wesl package first to fetch fixtures.`;
   throw new Error(msg);
-}
-
-/** @return source data for a single WESL file */
-function loadFile(basePath: string, filename: string): WeslSource {
-  const content = readFileSync(join(basePath, filename), "utf-8");
-  const modulePath = `./${filename}`;
-  const weslSrc = { [modulePath]: content };
-  return { weslSrc, rootModule: modulePath, lineCount: totalLines(weslSrc) };
 }
 
 /** @return total lines across all source files */

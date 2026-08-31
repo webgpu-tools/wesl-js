@@ -1,5 +1,4 @@
 import {
-  freshResolver,
   linkRegistry,
   RecordResolver,
 } from "../../../../_baseline/packages/wesl/src/index.ts";
@@ -10,16 +9,19 @@ interface RelinkState {
   rootModuleName: string;
 }
 
-/** Baseline repeat-link: older wesl versions mutate ASTs during binding, so
- * correct relinking requires freshResolver (re-parse per link). */
+/** Baseline repeat-link, mirroring variants/relink.ts. Kept as a copy (not
+ * shared) so this file can track an older baseline API independently.
+ * Note: baselines that predate immutable post-parse ASTs mutate ASTs during
+ * binding, so sharing the resolver across links would mismeasure there; only
+ * compare against baselines with immutable ASTs. */
 export function setup(source: WeslSource): RelinkState {
   const resolver = new RecordResolver(source.weslSrc);
   const rootModuleName = source.rootModule;
-  linkRegistry({ resolver: freshResolver(resolver), rootModuleName });
+  // warm the lazy parse cache so run() measures bind+emit only
+  linkRegistry({ resolver, rootModuleName });
   return { resolver, rootModuleName };
 }
 
 export function run(state: RelinkState): void {
-  const resolver = freshResolver(state.resolver);
-  linkRegistry({ resolver, rootModuleName: state.rootModuleName });
+  linkRegistry(state);
 }

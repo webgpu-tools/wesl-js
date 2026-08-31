@@ -17,7 +17,7 @@
     "typecheck": "tsgo"
   },
   "dependencies": {
-    "benchforge": "^0.2.14",
+    "benchforge": "^0.2.20",
     "wesl": "workspace:*",
     "wgsl_reflect": "^1.2.1"
   },
