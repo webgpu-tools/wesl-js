@@ -144,6 +144,42 @@ export function mapValues<T, U>(
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, fn(v)]));
 }
 
+/** cache of line-start positions, keyed by source text */
+const lineStartCache = new Map<string, number[]>();
+
+/** @return the character position of each line start in the text (cached).
+ * Lines are delimited by \n only.
+ * LATER: Does this "line break" actually match the spec? I think not */
+export function lineStarts(text: string): number[] {
+  const found = lineStartCache.get(text);
+  if (found) return found;
+  const starts = [...text.matchAll(/\n/g)].map(m => m.index + 1);
+  starts.unshift(0);
+  lineStartCache.set(text, starts);
+  return starts;
+}
+
+/** @return the index into lineStarts of the line containing offset (binary search) */
+export function lineIndexOf(offset: number, starts: number[]): number {
+  let low = 0;
+  let high = starts.length - 1;
+  if (offset >= starts[high]) return high;
+  while (low + 1 < high) {
+    const mid = (low + high) >> 1;
+    if (offset >= starts[mid]) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
+/** @return a ^^^^ caret line: indent spaces, then at least one caret */
+export function caretLine(indent: number, count: number): string {
+  return " ".repeat(Math.max(0, indent)) + "^".repeat(Math.max(1, count));
+}
+
 /**
  * Maps an character position in a string to a 1-indexed line number, and 1-indexed column.
  */
@@ -152,21 +188,9 @@ export function offsetToLineNumber(
   text: string,
 ): [lineNum: number, linePos: number] {
   const safeOffset = Math.min(text.length, Math.max(0, offset));
-  let lineStartOffset = 0;
-  let lineNum = 1;
-  while (true) {
-    // LATER: Does this "line break" actually match the spec? I think not
-    const lineEnd = text.indexOf("\n", lineStartOffset);
-    if (lineEnd === -1 || safeOffset <= lineEnd) {
-      // Last relevant line
-      const linePos = 1 + (safeOffset - lineStartOffset);
-      return [lineNum, linePos];
-    } else {
-      // Go to the next line
-      lineStartOffset = lineEnd + 1;
-      lineNum += 1;
-    }
-  }
+  const starts = lineStarts(text);
+  const line = lineIndexOf(safeOffset, starts);
+  return [line + 1, 1 + safeOffset - starts[line]];
 }
 
 /** Highlights an error.
@@ -174,19 +198,17 @@ export function offsetToLineNumber(
  * Returns a string with the line, and a string with the ^^^^ carets
  */
 export function errorHighlight(source: string, span: Span): [string, string] {
-  let lineStartOffset = source.lastIndexOf("\n", span[0]);
-  lineStartOffset = lineStartOffset === -1 ? 0 : lineStartOffset + 1;
-  let lineEndOffset = source.indexOf("\n", span[0]);
-  if (lineEndOffset === -1) {
-    lineEndOffset = source.length;
-  }
+  const safeStart = Math.min(source.length, Math.max(0, span[0]));
+  const starts = lineStarts(source);
+  const line = lineIndexOf(safeStart, starts);
+  const lineStart = starts[line];
+  const nextStart = starts[line + 1];
+  // slice to just before the \n, or to the end on the last line
+  const lineEnd = nextStart !== undefined ? nextStart - 1 : source.length;
 
   // LATER Handle multiline spans
-  const errorLength = span[1] - span[0];
-  const caretCount = Math.max(1, errorLength);
-  const linePos = Math.max(0, span[0] - lineStartOffset);
   return [
-    source.slice(lineStartOffset, lineEndOffset),
-    " ".repeat(linePos) + "^".repeat(caretCount),
+    source.slice(lineStart, lineEnd),
+    caretLine(span[0] - lineStart, span[1] - span[0]),
   ];
 }

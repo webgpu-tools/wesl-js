@@ -51,18 +51,6 @@ import { createWeslLinter, wesl } from "./Language.ts";
 import { saveEndpoint } from "./SaveEndpoint.ts";
 import cssText from "./WgslEdit.css?inline";
 
-type Theme = "light" | "dark" | "auto";
-
-type LintMode = "on" | "off";
-
-interface FileState {
-  doc: Text;
-  /** Authoritative once the file has been active; carries the per-file undo history. */
-  state?: EditorState;
-  scrollPos?: number;
-  selection?: EditorSelection;
-}
-
 /** `autosave` CustomEvent detail: full project snapshot + dirty file names. */
 export interface AutosaveDetail {
   project: WeslProject;
@@ -80,15 +68,31 @@ export interface WgslEditAttrs {
   "flat-files"?: boolean | string;
 }
 
+type Theme = "light" | "dark" | "auto";
+
+type LintMode = "on" | "off";
+
+interface FileState {
+  doc: Text;
+  /** Authoritative once the file has been active; carries the per-file undo history. */
+  state?: EditorState;
+  scrollPos?: number;
+  selection?: EditorSelection;
+}
+
 type GpuMessage = {
   offset: number;
   length: number;
   severity: string;
   message: string;
 };
+/** the slice of a linked WESL source map that diagnostic mapping reads */
 type LinkedSourceMap = {
   sourceMap: {
-    destToSrc(offset: number): { position: number; src: { path?: string } };
+    destToSrc(offset: number): {
+      position: number;
+      src: { path?: string; text: string };
+    };
   };
 };
 
@@ -1159,9 +1163,23 @@ function mapGpuDiagnostics(
     const mod = path ? fileToModulePath(path, pkg, false) : null;
     if (mod !== active) return [];
 
-    const endPos = sourceMap.destToSrc(msg.offset + msg.length);
-    const from = srcPos.position;
-    const to = endPos.position > from ? endPos.position : from + 1;
+    // clamp to the source text: glue fragments can anchor past a module's end,
+    // and an out-of-doc range makes CodeMirror's setDiagnostics throw.
+    // The linked snapshot's length is the right bound: @codemirror/lint only
+    // applies results when the doc is unchanged since the lint ran, so
+    // diagnostics built against this snapshot never reach a different doc.
+    const docEnd = srcPos.src.text.length;
+    const from = Math.min(srcPos.position, docEnd);
+    // map the last covered position (not one past the end, which may fall in
+    // the next fragment) to keep the range within the message's own span;
+    // if it maps into a different source file, fall back to a 1-char range
+    const lastOffset = msg.offset + msg.length - 1;
+    const endPos = msg.length > 0 ? sourceMap.destToSrc(lastOffset) : srcPos;
+    const end = endPos.src.path === path ? endPos.position + 1 : from;
+    // widen an empty range to 1 char; at end-of-doc the clamp wins and the
+    // range stays empty, which CodeMirror accepts (marks the position)
+    const nonEmptyEnd = end > from ? end : from + 1;
+    const to = Math.min(nonEmptyEnd, docEnd);
     const { severity, message } = msg;
     return { from, to, severity, message, source: "WebGPU" } as Diagnostic;
   });

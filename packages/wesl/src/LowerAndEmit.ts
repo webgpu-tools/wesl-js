@@ -267,12 +267,13 @@ function lowerAndEmitElem(e: AbstractElem, ctx: EmitContext): void {
 }
 
 function emitName(e: NameElem, ctx: EmitContext): void {
-  ctx.srcBuilder.add(e.name, e.start, e.end);
+  ctx.srcBuilder.add(e.name, e.start);
 }
 
+/** Emit generated text that has no user source, mapped to itself. */
 function emitSynthetic(e: SyntheticElem, ctx: EmitContext): void {
   const { text } = e;
-  ctx.srcBuilder.addSynthetic(text, text, 0, text.length);
+  ctx.srcBuilder.addSynthetic(text, text, 0);
 }
 
 function emitRefIdent(e: RefIdentElem, ctx: EmitContext): void {
@@ -280,16 +281,16 @@ function emitRefIdent(e: RefIdentElem, ctx: EmitContext): void {
   const target = refTarget(e.ident, bindings);
   if (target === "std") {
     // standard WGSL ident (like sin, or u32), emitted as-is
-    ctx.srcBuilder.add(e.ident.originalName, e.start, e.end);
+    ctx.srcBuilder.add(e.ident.originalName, e.start);
   } else if (target === "unbound") {
     failIdentElem(e, `unresolved identifier: '${e.ident.originalName}'`);
   } else {
-    ctx.srcBuilder.add(displayName(target, bindings), e.start, e.end);
+    ctx.srcBuilder.add(displayName(target, bindings), e.start);
   }
 }
 
 function emitDeclIdent(e: DeclIdentElem, ctx: EmitContext): void {
-  ctx.srcBuilder.add(displayName(e.ident, ctx.bindings), e.start, e.end);
+  ctx.srcBuilder.add(displayName(e.ident, ctx.bindings), e.start);
 }
 
 /** Emit an expression with any comments attached to it. Comments inside an
@@ -308,19 +309,6 @@ function emitElemAttributes(
 ): void {
   emitAttributes(e.attributes, ctx);
   emitAttributes(ctx.addedAttributes?.get(e), ctx);
-}
-
-function emitAttributes(
-  attributes: AttributeElem[] | undefined,
-  ctx: EmitContext,
-): void {
-  attributes?.forEach(a => {
-    emitInlineLeading(a, ctx);
-    if (emitAttribute(a, ctx)) {
-      emitInlineTrailing(a, ctx);
-      ctx.srcBuilder.add(" ", a.start, a.end);
-    }
-  });
 }
 
 /** Emit a declared identifier with its optional `: type` annotation. */
@@ -422,7 +410,11 @@ function emitFn(e: FnElem, ctx: EmitContext): void {
 
   emitElemAttributes(e, ctx);
 
-  builder.add("fn ", name.start - 3, name.start);
+  // Anchor `fn ` 3 chars before the name, where single-space `fn name` source
+  // puts it. Unusual whitespace or a comment in the gap only shifts this
+  // source-map anchor within the gap (never before the `fn` keyword, since at
+  // least one blankspace separates it from the name).
+  builder.add("fn ", name.start - 3);
   emitInlineLeading(name, ctx);
   emitDeclIdent(name, ctx);
   emitInlineTrailing(name, ctx);
@@ -474,7 +466,7 @@ function emitStruct(e: StructElem, ctx: EmitContext): void {
   }
 
   emitElemAttributes(e, ctx);
-  srcBuilder.add("struct ", start, name.start);
+  srcBuilder.add("struct ", start);
   emitInlineLeading(name, ctx);
   emitDeclIdent(name, ctx);
   emitInlineTrailing(name, ctx);
@@ -512,20 +504,20 @@ function emitAttribute(e: AttributeElem, ctx: EmitContext): boolean {
 
   if (kind === "@builtin") {
     const builtinStr = `@builtin(${e.attribute.param.name})`;
-    ctx.srcBuilder.add(builtinStr, e.start, e.end);
+    ctx.srcBuilder.add(builtinStr, e.start);
     return true;
   }
 
   if (kind === "@diagnostic") {
     const { severity, rule } = e.attribute;
     const diagStr = `@diagnostic${diagnosticControlToString(severity, rule)}`;
-    ctx.srcBuilder.add(diagStr, e.start, e.end);
+    ctx.srcBuilder.add(diagStr, e.start);
     return true;
   }
 
   if (kind === "@interpolate") {
     const params = e.attribute.params.map(v => v.name).join(", ");
-    ctx.srcBuilder.add(`@interpolate(${params})`, e.start, e.end);
+    ctx.srcBuilder.add(`@interpolate(${params})`, e.start);
     return true;
   }
 
@@ -537,13 +529,13 @@ function emitDirective(e: DirectiveElem, ctx: EmitContext): void {
   const { kind } = directive;
   if (kind === "diagnostic") {
     const diagStr = `diagnostic${diagnosticControlToString(directive.severity, directive.rule)};`;
-    ctx.srcBuilder.add(diagStr, e.start, e.end);
+    ctx.srcBuilder.add(diagStr, e.start);
   } else if (kind === "enable") {
     const exts = directive.extensions.map(v => v.name).join(", ");
-    ctx.srcBuilder.add(`enable ${exts};`, e.start, e.end);
+    ctx.srcBuilder.add(`enable ${exts};`, e.start);
   } else if (kind === "requires") {
     const exts = directive.extensions.map(v => v.name).join(", ");
-    ctx.srcBuilder.add(`requires ${exts};`, e.start, e.end);
+    ctx.srcBuilder.add(`requires ${exts};`, e.start);
   } else {
     assertUnreachable(kind);
   }
@@ -574,7 +566,7 @@ function emitExpressionCore(e: ExpressionElem, ctx: EmitContext): void {
   const builder = ctx.srcBuilder;
   switch (e.kind) {
     case "literal":
-      builder.add(e.value, e.start, e.end);
+      builder.add(e.value, e.start);
       return;
     case "ref":
       emitRefIdent(e, ctx);
@@ -583,15 +575,15 @@ function emitExpressionCore(e: ExpressionElem, ctx: EmitContext): void {
       emitTypeRef(e, ctx);
       return;
     case "binary-expression": {
-      const [start, end] = e.operator.span;
+      const [start] = e.operator.span;
       emitExpression(e.left, ctx);
-      builder.add(` ${e.operator.value} `, start, end);
+      builder.add(` ${e.operator.value} `, start);
       emitExpression(e.right, ctx);
       return;
     }
     case "unary-expression": {
-      const { value, start, end } = e.operator;
-      builder.add(value, start, end);
+      const { value, start } = e.operator;
+      builder.add(value, start);
       emitExpression(e.expression, ctx);
       return;
     }
@@ -618,7 +610,7 @@ function emitExpressionCore(e: ExpressionElem, ctx: EmitContext): void {
       return;
     case "component-member-expression":
       emitExpression(e.base, ctx);
-      builder.add("." + e.access.name, e.access.start, e.access.end);
+      builder.add("." + e.access.name, e.access.start);
       return;
     default:
       assertUnreachable(e);
@@ -633,6 +625,19 @@ function emitInlineTrailing(e: AbstractElemBase, ctx: EmitContext): void {
     emitComment(c, ctx);
     if (c.style === "line") newLine(ctx);
   }
+}
+
+function emitAttributes(
+  attributes: AttributeElem[] | undefined,
+  ctx: EmitContext,
+): void {
+  attributes?.forEach(a => {
+    emitInlineLeading(a, ctx);
+    if (emitAttribute(a, ctx)) {
+      emitInlineTrailing(a, ctx);
+      ctx.srcBuilder.add(" ", a.start);
+    }
+  });
 }
 
 /** Leading comments: each on its own indented line above the element. */
@@ -728,7 +733,7 @@ function emitValueDecl(e: ValueDeclElem, ctx: EmitContext): void {
 }
 
 function emitComment(c: CommentElem, ctx: EmitContext): void {
-  ctx.srcBuilder.add(c.srcModule.src.slice(c.start, c.end), c.start, c.end);
+  ctx.srcBuilder.add(c.srcModule.src.slice(c.start, c.end), c.start);
 }
 
 function warnEmptyStruct(e: StructElem): void {
@@ -767,16 +772,16 @@ function emitStandardAttribute(e: AttributeElem, ctx: EmitContext): void {
 
   const { params } = e.attribute;
   if (!params || params.length === 0) {
-    ctx.srcBuilder.add("@" + e.attribute.name, e.start, e.end);
+    ctx.srcBuilder.add("@" + e.attribute.name, e.start);
     return;
   }
 
-  ctx.srcBuilder.add("@" + e.attribute.name + "(", e.start, params[0].start);
+  ctx.srcBuilder.add("@" + e.attribute.name + "(", e.start);
   params.forEach((param, i) => {
     if (i > 0) ctx.srcBuilder.appendNext(", ");
     emitExpression(param.expression, ctx);
   });
-  ctx.srcBuilder.add(")", params[params.length - 1].end, e.end);
+  ctx.srcBuilder.add(")", params[params.length - 1].end);
 }
 
 /** A child context indented one level deeper. */
@@ -936,11 +941,11 @@ function emitSwitch(e: SwitchElem, ctx: EmitContext): void {
 /** lhs op rhs, with the phony target printed as `_`. */
 function emitAssign(e: AssignElem, ctx: EmitContext): void {
   if (e.lhs.kind === "phony") {
-    ctx.srcBuilder.add("_", e.lhs.span[0], e.lhs.span[1]);
+    ctx.srcBuilder.add("_", e.lhs.span[0]);
   } else {
     emitExpression(e.lhs, ctx);
   }
-  const [start, end] = e.op.span;
-  ctx.srcBuilder.add(` ${e.op.value} `, start, end);
+  const [start] = e.op.span;
+  ctx.srcBuilder.add(` ${e.op.value} `, start);
   emitExpression(e.rhs, ctx);
 }

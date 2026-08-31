@@ -93,37 +93,6 @@ export function mapGPUCompilationInfo(
   };
 }
 
-function mapCompilationMessage(
-  srcMap: SrcMap,
-  message: GPUCompilationMessage,
-): WeslGPUCompilationMessage {
-  const srcPosition = srcMap.destToSrc(message.offset);
-  // LATER what if this gets mapped to a completely different place?
-  const srcEndPosition =
-    message.length > 0
-      ? srcMap.destToSrc(message.offset + message.length)
-      : srcPosition;
-  const length = srcEndPosition.position - srcPosition.position;
-  const [lineNum, linePos] = offsetToLineNumber(
-    srcPosition.position,
-    srcPosition.src.text,
-  );
-
-  return {
-    __brand: message.__brand,
-    type: message.type,
-    message: message.message,
-    offset: srcPosition.position,
-    length,
-    lineNum,
-    linePos,
-    module: {
-      url: srcPosition.src.path ?? "",
-      text: srcPosition.src.text,
-    },
-  };
-}
-
 /**
  * Tries to imitate the way the browser logs the compilation info.
  * Does not do the remapping.
@@ -160,4 +129,33 @@ function compilationInfoToErrorMessage(
     }
   }
   return result;
+}
+
+/** Remap one GPU compilation message from linked WGSL offsets to WESL source. */
+function mapCompilationMessage(
+  srcMap: SrcMap,
+  message: GPUCompilationMessage,
+): WeslGPUCompilationMessage {
+  const srcPos = srcMap.destToSrc(message.offset);
+  const { src, position } = srcPos;
+  // a range whose ends land in different src texts, or backwards, can't be
+  // expressed here, so it collapses to zero length
+  let length = 0;
+  if (message.length > 0) {
+    const destEnd = message.offset + message.length;
+    const srcEnd = srcMap._destToSrcEnd(srcPos, destEnd);
+    if (srcEnd !== undefined) length = Math.max(0, srcEnd - position);
+  }
+  const [lineNum, linePos] = offsetToLineNumber(position, src.text);
+
+  return {
+    __brand: message.__brand,
+    type: message.type,
+    message: message.message,
+    offset: position,
+    length,
+    lineNum,
+    linePos,
+    module: { url: src.path ?? "", text: src.text },
+  };
 }

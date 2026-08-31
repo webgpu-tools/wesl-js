@@ -3,7 +3,7 @@ import { expect, test, vi } from "vitest";
 import { createShaderModule } from "../gpu/ShaderModule.ts";
 import { makeWeslDevice } from "../gpu/WeslDevice.ts";
 import { LinkedWesl } from "../LinkedWesl.ts";
-import { SrcMap } from "../SrcMap.ts";
+import { SrcMap, SrcMapBuilder } from "../SrcMap.ts";
 
 test("WeslDevice doesn't conflict with uncapturederror", async () => {
   const GPUDeviceMock = vi.fn(function (this: GPUDevice) {
@@ -108,15 +108,10 @@ test("LinkedWesl createShaderModule skips if it's not a WeslDevice", async () =>
 
   const createShaderModuleSpy = vi.spyOn(device, "createShaderModule");
   const linkedWesl = new LinkedWesl(
-    new SrcMap(
-      {
-        text: "cute generated code",
-      },
-      [],
-    ),
+    new SrcMap({ text: "cute generated code" }),
   );
 
-  // Test that this doesnt' throw
+  // Test that this doesn't throw
   createShaderModule(linkedWesl, device, {});
 
   expect(createShaderModuleSpy).toHaveBeenCalledTimes(1);
@@ -161,26 +156,12 @@ test("Point at WESL code", async () => {
   });
   const device = makeWeslDevice(new GPUDeviceMock() as any);
 
-  const linkedWesl = new LinkedWesl(
-    new SrcMap(
-      {
-        text: "cute generated code",
-      },
-      [
-        {
-          src: {
-            text: "\ncute source code",
-            path: "main.wesl",
-          },
-          // Point at start of line 2
-          srcStart: 1,
-          srcEnd: 11,
-          destStart: 0,
-          destEnd: 10,
-        },
-      ],
-    ),
-  );
+  const source = { text: "\ncute source code", path: "main.wesl" };
+  const builder = new SrcMapBuilder(source);
+  // the fragments concatenate into the linked text "cute generated code"
+  builder.add("cute gener", 1); // point at start of line 2
+  builder.add("ated code", 8); // in-range tail anchor ("urce code")
+  const linkedWesl = new LinkedWesl(SrcMapBuilder.build([builder]));
 
   device.pushErrorScope("validation");
   createShaderModule(linkedWesl, device, {});

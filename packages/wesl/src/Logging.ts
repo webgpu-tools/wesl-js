@@ -1,4 +1,5 @@
 import type { SrcMap, SrcWithPath } from "./SrcMap.ts";
+import { caretLine, lineIndexOf, lineStarts } from "./Util.ts";
 
 /** a console.log-like sink (declared structurally so that "wesl/core"
  * doesn't depend on ambient DOM or node globals) */
@@ -38,6 +39,22 @@ export async function withLoggerAsync<T>(
   }
 }
 
+interface SrcPositions {
+  positions: number | [number, number];
+  src: SrcWithPath;
+}
+
+interface SrcLine {
+  /** src line w/o newline */
+  line: string;
+  /** requested position relative to line start */
+  linePos: number;
+  /** requested position2 relative to line start */
+  linePos2?: number;
+  /** line number in the src (first line is #1) */
+  lineNum: number;
+}
+
 /**
  * Log a message along with the source line and a caret indicating the error position.
  * @param pos is the position in the source string, or if src is a SrcMap,
@@ -56,26 +73,30 @@ export function srcLog(
   logInternalSrc(log, mappedSrc.text, positions, ...msgs);
 }
 
-interface SrcPositions {
-  positions: number | [number, number];
-  src: SrcWithPath;
-}
-
-function mapSrcPositions(
-  srcMap: SrcMap,
-  destPos: number | [number, number],
-): SrcPositions {
-  const srcPos = srcMap.mapPositions(...[destPos].flat());
-  const { src } = srcPos[0];
-
-  let positions: [number, number] | number;
-  if (srcPos[1]?.src?.path === src.path && srcPos[1]?.src?.text === src.text) {
-    positions = srcPos.map(p => p.position) as [number, number];
+/** return the line in the src containing a given character position */
+export function srcLine(
+  src: string,
+  position: number | [number, number],
+): SrcLine {
+  let pos: number;
+  let pos2: number | undefined;
+  if (typeof position === "number") {
+    pos = position;
   } else {
-    positions = srcPos[0].position;
+    [pos, pos2] = position;
   }
+  const starts = lineStarts(src);
+  const lineIndex = lineIndexOf(pos, starts);
+  const lineStart = starts[lineIndex];
+  const nextStart = starts[lineIndex + 1]; // undefined on the last line
+  const lineEnd = nextStart !== undefined ? nextStart - 1 : src.length;
+  const line = src.slice(lineStart, lineEnd);
 
-  return { src, positions };
+  let linePos2: number | undefined;
+  const sameLine = pos2 !== undefined && pos2 >= lineStart && pos2 <= lineEnd;
+  if (sameLine) linePos2 = pos2! - lineStart;
+
+  return { line, linePos: pos - lineStart, linePos2, lineNum: lineIndex + 1 };
 }
 
 function logInternalSrc(
@@ -91,79 +112,23 @@ function logInternalSrc(
   logFn(caret);
 }
 
+/** Map a dest position (or range) back to one src text, narrowing a range that
+ *  straddles two src texts to just its start position. */
+function mapSrcPositions(
+  srcMap: SrcMap,
+  destPos: number | [number, number],
+): SrcPositions {
+  const [start, end] = Array.isArray(destPos) ? destPos : [destPos, destPos];
+  const srcPos = srcMap.destToSrc(start);
+  const { src, position } = srcPos;
+
+  if (end > start) {
+    const srcEnd = srcMap._destToSrcEnd(srcPos, end);
+    if (srcEnd !== undefined) return { src, positions: [position, srcEnd] };
+  }
+  return { src, positions: position };
+}
+
 function carets(linePos: number, linePos2?: number): string {
-  const indent = " ".repeat(Math.max(0, linePos));
-  const numCarets = linePos2 ? linePos2 - linePos : 1;
-  const caretStr = "^".repeat(Math.max(1, numCarets));
-  return indent + caretStr;
-}
-
-// map from src strings to line start positions
-const startCache = new Map<string, number[]>();
-
-interface SrcLine {
-  /** src line w/o newline */
-  line: string;
-  /** requested position relative to line start */
-  linePos: number;
-  /** requested position2 relative to line start */
-  linePos2?: number;
-  /** line number in the src (first line is #1) */
-  lineNum: number;
-}
-
-/** return the line in the src containing a given character position */
-export function srcLine(
-  src: string,
-  position: number | [number, number],
-): SrcLine {
-  let pos: number;
-  let pos2: number | undefined;
-  if (typeof position === "number") {
-    pos = position;
-  } else {
-    [pos, pos2] = position;
-  }
-  const starts = getStarts(src);
-
-  let start = 0;
-  let end = starts.length - 1;
-
-  // short circuit search if pos is after last line start
-  if (pos >= starts[end]) {
-    start = end;
-  }
-
-  // binary search to find start,end positions that surround provided pos
-  while (start + 1 < end) {
-    const mid = (start + end) >> 1;
-    if (pos >= starts[mid]) {
-      start = mid;
-    } else {
-      end = mid;
-    }
-  }
-
-  let linePos2: number | undefined;
-  if (pos2 !== undefined && pos2 >= starts[start] && pos2 < starts[end]) {
-    linePos2 = pos2 - starts[start];
-  }
-
-  // get line with possible trailing newline
-  const lineNl = src.slice(starts[start], starts[start + 1] || src.length);
-
-  // return line without trailing newline
-  const line = lineNl.slice(-1) === "\n" ? lineNl.slice(0, -1) : lineNl;
-
-  return { line, linePos: pos - starts[start], linePos2, lineNum: start + 1 };
-}
-
-/** return an array of the character positions of the start of each line in the src (cached) */
-function getStarts(src: string): number[] {
-  const found = startCache.get(src);
-  if (found) return found;
-  const starts = [...src.matchAll(/\n/g)].map(m => m.index! + 1);
-  starts.unshift(0);
-  startCache.set(src, starts);
-  return starts;
+  return caretLine(linePos, linePos2 ? linePos2 - linePos : 1);
 }
