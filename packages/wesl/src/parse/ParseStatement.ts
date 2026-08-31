@@ -5,6 +5,7 @@ import type {
   HasAttributes,
   Statement,
 } from "../AbstractElems.ts";
+import { findConditional } from "../Conditions.ts";
 import { findMap } from "../Util.ts";
 import { parseAttributeList } from "./ParseAttribute.ts";
 import { parseIfStatement, parseSwitchStatement } from "./ParseControlFlow.ts";
@@ -21,7 +22,6 @@ import { parseSimpleStatement } from "./ParseSimpleStatement.ts";
 import {
   attachAttributes,
   attrsOrUndef,
-  conditionalAttribute,
   expect,
   hasConditionalAttribute,
   throwParseError,
@@ -75,6 +75,23 @@ const moduleOnlyKeywords = new Set([
   "do",
 ]);
 
+/** Statement parsers, tried in order until one matches (module scope so the
+ * array is built once, not per statement). */
+const statementParsers = [
+  parseLocalVarDecl,
+  parseLetDecl,
+  parseConstDecl,
+  parseConstAssert,
+  parseCompoundStatement,
+  parseIfStatement,
+  parseSwitchStatement,
+  parseForStatement,
+  parseWhileStatement,
+  parseLoopStatement,
+  parseContinuingStatement,
+  parseSimpleStatement,
+];
+
 /** Function bodies share scope with parameters (per WGSL spec). */
 export function parseFunctionBody(ctx: ParsingContext): BlockElem | null {
   return parseCompoundStatement(ctx, undefined, { noScope: true });
@@ -96,7 +113,7 @@ export function parseCompoundStatement(
   ctx.enterNesting();
   try {
     ctx.stream.nextToken(); // consume the peeked '{'
-    const startPos = getStartWithAttributes(attributes, brace.span[0]);
+    const startPos = getStartWithAttributes(attributes, brace.start);
 
     const skipScope =
       options?.noScope ||
@@ -142,7 +159,7 @@ export function beginStatement(
   if (!token) return null;
   // Start at the keyword token, not any leading comment, so a preceding comment
   // falls in the gap before the statement and attaches as leading.
-  return getStartWithAttributes(attributes, token.span[0]);
+  return getStartWithAttributes(attributes, token.start);
 }
 
 /** Build a statement element from its typed fields and attach its attributes. */
@@ -153,7 +170,7 @@ export function finishStatement<K extends keyof ElemKindMap>(
   params: Omit<ElemKindMap[K], "kind" | "start" | "end">,
   attributes?: AttributeElem[],
 ): ElemKindMap[K] {
-  const end = ctx.stream.checkpoint();
+  const end = ctx.stream.position();
   const elem = { kind, start, end, ...params } as ElemKindMap[K];
   attachAttributes(elem as HasAttributes, attributes);
   return elem;
@@ -218,7 +235,7 @@ function parseBlockStatements(
  */
 function parseStatement(ctx: ParsingContext): Statement | null {
   const { stream } = ctx;
-  const startPos = stream.checkpoint();
+  const startPos = stream.position();
   const attributes = parseAttributeList(ctx);
 
   const token = stream.peek();
@@ -231,27 +248,14 @@ function parseStatement(ctx: ParsingContext): Statement | null {
     attributes.length > 0 && hasConditionalAttribute(attributes);
   if (hasConditional) ctx.pushScope("partial");
 
-  const parsers = [
-    parseLocalVarDecl,
-    parseLetDecl,
-    parseConstDecl,
-    parseConstAssert,
-    parseCompoundStatement,
-    parseIfStatement,
-    parseSwitchStatement,
-    parseForStatement,
-    parseWhileStatement,
-    parseLoopStatement,
-    parseContinuingStatement,
-    parseSimpleStatement,
-  ];
-  const stmt = findMap(parsers, p => p(ctx, attrsOrUndef(attributes)));
+  const attrs = attrsOrUndef(attributes);
+  const stmt = findMap(statementParsers, p => p(ctx, attrs));
 
   // Always pop the partial scope we pushed, even on the no-match path, so the
   // scope stack stays balanced; only a matched statement gets the condition.
   if (hasConditional) {
     const partialScope = ctx.popScope();
-    if (stmt) partialScope.condAttribute = conditionalAttribute(attributes);
+    if (stmt) partialScope.condAttribute = findConditional(attributes);
   }
   return stmt ? (stmt as Statement) : null;
 }

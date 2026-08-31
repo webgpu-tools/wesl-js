@@ -1,4 +1,3 @@
-import type { Span } from "../../Span.ts";
 import type { TypedToken } from "../../Stream.ts";
 import { toRegexSource } from "./RegexHelpers.ts";
 
@@ -28,11 +27,11 @@ export class RegexMatchers<Kind extends string> {
     if (matches === null) return null;
 
     // each matcher is a full-token capturing group, so the matched substring
-    // is the whole match and the span starts at the sticky position
+    // is the whole match and the token starts at the sticky position
     const matched = matches[0];
-    const span: Span = [position, position + matched.length];
     const kind = this.groups[matchedGroupIndex(matches)];
-    return { kind, span, text: matched };
+    const end = position + matched.length;
+    return { kind, text: matched, start: position, end };
   }
 }
 

@@ -1,7 +1,6 @@
 import type {
   Attribute,
   AttributeElem,
-  ConditionalAttribute,
   DeclarationElem,
   DeclIdentElem,
   ExpressionElem,
@@ -11,6 +10,7 @@ import type {
 } from "../AbstractElems.ts";
 import { ParseError } from "../ParseError.ts";
 import type { RefIdent } from "../Scope.ts";
+import type { Span } from "../Span.ts";
 import type { Stream, Token } from "../Stream.ts";
 import { type ExpressionOpts, parseExpression } from "./ParseExpression.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
@@ -24,7 +24,7 @@ export function expect(
 ): ReturnType<WeslStream["matchText"]> & {} {
   const token = stream.matchText(text);
   if (!token) {
-    const pos = stream.checkpoint();
+    const pos = stream.position();
     const msg = context
       ? `Expected '${text}' after ${context}`
       : `Expected '${text}'`;
@@ -68,9 +68,8 @@ export function parseContentExpression(
 export function throwParseError(stream: Stream<Token>, message: string): never {
   const weslStream = stream as WeslStream;
   const token = weslStream.peek();
-  const span = token
-    ? token.span
-    : ([weslStream.checkpoint(), weslStream.checkpoint()] as const);
+  const pos = weslStream.position();
+  const span: Span = token ? [token.start, token.end] : [pos, pos];
   throw new ParseError(message, span);
 }
 
@@ -98,7 +97,9 @@ export function parseCommaList<T>(
   return items;
 }
 
-/** Yield parsed elements until parser returns null. */
+/** Yield parsed elements until parser returns null. Lazy: consumers see each
+ *  element as it parses, so elements before a thrown syntax error survive
+ *  (the import parser relies on this). */
 export function* parseMany<T>(
   ctx: ParsingContext,
   parse: (ctx: ParsingContext) => T | null,
@@ -106,9 +107,21 @@ export function* parseMany<T>(
   for (let elem = parse(ctx); elem; elem = parse(ctx)) yield elem;
 }
 
+/** Parse elements until the parser returns null, collected into an array.
+ *  Eager parseMany, for hot paths: the generator's iterator protocol measures
+ *  ~1% of link time when run per attribute list. */
+export function parseManyEager<T>(
+  ctx: ParsingContext,
+  parse: (ctx: ParsingContext) => T | null,
+): T[] {
+  const items: T[] = [];
+  for (let elem = parse(ctx); elem; elem = parse(ctx)) items.push(elem);
+  return items;
+}
+
 /** Create a NameElem from a word token. */
 export function makeNameElem(token: WeslToken<"word">): NameElem {
-  const [start, end] = token.span;
+  const { start, end } = token;
   return { kind: "name", name: token.text, start, end };
 }
 
@@ -119,7 +132,7 @@ export function createDeclIdentElem(
   isGlobal: boolean,
 ): DeclIdentElem {
   const declIdent = ctx.createDeclIdent(nameToken.text, isGlobal);
-  const [start, end] = nameToken.span;
+  const { start, end } = nameToken;
   return {
     kind: "decl",
     ident: declIdent,
@@ -156,14 +169,6 @@ export function isConditionalAttribute(attr: Attribute): boolean {
 /** @return true if any attribute is a conditional (@if, @elif, @else) */
 export function hasConditionalAttribute(attributes: AttributeElem[]): boolean {
   return attributes.some(attr => isConditionalAttribute(attr.attribute));
-}
-
-/** The first conditional (@if, @elif, @else) attribute in the list, if any. */
-export function conditionalAttribute(
-  attributes: AttributeElem[],
-): ConditionalAttribute | undefined {
-  const found = attributes.find(a => isConditionalAttribute(a.attribute));
-  return found?.attribute as ConditionalAttribute | undefined;
 }
 
 /** Attach non-empty attributes array to element. */

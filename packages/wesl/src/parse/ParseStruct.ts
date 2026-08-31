@@ -35,7 +35,7 @@ export function parseStructDecl(
   const structToken = stream.matchText("struct");
   if (!structToken) return null;
 
-  const start = getStartWithAttributes(attributes, structToken.span[0]);
+  const start = getStartWithAttributes(attributes, structToken.start);
   const nameToken = expectWord(stream, "Expected identifier after 'struct'");
 
   const identElem = createDeclIdentElem(ctx, nameToken, true);
@@ -81,7 +81,7 @@ function parseStructMembers(ctx: ParsingContext): StructMemberElem[] {
       // (a break here would fail the '}' expect and drop the whole struct).
       // skip from memberStart, not the current position, so the unexpected
       // token itself may be the boundary (e.g. the '@' of the next member)
-      ctx.addError("Expected ',' after struct member", ...next.span);
+      ctx.addError("Expected ',' after struct member", next.start, next.end);
       skipToBoundary(stream, memberStart, atMemberBoundary);
       stream.matchText(",");
     } catch (e) {
@@ -95,17 +95,17 @@ function parseStructMembers(ctx: ParsingContext): StructMemberElem[] {
 /** Grammar: struct_member : attribute* member_ident ':' type_specifier */
 function parseStructMember(ctx: ParsingContext): StructMemberElem | null {
   const { stream } = ctx;
-  const checkpoint = stream.checkpoint();
+  const startPos = stream.position();
   const attrs = parseAttributeList(ctx);
 
   const nameToken = stream.matchKind("word");
   if (!nameToken) {
-    stream.reset(checkpoint);
+    stream.reset(startPos);
     return null;
   }
   const attributes = attrsOrUndef(attrs);
 
-  const start = getStartWithAttributes(attributes, nameToken.span[0]);
+  const start = getStartWithAttributes(attributes, nameToken.start);
   const name = makeNameElem(nameToken);
   expect(stream, ":", "struct member name");
 

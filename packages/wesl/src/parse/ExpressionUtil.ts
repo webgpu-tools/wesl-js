@@ -16,21 +16,18 @@ import type {
 import type { WeslToken } from "./WeslStream.ts";
 
 export function makeLiteral(token: WeslToken<"keyword" | "number">): Literal {
-  const [start, end] = token.span;
+  const { start, end } = token;
   return { kind: "literal", value: token.text, start, end };
 }
 
 export function makeUnaryOperator(token: WeslToken<"symbol">): UnaryOperator {
-  const [start, end] = token.span;
+  const { start, end } = token;
   return { value: token.text as UnaryOperator["value"], start, end };
 }
 
-export function makeBinaryOperator(token: {
-  text: string;
-  span: readonly [number, number];
-}): BinaryOperator {
+export function makeBinaryOperator(token: WeslToken): BinaryOperator {
   const value = token.text as BinaryOperator["value"];
-  return { value, span: token.span as [number, number] };
+  return { value, span: [token.start, token.end] };
 }
 
 export function makeUnaryExpression(

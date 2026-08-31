@@ -66,7 +66,8 @@ const unicodeMatcher = new RegexMatchers<InternalTokenKind>({
  * scan and no unicode restriction.
  */
 export class WeslLexer implements Stream<RawToken> {
-  private position = 0;
+  /** current scan offset (the `position` name is taken by the Stream method) */
+  private pos = 0;
   /** sticky number matcher (stateful via lastIndex, so kept per-instance) */
   private numberExp = new RegExp(digits.source, "y");
   public src: string;
@@ -75,17 +76,17 @@ export class WeslLexer implements Stream<RawToken> {
     this.src = src;
   }
 
-  checkpoint(): number {
-    return this.position;
+  position(): number {
+    return this.pos;
   }
   reset(position: number): void {
-    this.position = position;
+    this.pos = position;
   }
 
   nextToken(): RawToken | null {
     const { src } = this;
     const len = src.length;
-    let pos = this.position;
+    let pos = this.pos;
     // skip ASCII blankspace; unicode blankspace falls through to the regex
     while (pos < len) {
       const c = src.charCodeAt(pos);
@@ -93,7 +94,7 @@ export class WeslLexer implements Stream<RawToken> {
       else break;
     }
     if (pos >= len) {
-      this.position = pos;
+      this.pos = pos;
       return null;
     }
 
@@ -190,8 +191,8 @@ export class WeslLexer implements Stream<RawToken> {
         return this.symbol(pos, "~");
     }
     if (c >= 0x80) return this.regexToken(pos);
-    this.position = pos + 1;
-    return { kind: "invalid", span: [pos, pos + 1], text: src[pos] };
+    this.pos = pos + 1;
+    return { kind: "invalid", text: src[pos], start: pos, end: pos + 1 };
   }
 
   private token(
@@ -200,8 +201,8 @@ export class WeslLexer implements Stream<RawToken> {
     text: string,
   ): RawToken {
     const end = start + text.length;
-    this.position = end;
-    return { kind, span: [start, end], text };
+    this.pos = end;
+    return { kind, text, start, end };
   }
 
   private symbol(start: number, text: string): RawToken {
@@ -219,8 +220,8 @@ export class WeslLexer implements Stream<RawToken> {
         return this.regexToken(start); // unicode ident
       else break;
     }
-    this.position = pos;
-    return { kind: "word", span: [start, pos], text: src.slice(start, pos) };
+    this.pos = pos;
+    return { kind: "word", text: src.slice(start, pos), start, end: pos };
   }
 
   private number(start: number): RawToken {
@@ -235,7 +236,7 @@ export class WeslLexer implements Stream<RawToken> {
   private regexToken(start: number): RawToken | null {
     const token = unicodeMatcher.execAt(this.src, start);
     if (token === null) return null; // unreachable: `invalid` matches any char
-    this.position = token.span[1];
+    this.pos = token.end;
     return token;
   }
 }

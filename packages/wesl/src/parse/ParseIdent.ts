@@ -24,7 +24,7 @@ export function parseModulePath(stream: WeslStream): ParsedModulePath | null {
   const first = stream.peek();
   if (!first || !isPathSegment(first, true)) return null;
 
-  const start = first.span[0];
+  const start = first.start;
   stream.nextToken();
   const parts = [first.text];
 
@@ -36,7 +36,7 @@ export function parseModulePath(stream: WeslStream): ParsedModulePath | null {
     parts.push(next.text);
   }
 
-  return { parts, start, end: stream.checkpoint() };
+  return { parts, start, end: stream.position() };
 }
 
 /**

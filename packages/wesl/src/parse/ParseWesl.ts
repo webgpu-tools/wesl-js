@@ -19,7 +19,7 @@ export function parseWesl(
   try {
     parseModule(ctx);
     const { moduleElem, diagnostics } = state.stable;
-    attachComments(ctx, moduleElem);
+    if (keepingComments(options)) attachComments(ctx, moduleElem);
     diagnostics.push(...checkDoBlockNames(moduleElem));
     return state.stable;
   } catch (e) {
@@ -40,7 +40,7 @@ function createParseState(
   srcModule: SrcModule,
   parseOptions?: ParseOptions,
 ): { ctx: ParsingContext; state: WeslParseState } {
-  const stream = new WeslStream(srcModule.src);
+  const stream = new WeslStream(srcModule.src, keepingComments(parseOptions));
   const rootScope = emptyScope(null);
   const moduleElem: ModuleElem = {
     kind: "module",
@@ -61,4 +61,9 @@ function createParseState(
   };
   const ctx = new ParsingContext(stream, state, parseOptions);
   return { ctx, state };
+}
+
+/** @return true unless the caller opted out of comments (they default on). */
+function keepingComments(options?: ParseOptions): boolean {
+  return options?.keepComments !== false;
 }

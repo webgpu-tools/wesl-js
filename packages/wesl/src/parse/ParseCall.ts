@@ -55,13 +55,17 @@ function parseCallTemplateArgs(
   ctx: ParsingContext,
 ): TypeTemplateParameter[] | null {
   const { stream } = ctx;
-  const pos = stream.checkpoint();
+  const pos = stream.position();
 
   if (!stream.nextTemplateStartToken()) return null;
 
   const params = parseTemplateParams(ctx);
 
-  // Template args must be followed by '(' for a call - backtrack if not
+  // Template args must be followed by '(' for a call - backtrack if not.
+  // Known hazard: only the stream backtracks; refs saved to the scope by the
+  // discarded parseTemplateParams remain (e.g. `a < b > (c)` saves b twice).
+  // Harmless today - duplicates resolve to the same decl and emit is
+  // unaffected - but revisit when semantic tooling reads scopes directly.
   if (stream.peek()?.text !== "(") {
     stream.reset(pos);
     return null;
@@ -72,5 +76,5 @@ function parseCallTemplateArgs(
 /** Consume closing paren if present, returning its end position or null. */
 function matchCloseParen(stream: WeslStream): number | null {
   const token = stream.matchText(")");
-  return token ? token.span[1] : null;
+  return token ? token.end : null;
 }

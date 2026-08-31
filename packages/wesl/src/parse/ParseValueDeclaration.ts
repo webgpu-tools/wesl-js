@@ -44,14 +44,14 @@ export function parseTypedDecl(
 ): TypedDeclElem | null {
   const nameToken = ctx.stream.matchKind("word");
   if (!nameToken) return null;
-  const start = nameToken.span[0];
+  const start = nameToken.start;
 
   const decl = createDeclIdentElem(ctx, nameToken, isGlobal);
   ctx.saveIdent(decl.ident);
 
   const { typeRef, typeScope } = parseOptionalType(ctx);
 
-  const end = ctx.stream.checkpoint();
+  const end = ctx.stream.position();
   return { kind: "typeDecl", decl, typeRef, typeScope, start, end };
 }
 
@@ -67,7 +67,7 @@ function parseValueDecl<K extends ValueDeclKind>(
   const token = stream.matchText(keyword);
   if (!token) return null;
 
-  const startPos = getStartWithAttributes(attributes, token.span[0]);
+  const startPos = getStartWithAttributes(attributes, token.start);
   ctx.pushScope("partial");
 
   const typedDecl = parseTypedDecl(ctx, isGlobal);

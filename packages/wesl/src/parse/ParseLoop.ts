@@ -136,14 +136,17 @@ function parseForPhony(ctx: ParsingContext): AssignElem | undefined {
   const underscore = stream.matchText("_");
   if (!underscore) return undefined;
 
-  const lhs: PhonyTarget = { kind: "phony", span: underscore.span };
+  const lhs: PhonyTarget = {
+    kind: "phony",
+    span: [underscore.start, underscore.end],
+  };
   const eq = stream.matchText("=");
   if (!eq) throwParseError(stream, "Expected '=' after '_'");
-  const op: AssignOp = { value: "=", span: eq.span };
+  const op: AssignOp = { value: "=", span: [eq.start, eq.end] };
   const rhs = expectExpression(ctx, "Expected expression after '_ ='");
 
-  const start = underscore.span[0];
-  return { kind: "assign", lhs, op, rhs, start, end: stream.checkpoint() };
+  const start = underscore.start;
+  return { kind: "assign", lhs, op, rhs, start, end: stream.position() };
 }
 
 /**
@@ -155,7 +158,7 @@ function finishForUpdate(ctx: ParsingContext, expr: ExpressionElem): ForUpdate {
   const start = expr.start;
   const incDec = parseIncDecOp(stream);
   if (incDec) {
-    const end = stream.checkpoint();
+    const end = stream.position();
     if (incDec.op === "++")
       return { kind: "increment", target: expr, start, end };
     return { kind: "decrement", target: expr, start, end };
@@ -163,11 +166,11 @@ function finishForUpdate(ctx: ParsingContext, expr: ExpressionElem): ForUpdate {
   const assign = parseAssignmentRhs(ctx);
   if (assign) {
     const { op, rhs } = assign;
-    const end = stream.checkpoint();
+    const end = stream.position();
     return { kind: "assign", lhs: expr, op, rhs, start, end };
   }
   if (expr.kind === "call-expression") {
-    return { kind: "call", call: expr, start, end: stream.checkpoint() };
+    return { kind: "call", call: expr, start, end: stream.position() };
   }
   // A bare expression (no ++/--/assignment, not a call) is not a valid for
   // init/update clause; reject it rather than silently dropping it.

@@ -24,7 +24,7 @@ export function parseSimpleTypeRef(ctx: ParsingContext): TypeRefElem | null {
     ? parseTemplateParams(ctx)
     : undefined;
 
-  const end = ctx.stream.checkpoint();
+  const end = ctx.stream.position();
   return { kind: "type", name: refIdent, templateParams, start, end };
 }
 

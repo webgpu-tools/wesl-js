@@ -22,31 +22,38 @@ export interface CommentTrivia {
  *  Same code points as `isLineBreak` in AttachComments.ts (charCode form). */
 const lineBreak = String.raw`\r\n?|[\n\v\f\u{0085}\u{2028}\u{2029}]`;
 
-/** A peeked token cached at the position it was read from. */
-interface PeekedToken {
-  pos: number;
-  token: WeslToken | null;
-  end: number;
-}
-
 /** A stream that produces WESL tokens, skipping over comments and white space */
 export class WeslStream implements Stream<WeslToken> {
   private stream: Stream<TypedToken<InternalTokenKind>>;
-  /** New line (stateful: scanned via lastIndex, so kept per-instance). */
-  private eolPattern = new RegExp(lineBreak, "gu");
-  private blockCommentPattern = /\/\*|\*\//g;
+  /** New line or forbidden \0, for scanning line-comment bodies
+   *  (stateful: scanned via lastIndex, so kept per-instance). */
+  private eolOrNullPattern = new RegExp(lineBreak + "|\\0", "gu");
+  /** Block comment delimiters or forbidden \0. (No `u` flag needed for this
+   *  ASCII-only alternation; eolOrNullPattern needs `u` for its \u{...} escapes.) */
+  private blockCommentPattern = /\/\*|\*\/|\0/g;
   /** Comments skipped before a real token, keyed by that token's start position. */
   private triviaByPos = new Map<number, CommentTrivia[]>();
-  /** Last peeked token, so the following nextToken() skips the rescan.
-   *  Never invalidated: tokenization is deterministic per position. */
-  private peeked: PeekedToken | null = null;
+  /** Last peeked token, cached at the position it was read from (scalar fields,
+   *  not an object, to avoid an allocation per peek; peekedPos -1 = empty).
+   *  Never invalidated: tokenization is deterministic per position.
+   *  The cached token object itself is handed to callers (peek, nextToken's
+   *  peek-hit path, matchText/matchKind/nextIf, nextTemplateEndToken's plain-`>`
+   *  path), so returned tokens must never be mutated; nextToken's word->keyword
+   *  promotion happens before the token is cached. */
+  private peekedPos = -1;
+  private peekedToken: WeslToken | null = null;
+  private peekedEnd = 0;
   public src: string;
-  constructor(src: string) {
+  /** false skips trivia recording: comments are still scanned past (and
+   *  \0-checked) but not kept for the attachment pass. */
+  private keepComments: boolean;
+  constructor(src: string, keepComments = true) {
     this.src = src;
+    this.keepComments = keepComments;
     this.stream = new WeslLexer(src);
   }
-  checkpoint(): number {
-    return this.stream.checkpoint();
+  position(): number {
+    return this.stream.position();
   }
   reset(position: number): void {
     this.stream.reset(position);
@@ -58,21 +65,21 @@ export class WeslStream implements Stream<WeslToken> {
       .sort((a, b) => a[0] - b[0])
       .map(([, run]) => run);
   }
-  private recordTrivia(pos: number, pending?: CommentTrivia[]): void {
-    if (pending) this.triviaByPos.set(pos, pending);
-  }
-
   /** Next real token (comments/blankspace skipped and recorded as trivia); null at EOF. */
   nextToken(): WeslToken | null {
-    const peeked = this.usePeeked();
-    if (peeked !== null) return peeked.token;
+    // if the last peek() was at the current position, consume and return it
+    if (this.peekedPos === this.stream.position()) {
+      this.stream.reset(this.peekedEnd);
+      return this.peekedToken;
+    }
 
     let pending: CommentTrivia[] | undefined;
     while (true) {
       const token = this.stream.nextToken();
       if (token === null) {
         // trailing comments at end of file: key them past the last position
-        this.recordTrivia(this.src.length, pending);
+        if (pending !== undefined)
+          this.triviaByPos.set(this.src.length, pending);
         return null;
       }
 
@@ -80,12 +87,17 @@ export class WeslStream implements Stream<WeslToken> {
       if (kind === "blankspaces") {
         continue; // newline/blank flags are derived later, at attach time
       } else if (kind === "commentStart") {
-        pending ??= [];
-        pending.push(this.consumeComment(token));
+        if (this.keepComments) {
+          pending ??= [];
+          pending.push(this.consumeComment(token));
+        } else {
+          this.skipComment(token);
+        }
       } else if (kind === "invalid") {
-        throw new ParseError("Invalid token " + token.text, token.span);
+        const { start, end } = token;
+        throw new ParseError("Invalid token " + token.text, [start, end]);
       } else {
-        this.recordTrivia(token.span[0], pending);
+        if (pending !== undefined) this.triviaByPos.set(token.start, pending);
         const result = token as WeslToken;
         if (kind === "word" && keywordOrReserved.has(token.text)) {
           result.kind = "keyword";
@@ -95,43 +107,31 @@ export class WeslStream implements Stream<WeslToken> {
     }
   }
 
-  /** If the last peek() was at the current position, consume and return it. */
-  private usePeeked(): PeekedToken | null {
-    const peeked = this.peeked;
-    if (peeked !== null && peeked.pos === this.checkpoint()) {
-      this.reset(peeked.end);
-      return peeked;
-    }
-    return null;
+  /** Advance the stream past a comment.
+   *  @return the comment's end position */
+  private skipComment(token: TypedToken<InternalTokenKind>): number {
+    const end = this.commentEnd(token);
+    this.stream.reset(end);
+    return end;
   }
 
-  /** Skip a comment (rejecting embedded \0), advance the stream past it,
-   *  and return it as trivia. */
+  /** Skip a comment and return it as trivia. */
   private consumeComment(token: TypedToken<InternalTokenKind>): CommentTrivia {
     const style = token.text === "//" ? "line" : "block";
-    const start = token.span[0];
-    const end = this.commentEnd(token);
-    // WGSL forbids the null code point anywhere, including inside comments
-    // (a comment body is skipped here, so the `invalid` matcher never sees
-    // it). Scan only the comment body, keeping this O(comment length).
-    const bodyNull = this.src.slice(start, end).indexOf("\0");
-    if (bodyNull >= 0) {
-      const at = start + bodyNull;
-      throw new ParseError("Invalid token \\0", [at, at + 1]);
-    }
-    this.stream.reset(end);
+    const { start } = token;
+    const end = this.skipComment(token);
     return { style, start, end };
   }
 
   /** Peek at the next token without consuming it */
   peek(): WeslToken | null {
-    const pos = this.checkpoint();
-    const peeked = this.peeked;
-    if (peeked !== null && peeked.pos === pos) return peeked.token;
+    const pos = this.stream.position();
+    if (this.peekedPos === pos) return this.peekedToken;
     const token = this.nextToken();
-    const end = this.checkpoint();
-    this.reset(pos);
-    this.peeked = { pos, token, end };
+    this.peekedEnd = this.stream.position();
+    this.peekedToken = token;
+    this.peekedPos = pos;
+    this.stream.reset(pos);
     return token;
   }
 
@@ -170,7 +170,7 @@ export class WeslStream implements Stream<WeslToken> {
 
   /** Match a sequence of tokens by text. Resets and returns null if any fails. */
   matchSequence(...texts: string[]): WeslToken[] | null {
-    const startPos = this.checkpoint();
+    const startPos = this.position();
     const tokens: WeslToken[] = [];
     for (const text of texts) {
       const token = this.matchText(text);
@@ -183,18 +183,24 @@ export class WeslStream implements Stream<WeslToken> {
     return tokens;
   }
 
-  /** End position of a comment opened by a commentStart token. */
+  /** End position of a comment opened by a commentStart token.
+   *  WGSL forbids the null code point anywhere, and the `invalid` matcher never
+   *  sees comment bodies (they are skipped, not lexed). So both end-scanning
+   *  patterns below also match \0: a comment body is \0-checked by the same
+   *  native scan that finds its end. */
   private commentEnd(token: TypedToken<InternalTokenKind>): number {
     return token.text === "//"
-      ? this.lineCommentEnd(token.span[1])
-      : this.skipBlockComment(token.span[1]);
+      ? this.lineCommentEnd(token.end)
+      : this.skipBlockComment(token.end);
   }
 
   /** End of a line comment: the start of the next line break (or end of file). */
   private lineCommentEnd(position: number): number {
-    this.eolPattern.lastIndex = position;
-    const result = this.eolPattern.exec(this.src);
-    return result === null ? this.src.length : result.index;
+    this.eolOrNullPattern.lastIndex = position;
+    const result = this.eolOrNullPattern.exec(this.src);
+    if (result === null) return this.src.length;
+    if (result[0] === "\0") throw invalidNull(result.index);
+    return result.index;
   }
 
   private skipBlockComment(start: number): number {
@@ -209,6 +215,8 @@ export class WeslStream implements Stream<WeslToken> {
       } else if (result[0] === "/*") {
         // nested block comment: recurse so its */ doesn't close the outer one
         position = this.skipBlockComment(this.blockCommentPattern.lastIndex);
+      } else if (result[0] === "\0") {
+        throw invalidNull(result.index);
       } else {
         throw new Error("Unreachable, invalid block comment pattern");
       }
@@ -221,27 +229,28 @@ export class WeslStream implements Stream<WeslToken> {
    * Runs the [template list discovery algorithm](https://www.w3.org/TR/WGSL/#template-list-discovery).
    */
   nextTemplateStartToken(): (WeslToken & { kind: "symbol" }) | null {
-    const startPosition = this.stream.checkpoint();
-    const token = this.nextToken();
-    this.stream.reset(startPosition);
+    // peek (not nextToken+reset) so a declined probe leaves the token cached
+    // for the parser's next peek: this runs after every ident, so re-lexing
+    // the following token here was a measurable cost
+    const startPosition = this.stream.position();
+    const token = this.peek();
 
     //<<= << <= cannot be templates, so we match the entire token text
     if (token === null || token.kind !== "symbol" || token.text !== "<") {
       return null;
     }
-    if (!this.isTemplateStart(token.span[1])) {
+    if (!this.isTemplateStart(token.end)) {
       this.stream.reset(startPosition); // isTemplateStart advanced the stream
       return null;
     }
-    this.stream.reset(token.span[1]);
+    this.stream.reset(token.end);
     return token as WeslToken & { kind: "symbol" };
   }
 
   /** Match a template-closing `>`, splitting it off a `>>`/`>=`/`>>=` token when needed. */
   nextTemplateEndToken(): (WeslToken & { kind: "symbol" }) | null {
-    const startPosition = this.stream.checkpoint();
-    const token = this.nextToken();
-    this.stream.reset(startPosition);
+    // peek so a declined probe leaves the token cached for the next peek
+    const token = this.peek();
     if (token === null) return null;
 
     // Template closing can also match a >= or >> here, so split one `>` off
@@ -251,14 +260,16 @@ export class WeslStream implements Stream<WeslToken> {
     // this split; isTemplateStart's exhaustive check throws if the set grows.
     if (token.kind !== "symbol" || token.text[0] !== ">") return null;
 
+    // a plain `>` needs no split: consume the peeked token whole
+    if (token.text === ">") {
+      this.stream.reset(token.end);
+      return token as WeslToken & { kind: "symbol" };
+    }
+
     // SAFETY: The underlying streams implementations can be reset to any position.
-    const tokenPosition = token.span[0];
-    this.stream.reset(tokenPosition + 1);
-    return {
-      kind: "symbol",
-      span: [tokenPosition, tokenPosition + 1],
-      text: ">",
-    };
+    const { start } = token;
+    this.stream.reset(start + 1);
+    return { kind: "symbol", text: ">", start, end: start + 1 };
   }
 
   /** Next symbol from the raw stream, skipping comment bodies (so symbols
@@ -324,7 +335,7 @@ export class WeslStream implements Stream<WeslToken> {
     while (true) {
       const nextToken = this.nextRawSymbol();
       if (nextToken === null) {
-        const after = this.stream.checkpoint();
+        const after = this.stream.position();
         throw new ParseError("Unclosed bracket!", [after, after]);
       }
       if (nextToken.text === "(") {
@@ -337,4 +348,9 @@ export class WeslStream implements Stream<WeslToken> {
       }
     }
   }
+}
+
+/** Error for a forbidden \0 code point found inside a comment body. */
+function invalidNull(at: number): ParseError {
+  return new ParseError("Invalid token \\0", [at, at + 1]);
 }

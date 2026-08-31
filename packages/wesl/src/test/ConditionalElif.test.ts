@@ -223,3 +223,25 @@ test("@elif chain resets after non-conditional", async () => {
   const result = await link({ weslSrc: { app: src }, rootModuleName: "app" });
   expectTrimmedMatch(result.dest, expected);
 });
+
+test("conditional empty statement keeps its @else chain intact", async () => {
+  // the attribute must attach to the `;` (empty statement) so filtering both
+  // elides it and carries the chain state to the @else sibling
+  const src = `
+    fn main() {
+      @if(false) ;
+      @else { let x = 1; }
+    }
+  `;
+
+  const expected = `
+    fn main() {
+      {
+        let x = 1;
+      }
+    }
+  `;
+
+  const result = await link({ weslSrc: { app: src }, rootModuleName: "app" });
+  expectTrimmedMatch(result.dest, expected);
+});

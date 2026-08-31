@@ -46,7 +46,7 @@ function parseVarOrLet(
   const token = stream.matchText(keyword);
   if (!token) return null;
 
-  const startPos = getStartWithAttributes(attributes, token.span[0]);
+  const startPos = getStartWithAttributes(attributes, token.start);
   const template = hasTemplate ? parseTemplateList(ctx) : undefined;
 
   const typedDecl = parseTypedDecl(ctx, false);

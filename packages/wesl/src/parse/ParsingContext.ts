@@ -1,6 +1,5 @@
 import type { AbstractElem } from "../AbstractElems.ts";
 import { errorDiagnostic } from "../Diagnostics.ts";
-import { ParseError } from "../ParseError.ts";
 import type { WeslParseContext, WeslParseState } from "../ParseWESL.ts";
 import {
   type DeclIdent,
@@ -11,6 +10,7 @@ import {
   type Scope,
   type SrcModule,
 } from "../Scope.ts";
+import { throwParseError } from "./ParseUtil.ts";
 import type { WeslStream } from "./WeslStream.ts";
 
 /** Opt-in toggles for not-yet-spec'd WESL/WGSL features (for prototyping). */
@@ -22,6 +22,11 @@ export interface WeslExtensions {
 export interface ParseOptions {
   /** Enable parsing of experimental, not-yet-spec'd syntax extensions. */
   weslExtensions?: WeslExtensions;
+
+  /** Record comments as AST trivia so emit can reproduce them (default true).
+   * false skips trivia recording and comment attachment entirely, so linked
+   * output contains no source comments. */
+  keepComments?: boolean;
 }
 
 /**
@@ -60,10 +65,6 @@ export class ParsingContext {
     this.options = options ?? {};
   }
 
-  position(): number {
-    return this.stream.checkpoint();
-  }
-
   /** Nesting depth of recursive constructs, bounded by maxNesting. */
   nesting = 0;
 
@@ -71,11 +72,8 @@ export class ParsingContext {
    * Callers pair this with exitNesting in a finally block.
    * @throws ParseError when input is nested too deeply to parse recursively. */
   enterNesting(): void {
-    if (this.nesting >= maxNesting) {
-      const pos = this.stream.checkpoint();
-      const span = this.stream.peek()?.span;
-      throw new ParseError(nestedTooDeeply, span ?? [pos, pos]);
-    }
+    if (this.nesting >= maxNesting)
+      throwParseError(this.stream, nestedTooDeeply);
     this.nesting++;
   }
 

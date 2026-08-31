@@ -24,7 +24,7 @@ export function markAttempt(ctx: ParsingContext): ParseAttempt {
   const scope = ctx.currentScope();
   const scopeLength = scope.contents.length;
   const { parsingAttrParam, nesting } = ctx;
-  const start = ctx.stream.checkpoint();
+  const start = ctx.stream.position();
   return { start, scope, scopeLength, parsingAttrParam, nesting };
 }
 
@@ -111,14 +111,14 @@ export function skipToBoundary(
 ): boolean {
   let depth = 0;
   while (true) {
-    const pos = stream.checkpoint();
+    const pos = stream.position();
     let token: WeslToken | null;
     try {
       token = stream.peek();
     } catch (e) {
       if (!(e instanceof ParseError)) throw e;
       // tokenizer error (e.g. invalid character); the stream advanced past it
-      if (stream.checkpoint() === pos) return false; // can't advance; give up
+      if (stream.position() === pos) return false; // can't advance; give up
       continue;
     }
     if (token === null) return false;

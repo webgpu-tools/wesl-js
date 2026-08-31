@@ -161,5 +161,9 @@ test("regression: a normal fn named do_something is unaffected", async () => {
 });
 
 test("regression: do as a reserved word still errors when the extension is off", () => {
-  expect(parseErrorText("fn f() { do }")).toMatch(/Expected ';'/);
+  // `do` parses as a bare ident expression, which is no statement by itself
+  // (a `;` wouldn't fix it, so the error names the missing statement forms)
+  expect(parseErrorText("fn f() { do }")).toMatch(
+    /Expected call, assignment, or increment/,
+  );
 });

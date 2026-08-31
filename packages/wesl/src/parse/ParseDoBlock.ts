@@ -29,7 +29,7 @@ export function parseDoBlock(
   const doToken = stream.matchText("do");
   if (!doToken) return null;
 
-  const startPos = getStartWithAttributes(attributes, doToken.span[0]);
+  const startPos = getStartWithAttributes(attributes, doToken.start);
   const nameToken = expectWord(stream, "Expected identifier after 'do'");
   const name = makeNameElem(nameToken);
 
@@ -50,7 +50,7 @@ export function parseDoBlock(
     params,
     body,
     start: startPos,
-    end: stream.checkpoint(),
+    end: stream.position(),
   };
   attachAttributes(doBlock, attributes);
   return doBlock;

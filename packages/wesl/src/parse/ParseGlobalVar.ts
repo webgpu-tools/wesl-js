@@ -33,7 +33,7 @@ export function parseGlobalVarDecl(
   const varToken = stream.matchText("var");
   if (!varToken) return null;
 
-  const startPos = getStartWithAttributes(attributes, varToken.span[0]);
+  const startPos = getStartWithAttributes(attributes, varToken.start);
   ctx.pushScope("partial");
 
   const template = parseTemplateList(ctx);
@@ -70,7 +70,7 @@ export function parseAliasDecl(
   const aliasToken = stream.matchText("alias");
   if (!aliasToken) return null;
 
-  const startPos = getStartWithAttributes(attributes, aliasToken.span[0]);
+  const startPos = getStartWithAttributes(attributes, aliasToken.start);
 
   const nameToken = expectWord(stream, "Expected identifier after 'alias'");
 
@@ -108,7 +108,7 @@ export function parseConstAssert(
   const assertToken = ctx.stream.matchText("const_assert");
   if (!assertToken) return null;
 
-  const startPos = getStartWithAttributes(attributes, assertToken.span[0]);
+  const startPos = getStartWithAttributes(attributes, assertToken.start);
   const expression = expectExpression(ctx);
   expect(ctx.stream, ";", "const_assert expression");
 

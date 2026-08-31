@@ -205,8 +205,8 @@ function parseParenExpr(
   if (!expression) throwParseError(stream, "Expected expression after '('");
 
   const close = expect(stream, ")", "expression");
-  const start = open.span[0];
-  const end = close.span[1];
+  const start = open.start;
+  const end = close.end;
   return { kind: "parenthesized-expression", expression, start, end };
 }
 
@@ -237,7 +237,7 @@ function parseTemplateElaboratedIdent(
     name: refIdent.ident,
     templateParams,
     start: refIdent.start,
-    end: ctx.stream.checkpoint(),
+    end: ctx.stream.position(),
   };
 }
 
@@ -295,5 +295,5 @@ function parseIndexAccess(
   const indexExpr = parseExpression(ctx);
   if (!indexExpr) throwParseError(stream, "Expected expression in array index");
   const closeBracket = expect(stream, "]", "array index");
-  return makeComponentExpression(base, indexExpr, closeBracket.span[1]);
+  return makeComponentExpression(base, indexExpr, closeBracket.end);
 }

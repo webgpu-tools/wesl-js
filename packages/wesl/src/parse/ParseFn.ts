@@ -37,7 +37,7 @@ export function parseFnDecl(
   const fnToken = stream.matchText("fn");
   if (!fnToken) return null;
 
-  const startPos = getStartWithAttributes(attributes, fnToken.span[0]);
+  const startPos = getStartWithAttributes(attributes, fnToken.start);
   const nameToken = expectWord(stream, "Expected identifier after 'fn'");
   const declIdentElem = createDeclIdentElem(ctx, nameToken, true);
   ctx.saveIdent(declIdentElem.ident);
@@ -69,7 +69,7 @@ export function parseFnDecl(
     returnType,
     returnAttributes,
     start: startPos,
-    end: stream.checkpoint(),
+    end: stream.position(),
   };
   attachAttributes(fnElem, attributes);
   linkDeclIdentElem(declIdentElem, fnElem);

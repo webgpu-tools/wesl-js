@@ -37,7 +37,7 @@ function parseImportStatement(ctx: ParsingContext): ImportElem | null {
 
   const { statement: imports, importPos } = parseResult;
   const start = condAttr?.start ?? importPos;
-  const end = stream.checkpoint();
+  const end = stream.position();
   const attributes = condAttr ? [condAttr] : undefined;
   return { kind: "import", imports, start, end, attributes };
 }
@@ -60,7 +60,7 @@ function parseImportStatementBase(
   const statement = isStatement
     ? prependSegments(relative, parsed)
     : makeStatement(relative, parsed);
-  return { statement, importPos: importToken.span[0] };
+  return { statement, importPos: importToken.start };
 }
 
 /** WESL Grammar: import_relative : 'package' '::' | 'super' '::' ('super' '::')* */

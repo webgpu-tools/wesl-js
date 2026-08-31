@@ -20,14 +20,17 @@ import {
   expectWord,
   makeNameElem,
   parseCommaList,
-  parseMany,
+  parseManyEager,
   throwParseError,
 } from "./ParseUtil.ts";
 import type { ParsingContext } from "./ParsingContext.ts";
 
 /** Grammar: attribute * */
 export function parseAttributeList(ctx: ParsingContext): AttributeElem[] {
-  return [...parseMany(ctx, parseAttribute)];
+  // perf, not semantics: parseManyEager returns [] here anyway, but this runs
+  // before every statement and declaration and most have no attributes
+  if (ctx.stream.peek()?.text !== "@") return [];
+  return parseManyEager(ctx, parseAttribute);
 }
 
 /** WESL Grammar: if_attribute : '@if' '(' translate_time_expression ')' */
@@ -53,18 +56,15 @@ export function parseWeslConditional(
   const { stream } = ctx;
   const peeked = stream.peek();
   if (peeked?.text !== "@") return null;
-  const startPos = peeked.span[0]; // Use token position, not stream checkpoint
+  // start at the '@' token, not at the stream cursor: the cursor sits before
+  // any leading comments, which would then land inside the elem's span and be
+  // lost to AttachComments rather than attached to it
+  const startPos = peeked.start;
 
-  const ifAttr = parseIfAttribute(ctx);
-  if (ifAttr) return attributeElem(ifAttr, startPos, stream.checkpoint());
-
-  const elifAttr = parseElifAttribute(ctx);
-  if (elifAttr) return attributeElem(elifAttr, startPos, stream.checkpoint());
-
-  const elseAttr = parseElseAttribute(ctx);
-  if (elseAttr) return attributeElem(elseAttr, startPos, stream.checkpoint());
-
-  return null;
+  const attr =
+    parseIfAttribute(ctx) ?? parseElifAttribute(ctx) ?? parseElseAttribute(ctx);
+  if (!attr) return null;
+  return attributeElem(attr, startPos, stream.position());
 }
 
 /**
@@ -89,7 +89,7 @@ function parseConditionalAttribute<T>(
   makeAttr: (expr: TranslateTimeExpressionElem) => T,
 ): T | null {
   const { stream } = ctx;
-  const startPos = stream.checkpoint();
+  const startPos = stream.position();
   if (!stream.matchSequence("@", keyword)) return null;
 
   expect(stream, "(", `@${keyword}`);
@@ -106,7 +106,7 @@ function parseConditionalAttribute<T>(
     kind: "translate-time-expression",
     expression: expr,
     start: startPos,
-    end: stream.checkpoint(),
+    end: stream.position(),
   };
   return makeAttr(translateTimeExpr);
 }
@@ -136,7 +136,9 @@ function parseStandardAttribute(ctx: ParsingContext): AttributeElem | null {
   const { stream } = ctx;
   const atToken = stream.matchText("@");
   if (!atToken) return null;
-  const startPos = atToken.span[0]; // Use actual @ position, not before whitespace
+  // the '@' itself, not the cursor before it: leading comments must stay
+  // outside the elem's span (see parseWeslConditional)
+  const startPos = atToken.start;
 
   // `@` can begin nothing but an attribute, so a bad name is a hard error here.
   // Backtracking would instead surface a mispointed error at the caller, and in
@@ -165,12 +167,12 @@ function parseStandardAttribute(ctx: ParsingContext): AttributeElem | null {
   if (name === "must_use" && params !== undefined) {
     throw new ParseError("@must_use does not accept parameters", [
       startPos,
-      stream.checkpoint(),
+      stream.position(),
     ]);
   }
 
   const stdAttr: StandardAttribute = { kind: "@attribute", name, params };
-  return attributeElem(stdAttr, startPos, stream.checkpoint());
+  return attributeElem(stdAttr, startPos, stream.position());
 }
 
 function parseBuiltinAttribute(
@@ -188,7 +190,7 @@ function parseBuiltinAttribute(
     param: makeNameElem(nameToken),
   };
 
-  return attributeElem(builtinAttr, startPos, stream.checkpoint());
+  return attributeElem(builtinAttr, startPos, stream.position());
 }
 
 function parseInterpolateAttribute(
@@ -204,7 +206,7 @@ function parseInterpolateAttribute(
     kind: "@interpolate",
     params,
   };
-  return attributeElem(interpolateAttr, startPos, stream.checkpoint());
+  return attributeElem(interpolateAttr, startPos, stream.position());
 }
 
 /** @diagnostic(severity, rule) or @diagnostic(severity, namespace.rule) */
@@ -234,7 +236,7 @@ function parseDiagnosticAttribute(
 
   const kind = "@diagnostic";
   const diagnosticAttr: DiagnosticAttribute = { kind, severity, rule };
-  return attributeElem(diagnosticAttr, startPos, stream.checkpoint());
+  return attributeElem(diagnosticAttr, startPos, stream.position());
 }
 
 /** Parse attribute params as expressions to capture identifier refs. */
@@ -249,8 +251,8 @@ function parseNameElem(ctx: ParsingContext): NameElem {
 
 function parseAttrParam(ctx: ParsingContext): UnknownExpressionElem {
   const { stream } = ctx;
-  const start = stream.checkpoint();
+  const start = stream.position();
   const expression = parseExpression(ctx);
   if (!expression) throwParseError(stream, "Expected attribute parameter");
-  return { kind: "expression", expression, start, end: stream.checkpoint() };
+  return { kind: "expression", expression, start, end: stream.position() };
 }

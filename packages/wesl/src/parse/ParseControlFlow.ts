@@ -128,12 +128,12 @@ function parseElseBody(
   const condition = expectExpression(ctx, msg);
   const body = expectCompound(ctx, "Expected '{' after else if");
   const elseBranch = parseElseChain(ctx);
-  const end = stream.checkpoint();
+  const end = stream.position();
 
   // Start at the 'else' keyword, not the pre-keyword position, so a comment
   // before 'else if' falls in the gap and leads the branch (matches
   // beginStatement); otherwise the nested if swallows it.
-  const start = elseToken.span[0];
+  const start = elseToken.start;
   return { kind: "if", condition, body, else: elseBranch, start, end };
 }
 
@@ -149,7 +149,7 @@ function parseSwitchClause(ctx: ParsingContext): SwitchClauseElem {
   }
   // The clause start is the keyword token, not any leading comment, so a
   // preceding comment falls in the gap before it and attaches as leading.
-  const clauseStart = getStartWithAttributes(attrs, keyword.span[0]);
+  const clauseStart = getStartWithAttributes(attrs, keyword.start);
 
   let selectors: (ExpressionElem | "default")[];
   let body: BlockElem;

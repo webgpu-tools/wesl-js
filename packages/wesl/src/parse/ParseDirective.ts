@@ -22,7 +22,7 @@ import type { WeslStream, WeslToken } from "./WeslStream.ts";
 /** Grammar: global_directive : diagnostic_directive | enable_directive | requires_directive */
 export function parseDirective(ctx: ParsingContext): DirectiveElem | null {
   const { stream } = ctx;
-  const startPos = stream.checkpoint();
+  const startPos = stream.position();
   const attrs = attrsOrUndef(parseAttributeList(ctx));
 
   const result =
@@ -98,8 +98,8 @@ function makeDirectiveElem(
   stream: WeslStream,
   attributes?: AttributeElem[],
 ): DirectiveElem {
-  const start = getStartWithAttributes(attributes, token.span[0]);
-  const end = stream.checkpoint();
+  const start = getStartWithAttributes(attributes, token.start);
+  const end = stream.position();
   const elem: DirectiveElem = { kind: "directive", directive, start, end };
   attachAttributes(elem, attributes);
   return elem;

@@ -5,6 +5,7 @@ import type {
   GlobalDeclarationElem,
   ModuleElem,
 } from "../AbstractElems.ts";
+import { findConditional } from "../Conditions.ts";
 import { type Diagnostic, errorDiagnostic } from "../Diagnostics.ts";
 import { declsOfKind } from "../LinkerUtil.ts";
 import { ParseError } from "../ParseError.ts";
@@ -28,7 +29,6 @@ import {
 import { parseStructDecl } from "./ParseStruct.ts";
 import {
   attrsOrUndef,
-  conditionalAttribute,
   hasConditionalAttribute,
   parseMany,
   throwParseError,
@@ -131,7 +131,7 @@ function parseHeader(ctx: ParsingContext): void {
       recoverAtDeclBoundary(ctx, e, attempt);
       // no forward progress: give up on the header (defensive; tokenizer
       // errors always advance the stream, so this looks unreachable)
-      if (stream.checkpoint() === attempt.start) return;
+      if (stream.position() === attempt.start) return;
     }
   }
 }
@@ -150,7 +150,7 @@ function parseDeclarations(ctx: ParsingContext): void {
     } catch (e) {
       if (!(e instanceof ParseError)) throw e;
       recoverAtDeclBoundary(ctx, e, attempt);
-      if (stream.checkpoint() === attempt.start) return; // wedged (unlexable input); give up
+      if (stream.position() === attempt.start) return; // wedged (unlexable input); give up
     }
   }
 }
@@ -217,7 +217,12 @@ function parseNextDeclaration(ctx: ParsingContext): boolean {
   if (hasConditional) ctx.pushScope("partial");
 
   const parsed = parseDecl(ctx, attrs);
-  if (hasConditional && parsed) finalizeConditional(ctx, attrs);
+  // Always pop the partial scope we pushed, even on the no-match path, so the
+  // scope stack stays balanced; only a parsed declaration gets the condition.
+  if (hasConditional) {
+    const partialScope = ctx.popScope();
+    if (parsed) partialScope.condAttribute = findConditional(attrs);
+  }
 
   if (parsed) return true;
   if (attrs.length)
@@ -249,15 +254,6 @@ function parseDecl(ctx: ParsingContext, attrs: AttributeElem[]): boolean {
   if (!elem) return false;
   recordDecl(ctx, elem, attrs);
   return true;
-}
-
-/** Pop conditional scope and attach the conditional attribute. */
-function finalizeConditional(
-  ctx: ParsingContext,
-  attrs: AttributeElem[],
-): void {
-  const partialScope = ctx.popScope();
-  partialScope.condAttribute = conditionalAttribute(attrs);
 }
 
 /** Record a parsed declaration, extending start to include attributes. */
