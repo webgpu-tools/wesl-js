@@ -26,6 +26,8 @@ export interface RecordResolverOptions {
   debugWeslRoot?: string;
   /** Enable experimental, not-yet-spec'd syntax extensions while parsing. */
   weslExtensions?: WeslExtensions;
+  /** Preserve source comments through linking (default true). */
+  keepComments?: boolean;
 }
 
 const libRegex = /^lib\.w[eg]sl$/i;
@@ -37,6 +39,7 @@ export class RecordResolver implements BatchModuleResolver {
   readonly packageName: string;
   readonly debugWeslRoot: string;
   readonly weslExtensions?: WeslExtensions;
+  readonly keepComments?: boolean;
 
   constructor(
     sources: Record<string, string>,
@@ -47,6 +50,7 @@ export class RecordResolver implements BatchModuleResolver {
     this.packageName = packageName;
     this.debugWeslRoot = normalizeDebugRoot(debugWeslRoot);
     this.weslExtensions = weslExtensions;
+    this.keepComments = options.keepComments;
   }
 
   resolveModule(modulePath: string): WeslAST | undefined {
@@ -59,7 +63,7 @@ export class RecordResolver implements BatchModuleResolver {
     const debugFilePath = this.modulePathToDebugPath(modulePath);
     const ast = parseSrcModule(
       { modulePath, debugFilePath, src: source },
-      { weslExtensions: this.weslExtensions },
+      { weslExtensions: this.weslExtensions, keepComments: this.keepComments },
     );
     this.astCache.set(modulePath, ast);
     return ast;
@@ -121,11 +125,18 @@ export class BundleResolver implements ModuleResolver {
   private readonly sources: Record<string, string>;
   private readonly packageName: string;
   private readonly debugWeslRoot: string;
+  /** Preserve source comments while parsing (default true). */
+  private readonly keepComments?: boolean;
 
-  constructor(bundle: WeslBundle, debugWeslRoot?: string) {
+  constructor(
+    bundle: WeslBundle,
+    debugWeslRoot?: string,
+    keepComments?: boolean,
+  ) {
     this.sources = bundle.modules;
     this.packageName = bundle.name;
     this.debugWeslRoot = normalizeDebugRoot(debugWeslRoot);
+    this.keepComments = keepComments;
   }
 
   resolveModule(modulePath: string): WeslAST | undefined {
@@ -141,7 +152,10 @@ export class BundleResolver implements ModuleResolver {
     if (!source) return undefined;
 
     const debugFilePath = this.modulePathToDebugPath(modulePath);
-    const ast = parseSrcModule({ modulePath, debugFilePath, src: source });
+    const ast = parseSrcModule(
+      { modulePath, debugFilePath, src: source },
+      { keepComments: this.keepComments },
+    );
     this.astCache.set(modulePath, ast);
     return ast;
   }
@@ -178,13 +192,17 @@ export function composeResolvers(
   return defined.length === 1 ? defined[0] : new CompositeResolver(defined);
 }
 
-/** Create resolvers for library bundles and their transitive dependencies. */
+/** Create resolvers for library bundles and their transitive dependencies.
+ * keepComments defaults to true, and applies to every bundle parsed here. */
 export function createLibraryResolvers(
   libs: WeslBundle[],
   debugWeslRoot?: string,
+  keepComments?: boolean,
 ): BundleResolver[] {
   const flattened = flattenLibraryTree(libs);
-  return flattened.map(lib => new BundleResolver(lib, debugWeslRoot));
+  return flattened.map(
+    lib => new BundleResolver(lib, debugWeslRoot, keepComments),
+  );
 }
 
 /** Convert file path to module path (e.g., "foo/bar.wesl" to "package::foo::bar"). */

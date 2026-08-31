@@ -96,6 +96,19 @@ export interface LinkParams {
    * Only applied to the local source resolver built from `weslSrc`; callers
    * that supply their own `resolver` must set it on that resolver. */
   weslExtensions?: WeslExtensions;
+
+  /** preserve source comments in the emitted WGSL (default true).
+   * false skips comment recording and attachment during parsing, a useful
+   * speedup for runtime linking where output comments don't matter.
+   * Applies to every resolver link() builds itself (`weslSrc`, `libs`, and
+   * `virtualLibs`; `constants` sources never contain comments); callers that
+   * supply their own `resolver` set it there. */
+  keepComments?: boolean;
+
+  /** record source-map positions for the emitted WGSL (default true).
+   * false skips position recording: LinkedWesl.dest is unaffected, but
+   * sourceMap entries will be empty (errors won't map back to WESL source). */
+  sourceMap?: boolean;
 }
 
 /** Project config for web components and tools. */
@@ -116,7 +129,7 @@ export type WeslProject = Pick<
 export interface LinkRegistryParams
   extends Pick<
     LinkParams,
-    "rootModuleName" | "conditions" | "config" | "mangler"
+    "rootModuleName" | "conditions" | "config" | "mangler" | "sourceMap"
   > {
   resolver: ModuleResolver;
 }
@@ -159,32 +172,27 @@ export async function linkWithResolver(
 export function _linkSync(params: LinkParams): SrcMap {
   const { weslSrc, libs = [], packageName, debugWeslRoot, resolver } = params;
   const { weslExtensions, virtualLibs, constants, conditions = {} } = params;
-  const { rootModuleName = "main" } = params;
+  const { rootModuleName = "main", keepComments } = params;
 
   if (!resolver && !weslSrc) {
     throw new Error("Either resolver or weslSrc must be provided");
   }
-  const primaryResolver =
-    resolver ??
-    new RecordResolver(weslSrc!, {
-      packageName,
-      debugWeslRoot,
-      weslExtensions,
-    });
+  const options = { packageName, debugWeslRoot, weslExtensions, keepComments };
+  const primaryResolver = resolver ?? new RecordResolver(weslSrc!, options);
 
   // virtual modules resolve last, and constants shadow a virtualLib named 'constants'
   const rootModulePath = normalizeModuleName(rootModuleName);
   const hostPackage = rootModulePath.split("::")[0];
   const finalResolver = composeResolvers(
     primaryResolver,
-    ...createLibraryResolvers(libs, debugWeslRoot),
+    ...createLibraryResolvers(libs, debugWeslRoot, keepComments),
     constants && createConstantsResolver(constants, hostPackage),
     virtualLibs &&
-      createVirtualLibraryResolver(virtualLibs, {
-        conditions,
-        rootModulePath,
-        packageName: hostPackage,
-      }),
+      createVirtualLibraryResolver(
+        virtualLibs,
+        { conditions, rootModulePath, packageName: hostPackage },
+        keepComments,
+      ),
   );
 
   return linkRegistry({ ...params, resolver: finalResolver });
@@ -211,6 +219,7 @@ export function linkRegistry(params: LinkRegistryParams): SrcMap {
     newStatements,
     ast.bindings,
     params.conditions,
+    params.sourceMap !== false,
   );
   return SrcMapBuilder.build(builders);
 }
@@ -259,6 +268,7 @@ function emitWgsl(
   newStatements: EmittableElem[],
   bindings: LinkBindings,
   conditions: Conditions = {},
+  sourceMap = true,
 ): SrcMapBuilder[] {
   const [directives, statements] = partition(
     newStatements,
@@ -272,11 +282,12 @@ function emitWgsl(
     emitElem(s.srcModule, s.elem, conditions, bindings, {
       addNl: true,
       skipConditionalFiltering: true,
+      sourceMap,
     });
   const directiveBuilders = hoisted.map(emitStatement);
   const statementBuilders = statements.map(emitStatement);
 
-  const rootBuilder = builderFromModule(srcModule);
+  const rootBuilder = builderFromModule(srcModule, sourceMap);
   lowerAndEmit({
     srcBuilder: rootBuilder,
     rootElems: [rootModuleElem],
@@ -288,6 +299,7 @@ function emitWgsl(
   const declBuilders = newDecls.map(decl =>
     emitElem(decl.srcModule, decl.declElem!, conditions, bindings, {
       skipConditionalFiltering: true,
+      sourceMap,
     }),
   );
 
@@ -338,9 +350,13 @@ function emitElem(
   elem: AbstractElem,
   conditions: Conditions,
   bindings: LinkBindings,
-  opts: { addNl?: boolean; skipConditionalFiltering?: boolean } = {},
+  opts: {
+    addNl?: boolean;
+    skipConditionalFiltering?: boolean;
+    sourceMap?: boolean;
+  } = {},
 ): SrcMapBuilder {
-  const builder = builderFromModule(srcModule);
+  const builder = builderFromModule(srcModule, opts.sourceMap !== false);
   lowerAndEmit({
     srcBuilder: builder,
     rootElems: [elem],
@@ -352,11 +368,14 @@ function emitElem(
   return builder;
 }
 
-function builderFromModule(srcModule: SrcModule): SrcMapBuilder {
-  return new SrcMapBuilder({
-    text: srcModule.src,
-    path: srcModule.debugFilePath,
-  });
+/** A builder for output emitted from srcModule.
+ *  trackPositions false emits the text without recording source positions. */
+function builderFromModule(
+  srcModule: SrcModule,
+  trackPositions = true,
+): SrcMapBuilder {
+  const src = { text: srcModule.src, path: srcModule.debugFilePath };
+  return new SrcMapBuilder(src, trackPositions);
 }
 
 /*
