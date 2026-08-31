@@ -98,6 +98,7 @@ function structuralFields(elem: AbstractElem): AbstractElem[] {
       return [
         elem.name,
         ...elem.params,
+        ...(elem.returnAttributes ?? []),
         ...(elem.returnType ? [elem.returnType] : []),
         elem.body,
       ];

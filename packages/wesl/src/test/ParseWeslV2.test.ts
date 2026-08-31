@@ -1194,6 +1194,7 @@ test("parse @location", () => {
             decl %pos
             type vec4f
               ref vec4f
+        attribute @location(literal literal(0))
         type vec4f
           ref vec4f
         block
