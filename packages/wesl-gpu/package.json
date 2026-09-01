@@ -1,7 +1,7 @@
 {
   "name": "wesl-gpu",
   "description": "Browser-compatible WebGPU utilities for shader testing and rendering",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "type": "module",
   "files": [
     "dist",
