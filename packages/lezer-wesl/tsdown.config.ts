@@ -4,4 +4,5 @@ export default defineConfig({
   clean: true,
   platform: "neutral",
   logLevel: "warn",
+  dts: true,
 });
