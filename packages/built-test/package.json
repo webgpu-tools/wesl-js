@@ -15,6 +15,7 @@
     "typecheck:node": "tsgo --project tsconfig.node.json"
   },
   "dependencies": {
+    "lezer-wesl": "workspace:*",
     "wesl": "workspace:*",
     "wesl-gpu": "workspace:*",
     "wesl-link": "workspace:*",

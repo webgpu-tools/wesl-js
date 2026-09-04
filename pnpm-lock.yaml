@@ -329,6 +329,9 @@ importers:
 
   packages/built-test:
     dependencies:
+      lezer-wesl:
+        specifier: workspace:*
+        version: link:../lezer-wesl
       wesl:
         specifier: workspace:*
         version: link:../wesl

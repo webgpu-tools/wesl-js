@@ -5,7 +5,8 @@
 
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { expect, test } from "vitest";
+import { parser, weslHighlighting } from "lezer-wesl";
+import { expect, expectTypeOf, test } from "vitest";
 import { link } from "wesl";
 import linkParams from "../shaders/main.wesl?link";
 
@@ -16,6 +17,16 @@ test("verify link() function works with built packages", async () => {
   const wgsl = result.dest;
   expect(wgsl).toContain("fn add");
   expect(wgsl).toContain("fn compute");
+});
+
+// lezer-wesl ships a hand-written parser.d.ts for its generated parser.js;
+// this guards both that the published declarations resolve (the browser
+// typecheck below, skipLibCheck off) and that parser hasn't degraded to any.
+test("lezer-wesl parser and highlighting work with built packages", () => {
+  expectTypeOf(parser).not.toBeAny();
+  expectTypeOf(weslHighlighting).not.toBeAny();
+  const tree = parser.parse("fn main() { let x = 1; }");
+  expect(tree.toString()).toContain("FunctionDeclaration");
 });
 
 const externalTest = process.cwd().endsWith("temp-built-test");
@@ -46,6 +57,7 @@ test.skipIf(!externalTest)("typecheck a browser side consumer", () => {
 
 // All published packages - check for TypeScript exports (Node.js can't run .ts in node_modules)
 const packagesToCheck = [
+  "lezer-wesl",
   "wesl",
   "wesl-gpu",
   "wesl-link",
