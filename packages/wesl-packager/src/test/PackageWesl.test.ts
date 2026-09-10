@@ -106,6 +106,39 @@ test("error if the package name isn't usable in shader code", async () => {
   }
 });
 
+test("import a scoped npm dependency with a valid js identifier", async () => {
+  const workDir = await fs.mkdtemp(path.join(tmpdir(), "wesl-packager-dep-"));
+  try {
+    const depDir = path.join(workDir, "node_modules", "@scope", "my-pkg");
+    await mkdir(depDir, { recursive: true });
+    await mkdir(path.join(workDir, "shaders"));
+    const pkgJson = `{ "name": "app_pkg", "private": true }\n`;
+    const depPkgJson = `{ "name": "@scope/my-pkg", "exports": "./dist/weslBundle.js" }\n`;
+    await fs.writeFile(path.join(workDir, "package.json"), pkgJson);
+    await fs.writeFile(path.join(depDir, "package.json"), depPkgJson);
+    const shader = "import scope__my_pkg::foo;\nfn main() { foo(); }\n";
+    await fs.writeFile(path.join(workDir, "shaders", "main.wesl"), shader);
+
+    const distDir = path.join(workDir, "dist");
+    await packageCli(
+      `--projectDir ${workDir}
+       --baseDir ${workDir}/shaders
+       --src ${workDir}/shaders/*.wesl
+       --updatePackageJson false
+       --outDir ${distDir}`,
+    );
+
+    const contents = await readFile(
+      path.join(distDir, "weslBundle.js"),
+      "utf8",
+    );
+    expect(contents).toContain(`import scope__my_pkg from "@scope/my-pkg";`);
+    expect(contents).toContain("dependencies: [scope__my_pkg]");
+  } finally {
+    await rimraf(workDir);
+  }
+});
+
 function packageCli(argsLine: string): Promise<void> {
   return packagerCli(argsLine.split(/\s+/));
 }

@@ -136,9 +136,7 @@ async function writeJsBundle(
 ): Promise<void> {
   await mkdir(outDir, { recursive: true });
 
-  const depNames = dependencies.map(dep =>
-    dep.replaceAll("/", "_").replaceAll("@", ""),
-  );
+  const depNames = dependencies.map(sanitizePackageName);
   const depsWithNames = zip(dependencies, depNames);
 
   const imports = depsWithNames
