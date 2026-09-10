@@ -1,7 +1,7 @@
 {
   "name": "wesl-plugin",
   "description": "",
-  "version": "0.6.80",
+  "version": "0.6.81",
   "type": "module",
   "files": [
     "src",
