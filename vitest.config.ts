@@ -5,6 +5,7 @@ export default defineProject({
     projects: [
       "packages/*",
       "packages/wesl-plugin/test/*",
+      "!packages/**/.claude",
       "!packages/wgsl-studio", // uses vscode-test, not vitest
     ],
     exclude: ["_baseline/**"],
