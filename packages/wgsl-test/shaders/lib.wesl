@@ -27,10 +27,15 @@ fn expectEq(actual: u32, expected: u32) {
   }
 }
 
+fn containsNan(values: vec4f) -> bool {
+  let magnitudeBits = bitcast<vec4u>(values) & vec4u(0x7fffffffu);
+  return any(magnitudeBits > vec4u(0x7f800000u));
+}
+
 fn expectWithin(actual: f32, expected: f32, relTol: f32, absTol: f32) {
   let diff = abs(actual - expected);
   let tolerance = max(absTol, relTol * max(abs(actual), abs(expected)));
-  if (diff > tolerance) {
+  if (diff > tolerance || containsNan(vec4f(actual, expected, 0.0, 0.0))) {
     recordFailure(vec4f(actual, 0.0, 0.0, 0.0), vec4f(expected, 0.0, 0.0, 0.0));
   }
 }
@@ -42,7 +47,7 @@ fn expectNear(actual: f32, expected: f32) {
 fn expectWithinVec2(actual: vec2f, expected: vec2f, relTol: f32, absTol: f32) {
   let diff = abs(actual - expected);
   let tolerance = max(vec2f(absTol), relTol * max(abs(actual), abs(expected)));
-  if (any(diff > tolerance)) {
+  if (any(diff > tolerance) || containsNan(vec4f(actual, expected))) {
     recordFailure(vec4f(actual, 0.0, 0.0), vec4f(expected, 0.0, 0.0));
   }
 }
@@ -54,7 +59,7 @@ fn expectNearVec2(actual: vec2f, expected: vec2f) {
 fn expectWithinVec3(actual: vec3f, expected: vec3f, relTol: f32, absTol: f32) {
   let diff = abs(actual - expected);
   let tolerance = max(vec3f(absTol), relTol * max(abs(actual), abs(expected)));
-  if (any(diff > tolerance)) {
+  if (any(diff > tolerance) || containsNan(vec4f(actual, 0.0)) || containsNan(vec4f(expected, 0.0))) {
     recordFailure(vec4f(actual, 0.0), vec4f(expected, 0.0));
   }
 }
@@ -66,7 +71,7 @@ fn expectNearVec3(actual: vec3f, expected: vec3f) {
 fn expectWithinVec4(actual: vec4f, expected: vec4f, relTol: f32, absTol: f32) {
   let diff = abs(actual - expected);
   let tolerance = max(vec4f(absTol), relTol * max(abs(actual), abs(expected)));
-  if (any(diff > tolerance)) {
+  if (any(diff > tolerance) || containsNan(actual) || containsNan(expected)) {
     recordFailure(actual, expected);
   }
 }

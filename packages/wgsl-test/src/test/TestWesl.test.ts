@@ -44,6 +44,13 @@ test("failing test with expectNear() reports actual and expected", async () => {
   expect(results[0].expected?.[0]).toBeCloseTo(2.0);
 });
 
+test("tolerance assertions reject NaN", async () => {
+  const src = loadFixture("nan_within.wesl");
+  const results = await runWesl({ device, src });
+  expect(results[0].passed).toBe(false);
+  expect(results[0].failCount).toBe(8);
+});
+
 test("failing assertion values survive later passing assertions", async () => {
   const src = loadFixture("first_failure.wesl");
   const results = await runWesl({ device, src });
